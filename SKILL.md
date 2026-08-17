@@ -13,20 +13,41 @@ Repo Governor answers one question — *is this work currently authorized, and w
 
 A TODO, a `READY` task, a new dependency release, an unused-looking module, a green build — each is *evidence*. None is permission.
 
+## Where to run it
+
+**Stand in the repository you are governing. Invoke the engine by its full path.**
+
+The engine governs the repository you are standing in, not the directory it lives in — so `cd`-ing into this skill to make a relative path work would govern the skill instead of your repository. That is a real defect this project shipped and fixed (ADR-027, `Proposed` — the behaviour ships, the decision is not yet ratified); do not recreate it.
+
+You need the skill's own location. Take it, in this order:
+
+1. the base directory your host gave you when it loaded this skill — most hosts state it;
+2. the directory this `SKILL.md` was read from;
+3. failing both, **ask**. Do not guess a path, and do not `cd` here to avoid the question.
+
+```bash
+RG=/path/to/repo-governor          # the skill's directory, from above
+cd /path/to/the/repository/you/are/governing
+```
+
+Every command below assumes `$RG` is set and that you are standing in the target repository.
+
 ## Before anything else
 
 ```bash
-python3 engine/manifest.py            # is this repository governed?
+python3 "$RG/engine/manifest.py"            # is this repository governed?
 ```
 
 - **`MANIFEST VALID`** → governed. Continue.
-- **`AUTHORITY_SOURCE_MISSING`** → not onboarded. Run `python3 engine/onboard.py .` and stop; binding requires a human.
+- **`AUTHORITY_SOURCE_MISSING`** → not onboarded. It names the path it looked in — check that it is the repository you meant. Run `python3 "$RG/engine/onboard.py" .` and stop; binding requires a human.
 - **`MANIFEST INVALID`** → refuse to evaluate. Report the errors. Do not guess.
+
+A GitHub-backed role must declare its repository in the manifest binding — `env.REPO_GOVERNOR_GH_REPO` — because identity is never defaulted (ADR-028, `Proposed`). An adapter that cannot tell which repository it is reading refuses rather than guessing.
 
 ## Ask the engine
 
 ```bash
-python3 engine/completion.py <work-id>
+python3 "$RG/engine/completion.py" <work-id>
 ```
 
 Returns JSON with a `decision`. Obey it:
@@ -57,12 +78,12 @@ Anything you notice that is not the authorized work — a possible feature, a bu
 
 `CAPTURE_ONLY` is the default and is a complete, correct outcome. Promoting a discovery requires separate admission through the roadmap provider.
 
-**This one is on you, not on the engine.** The discovery path is specified (ADR-014) and not implemented: no engine module emits `CAPTURE_ONLY`, and `engine/completion.py` governs the completion axis only. Until it is built, INV-001 is a rule you follow rather than a rule the engine enforces — so do not read a clean `completion.py` run as clearance to act on something you discovered.
+**This one is on you, not on the engine.** The discovery path is specified (ADR-024, held `Proposed`) and not implemented: no engine module emits `CAPTURE_ONLY`, and `completion.py` governs the completion axis only. Until it is built, INV-001 is a rule you follow rather than a rule the engine enforces — so do not read a clean `completion.py` run as clearance to act on something you discovered.
 
 ## Before deleting anything
 
 ```bash
-python3 adapters/retirement-analysis query retirement obligation_check asset=<path>
+python3 "$RG/engine/retirement.py" <path>
 ```
 
 `REMOVAL_READY` requires every obligation dimension resolved and clear. Static analysis alone **can never reach it** — dynamic loading, runtime usage, public contracts and migration obligations are invisible to grep and return as blocking unknowns. A `RETIREMENT_REVIEW` on an asset with zero references is the correct, expected result, not a false positive.
@@ -70,14 +91,14 @@ python3 adapters/retirement-analysis query retirement obligation_check asset=<pa
 ## Onboarding a repository
 
 ```bash
-python3 engine/onboard.py <path>            # assess condition, detect candidates
-python3 engine/onboard.py <path> --write    # write .repo-governor.proposed.json
+python3 "$RG/engine/onboard.py" <path>            # assess condition, detect candidates
+python3 "$RG/engine/onboard.py" <path> --write    # write .repo-governor.proposed.json
 ```
 
 Detection **proposes**. It never binds. Promoting the proposal to `.repo-governor.json` is a human action, and the engine never reads the proposal file. Two candidates for a single-valued role produce `PROVIDER_CONFLICT` and onboarding halts — no ranking is applied, because any automatic tie-break would silently confer authority.
 
 ```bash
-python3 engine/manifest.py --validate       # do bound adapters satisfy their declared contracts?
+python3 "$RG/engine/manifest.py" --validate       # do bound adapters satisfy their declared contracts?
 ```
 
 ## Load these only when you need them

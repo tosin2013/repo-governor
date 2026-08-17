@@ -94,6 +94,9 @@ REASONS = {
     # retirement — blocking: unresolved obligations must never permit removal
     "NOT_VISIBLE_TO_STATIC_ANALYSIS": ("retirement", True,
                                        "Dynamic loading, runtime usage or public contracts are invisible to grep."),
+    "NO_RETIREMENT_EVIDENCE":        ("retirement", True,
+                                      "No retirement provider is bound, so nothing was checked. "
+                                      "Nothing checked must never read as nothing owed."),
 
     # change signals — non-blocking: a signal is not work (INV-006)
     "IMPACT_NOT_ASSESSED":           ("change_signals", False,
@@ -104,6 +107,9 @@ REASONS = {
                                       "The bound provider could not be reached."),
     "TRANSPORT_UNCONFIGURED":        ("provider", True,
                                       "No transport is configured, so the provider advertises nothing."),
+    "MANIFEST_UNREADABLE":           ("provider", True,
+                                      "The governance manifest is missing or invalid for the repository "
+                                      "being governed, so no binding is known and nothing may be ruled."),
 }
 
 DIMENSIONS = ("authority", "acceptance", "scope", "architecture", "execution",
