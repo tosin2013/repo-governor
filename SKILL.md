@@ -109,6 +109,7 @@ python3 "$RG/engine/manifest.py" --validate       # do bound adapters satisfy th
 | `references/dispositions.md` | full disposition and unknown-reason semantics |
 | `references/providers.md` | writing an adapter, or a provider is behaving oddly |
 | `references/lifecycles.md` | admission, maintenance or retirement state machines |
+| `docs/workflows/` | prompt recipes per situation — what the human should ask, with the do-not clauses |
 | `docs/reference/` | any `§NN` citation; start at its section map |
 
 ## What this never does

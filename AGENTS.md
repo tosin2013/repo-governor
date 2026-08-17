@@ -48,6 +48,10 @@ python3 engine/retirement.py <path>
 - **Provider identity is never defaulted** ([ADR-028](docs/adrs/028-provider-identity-is-never-defaulted.md)). An adapter that cannot tell which system it is reading must fail, not guess.
 - **Fixtures live under `conformance/`, never under `.repo-governor/`**, and fixture ids name the state they demonstrate, never a real work item. Binding a fixture as a provider of record is how this project reproduced §54's oldest failure condition inside itself ([ADR-022](docs/adrs/022-repo-governor-does-not-own-roadmap-state.md)).
 
+## What to actually ask
+
+[`docs/workflows/`](docs/workflows/README.md) carries prompt recipes per situation — starting work, discoveries, dependency updates, bugs, architecture changes, retirement, finishing, roadmap maintenance. Shapes to adapt, each with an explicit "do not" clause.
+
 ## Before you commit
 
 ```bash
@@ -59,4 +63,4 @@ All suites pass on `main`. A suite that fails is a defect in your change, not a 
 
 ## Decisions
 
-`docs/adrs/` — 21 of 26 `Accepted`. **A `Proposed` ADR is not architecture you may rely on**, and the ratification review ([`RATIFICATION-v0.1.0.md`](docs/adrs/RATIFICATION-v0.1.0.md)) explains which are held and why. Changing an ADR's status means re-reading `SKILL.md` and `references/` for instructions that now contradict it.
+`docs/adrs/` is the decision ledger. **A `Proposed` ADR is not architecture you may rely on** — the ratification review ([`RATIFICATION-v0.1.0.md`](docs/adrs/RATIFICATION-v0.1.0.md)) records what is Accepted, what is held, and why. No count is repeated here on purpose: this file once said "21 of 26" after the ledger said 23, and a duplicated derivable fact eventually disagrees with its source. Read the ledger. Changing an ADR's status means re-reading `SKILL.md` and `references/` for instructions that now contradict it.

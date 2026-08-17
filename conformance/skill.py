@@ -100,6 +100,33 @@ def main():
         fails += check("an ungoverned repository yields AUTHORITY_SOURCE_MISSING naming its path",
                        "AUTHORITY_SOURCE_MISSING" in out and td in out, out[:120])
 
+    print("\nAny stated ADR count matches the ledger\n")
+
+    # A count is a duplicated derivable fact, and duplicated state eventually
+    # disagrees: AGENTS.md said "21 of 26 Accepted" after the ledger said 23,
+    # because the line predated a ratification pass and nothing recomputed it.
+    # Any "N of M Accepted"-shaped claim on the surface must match a recount
+    # of the ledger itself -- or better, not exist at all.
+    statuses = {}
+    for f in sorted((ROOT / "docs" / "adrs").glob("[0-9][0-9][0-9]-*.md")):
+        m = re.search(r"^\*\*Status\*\*:\s*(\w+)", f.read_text(), re.M)
+        st = m.group(1) if m else "UNSTATED"
+        statuses[st] = statuses.get(st, 0) + 1
+    accepted, total = statuses.get("Accepted", 0), sum(statuses.values())
+    count_docs = [("README.md", (ROOT / "README.md").read_text()),
+                  ("AGENTS.md", agents),
+                  ("docs/adrs/README.md", (ROOT / "docs" / "adrs" / "README.md").read_text())]
+    for doc, text in count_docs:
+        for m in re.finditer(r"(\d+)\s+of\s+(\d+)\s+ADRs?[^.\n]{0,40}Accepted|"
+                             r"(\d+)\s+ADRs?\s+—\s+\*\*(\d+)\s+Accepted|"
+                             r"\*\*(\d+)\s+of\s+(\d+)\s+ADRs are Accepted|"
+                             r"(\d+)\s+architectural decisions\s+\((\d+)\s+Accepted\)", text):
+            nums = [g for g in m.groups() if g]
+            claim = tuple(int(n) for n in nums)
+            ok_claim = accepted in claim and total in claim
+            fails += check(f"{doc} count claim {claim} matches ledger ({accepted} of {total})",
+                           ok_claim, f"ledger says {accepted} Accepted of {total}")
+
     print("\nThe decision index accounts for every decision\n")
 
     # A reader who finds ADR-024 and ADR-027 and nothing between has to guess
@@ -118,9 +145,22 @@ def main():
 
     print("\nThe surface does not cite decisions that have moved\n")
 
-    for doc, text in (("SKILL.md", skill), ("AGENTS.md", agents),
-                      *[(f"references/{p.name}", p.read_text())
-                        for p in sorted((ROOT / "references").glob("*.md"))]):
+    surface = [("SKILL.md", skill), ("AGENTS.md", agents),
+               *[(f"references/{p.name}", p.read_text())
+                 for p in sorted((ROOT / "references").glob("*.md"))],
+               *[(f"docs/workflows/{p.name}", p.read_text())
+                 for p in sorted((ROOT / "docs" / "workflows").glob("*.md"))]]
+
+    # The workflow pages teach humans what to ask, so they are agent surface too
+    # (issue 29's lesson: the instructions ARE the product). Same rules: no bare
+    # relative engine path a reader could copy into the wrong repository.
+    for doc, text in surface:
+        if doc.startswith("docs/workflows/"):
+            bare_wf = [ln.strip() for ln in text.splitlines()
+                       if re.search(r"python3 (engine|adapters)/", ln)]
+            fails += check(f"{doc} has no bare relative invocation", not bare_wf, str(bare_wf[:1]))
+
+    for doc, text in surface:
         for num in sorted(set(ADR_RE.findall(text))):
             st = adr_status(num)
             if st is None:
