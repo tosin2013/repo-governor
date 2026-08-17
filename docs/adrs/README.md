@@ -86,7 +86,7 @@ Questions 3 and 4 are the ones that could invalidate the product. Both should be
 | 3. Low-complexity repos need no extra providers | 🟡 Designed | ADR-006, ADR-003 rule 4 |
 | 4. Detection does not assign authority | 🟡 Designed | ADR-010 |
 | 5. Manifest semantics stable | 🟡 Designed | ADR-004 + ADR-015; **unblocked** |
-| 6. One viable adapter per required core role | 🟡 Partial — 6 of 7 | `git`, `adr`, `file-roadmap`, `github-projects`, `linear` pass [Layer 1](../../conformance/layer1.py) **64/64**; [Layer 2](../../conformance/layer2.py) 9/9 EQUIVALENT across 3 roadmap providers; [transport](../../conformance/transport.py) equivalence CONFIRMED. `acceptance-file` added; Layer 1 **75/75**. Missing: execution, change-signal, retirement |
+| 6. One viable adapter per required core role | ✅ **Met** — verified by `engine/completion.py GATE-6` → `STOP_COMPLETE`, not by assertion | All 9 adapters pass [Layer 1](../../conformance/layer1.py) **112/112**; [Layer 2](../../conformance/layer2.py) 9/9 EQUIVALENT across 3 roadmap providers; criteria in `.repo-governor/acceptance/GATE-6.json` |
 | 7. `UNKNOWN` and failure behavior defined | 🟡 Designed | ADR-007, ADR-002 + ADR-017; unblocked, but the reason vocabulary is not yet closed |
 
 Designed ≠ validated. Every 🟡 becomes ✅ only when the corresponding fixture passes.

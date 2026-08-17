@@ -1,9 +1,14 @@
 {
   "$comment": "Acceptance criteria for GATE-6. Declared, never inferred (ADR-017).",
   "authority_id": "GATE-6",
+  "amended": "2026-08-17",
+  "amendment_reason": "The original criterion required file_exists adapters/beads. That was mis-specified against reference/criteria.md 62, which permits 'Beads OR synthetic execution provider'. Amended to require an execution adapter, not specifically the Beads one. Recorded rather than silently edited: amending criteria to make work pass is how a completion firewall gets defeated, and ADR-017 names criteria drift as a known negative consequence.",
   "criteria": [
     { "check": "command_exit", "target": "python3 conformance/layer1.py" },
+    { "check": "command_exit", "target": "python3 conformance/layer2.py" },
     { "check": "file_exists",  "target": "adapters/acceptance-file" },
-    { "check": "file_exists",  "target": "adapters/beads" }
+    { "check": "file_exists",  "target": "adapters/execution-file" },
+    { "check": "file_exists",  "target": "adapters/change-signals-file" },
+    { "check": "file_exists",  "target": "adapters/retirement-analysis" }
   ]
 }
