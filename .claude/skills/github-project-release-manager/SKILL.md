@@ -81,11 +81,21 @@ jq -r '.mode, .board_recommendation, .release_recommendation' /tmp/snap.json
 | `mode` | `setup` or `operational` — obey it |
 | `project_write_scope` | `false` → board mutations will fail; say so, don't attempt |
 | `linked_projects` | projects actually linked to this repo (not all your projects) |
-| `complexity_score` | 0–8; drives the board recommendation |
+| `complexity_score` | 0–8; drives the board recommendation. **Measures coordination need** — contributors, open items, activity — **not tracking need.** A solo repository under heavy development scores low and may still warrant a board. |
+| `board_decided` / `release_decided` | the decision **recorded in the marker**. When present it **outranks** the computed recommendation — report it, do not re-argue it |
 | `board_recommendation` | `none` / `lightweight` / `full` |
 | `release_recommendation` | `none` / `milestone` / `automated` |
 
 **Enter Setup mode only when `mode` is `setup`, or when the user explicitly asks for a re-evaluation.** Otherwise go to Operational mode.
+
+**A recorded decision outranks the computed recommendation.** When `board_decided` is set, the driver prints it and flags any divergence:
+
+```text
+board (decided)    : full  [human override]
+                     computed would be 'none'; the recorded decision governs.
+```
+
+Report the decision. Do not re-open the question — a driver that surfaces only its own computation asks the human to re-litigate a settled choice every run, which is how a parallel decision surface starts.
 
 ## Step 2a — Setup mode
 

@@ -29,7 +29,7 @@
       "status_snapshot": "10 Done, 9 Backlog (2026-08-17). Board and issues reconciled, 0 drift across 19 items.",
       "write_scope_acquired": "2026-08-17 \u2014 token now carries 'project'; manual field edits work. Note the refresh REPLACED read:project rather than adding to it."
     },
-    "reason": "Linked by the maintainer on 2026-08-17, overriding the complexity-score recommendation of 'none' (score 0/8). Human decision takes precedence; do not re-evaluate.",
+    "reason": "Linked by the maintainer on 2026-08-17, overriding the computed recommendation of 'none'. The override is correct and the score is not wrong: it measures COORDINATION need \u2014 contributors, open items, activity \u2014 and coordination need genuinely is low for a solo repository. What it does not measure is TRACKING need. This repository carries 19 tracked items across three distinct categories (gate conditions, thesis risks, architecture questions) with real dependencies between them, and that is what the board is for. Two different needs; the score only sees one.",
     "revisit_when": "board sits empty with no open issues for an extended period, or the maintainer asks to reconsider",
     "populated_at": "2026-08-17"
   },

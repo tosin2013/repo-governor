@@ -59,6 +59,16 @@ LINKED_N=$(printf '%s' "$LINKED" | grep -o '"number"' | wc -l | tr -d ' ')
 CONFIG_PATH=".github/project-config.json"
 if [ -f "$CONFIG_PATH" ]; then HAS_CONFIG=true; else HAS_CONFIG=false; fi
 
+# A recorded decision OUTRANKS the computed recommendation. Reporting only the
+# computation asks the human to re-litigate a settled question on every run,
+# which is the shadow-system failure this skill exists to avoid.
+BOARD_DECIDED=""; BOARD_SOURCE=""; REL_DECIDED=""
+if [ "$HAS_CONFIG" = true ] && command -v jq >/dev/null; then
+  BOARD_DECIDED=$(jq -r '.board.decision // empty' "$CONFIG_PATH" 2>/dev/null)
+  BOARD_SOURCE=$(jq -r '.board.source // "recorded"' "$CONFIG_PATH" 2>/dev/null)
+  REL_DECIDED=$(jq -r '.release.decision // empty' "$CONFIG_PATH" 2>/dev/null)
+fi
+
 # --- release markers ----------------------------------------------------------
 # NOTE: `gh release list` prints nothing and exits 0 when empty — count lines.
 REL_N=$(gh release list --limit 100 2>/dev/null | grep -c . || true)
@@ -141,7 +151,11 @@ if [ "$JSON" -eq 1 ]; then
   "prs_merged_30d": $PRS_MERGED_30,
   "complexity_score": $SCORE,
   "board_recommendation": "$BOARD_REC",
-  "release_recommendation": "$REL_REC"
+  "release_recommendation": "$REL_REC",
+  "board_decided": "$BOARD_DECIDED",
+  "board_decision_source": "$BOARD_SOURCE",
+  "release_decided": "$REL_DECIDED",
+  "score_measures": "coordination need (contributors, open items, activity) -- not tracking need. A solo repository under heavy development scores low and may still warrant a board."
 }
 EOF
 else
@@ -161,7 +175,19 @@ else
   echo "open issues / PRs  : $ISSUES_OPEN / $PRS_OPEN"
   echo "PRs merged (30d)   : $PRS_MERGED_30"
   echo "--- recommendation ---"
-  echo "complexity score   : $SCORE/8"
-  echo "board              : $BOARD_REC"
-  echo "release process    : $REL_REC"
+  echo "complexity score   : $SCORE/8  (coordination need: contributors, open items, activity)"
+  if [ -n "$BOARD_DECIDED" ]; then
+    echo "board (decided)    : $BOARD_DECIDED  [$BOARD_SOURCE]"
+    [ "$BOARD_DECIDED" != "$BOARD_REC" ] && \
+      echo "                     computed would be '$BOARD_REC'; the recorded decision governs."
+  else
+    echo "board              : $BOARD_REC"
+  fi
+  if [ -n "$REL_DECIDED" ]; then
+    echo "release (decided)  : $REL_DECIDED"
+    [ "$REL_DECIDED" != "$REL_REC" ] && \
+      echo "                     computed would be '$REL_REC'; the recorded decision governs."
+  else
+    echo "release process    : $REL_REC"
+  fi
 fi
