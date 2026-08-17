@@ -34,7 +34,16 @@ gh api graphql -> {"data": {"repository": {"issues": {"nodes": [
 
 Typed JSON. `state.type` is a field with a closed vocabulary, addressable and citable. That is what `_protocol.cite()` needs to produce provenance, and what the normalization maps in `adapters/linear` operate on.
 
-MCP *can* return typed data — the protocol supports structured content, and some servers use it well. But it does not *guarantee* it, and the common case in the wild is prose. An adapter that receives a markdown blob and extracts `state.type` from it by pattern-matching is doing precisely what ADR-012 forbids: treating free text as a typed fact.
+MCP *can* return typed data — the protocol supports structured content, and some servers use it well. But it does not *guarantee* it. An adapter that receives a markdown blob and extracts `state.type` from it by pattern-matching is doing precisely what ADR-012 forbids: treating free text as a typed fact.
+
+> **Measured against a first-party server, 2026-08-17.** The original claim that "the common case in the wild is prose" was drawn from two samples and was too broad. Linear's official MCP server returns **typed JSON**:
+>
+> ```json
+> {"id":"TOS-299","title":"...","status":"Backlog","statusType":"backlog"}
+> [{"type":"started","name":"In Review"},{"type":"backlog","name":"Backlog"}]
+> ```
+>
+> `statusType` is exactly the field `adapters/linear` normalizes on, drawn from a closed vocabulary Linear controls. **MCP transport is viable for Linear**, and the rule in this ADR — use MCP only where the server returns structured content — selects it in rather than out. The rule was right; the empirical generalization behind it was not, and prose-returning servers (`deepwiki`, the `adr-analysis` server) are one class rather than the norm.
 
 ### Three further constraints
 

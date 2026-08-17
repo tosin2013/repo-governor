@@ -33,11 +33,15 @@ ROLE = "roadmap_authority"
 FIXTURE = os.environ.get("REPO_GOVERNOR_GH_FIXTURE")
 NWO = os.environ.get("REPO_GOVERNOR_GH_REPO", "tosin2013/repo-governor")
 
-QUERY = """
-query($owner:String!, $repo:String!) {
+# Fetch ONE issue by number. The previous query paged `issues(first:50)` and
+# searched the result, which silently returned NOT_FOUND for any issue outside
+# that window. Verified against a real repository with 380 issues: #1391 exists
+# and was reported as not existing. NOT_FOUND means "this work item does not
+# exist", so a pagination limit was being reported as an absence of authority.
+ISSUE_QUERY = """
+query($owner:String!, $repo:String!, $number:Int!) {
   repository(owner:$owner, name:$repo) {
-    issues(first:50, states:[OPEN,CLOSED]) {
-      nodes {
+    issue(number:$number) {
         number title state stateReason
         labels(first:10){ nodes{ name } }
         milestone { title }
@@ -51,7 +55,6 @@ query($owner:String!, $repo:String!) {
             }
           }
         }
-      }
     }
   }
 }
@@ -74,6 +77,31 @@ CLOSED_REASON = {
     "DUPLICATE": "CANCELLED",
     "COMPLETED": None,           # defer to board status
 }
+
+
+def _fetch_one(fn, number):
+    """Fetch a single issue by number. Live mode only; fixtures use _fetch."""
+    owner, _, repo = NWO.partition("/")
+    try:
+        p = subprocess.run(
+            ["gh", "api", "graphql", "-f", f"query={ISSUE_QUERY}", "-f", f"owner={owner}",
+             "-f", f"repo={repo}", "-F", f"number={number}"],
+            capture_output=True, text=True, timeout=60,
+        )
+    except FileNotFoundError:
+        return None, fail(ROLE, fn, "PROVIDER_UNAVAILABLE", "gh CLI is not installed")
+    except subprocess.TimeoutExpired:
+        return None, fail(ROLE, fn, "PROVIDER_UNAVAILABLE", "gh api timed out")
+    if p.returncode != 0:
+        return None, fail(ROLE, fn, "PROVIDER_UNAVAILABLE", f"gh api failed: {p.stderr.strip()[:200]}")
+    try:
+        data = json.loads(p.stdout)
+    except json.JSONDecodeError as e:
+        return None, fail(ROLE, fn, "MALFORMED_SOURCE", f"gh returned non-JSON: {e}")
+    node = (((data.get("data") or {}).get("repository") or {}).get("issue"))
+    if node is None:
+        return None, fail(ROLE, fn, "NOT_FOUND", f"no issue #{number} in {NWO}")
+    return node, None
 
 
 def _fetch(fn):
@@ -116,19 +144,22 @@ def _issues(fn):
 
 
 def _find(fn, kw):
-    nodes, err = _issues(fn)
-    if err:
-        return None, err
     wid = kw.get("id")
     if not wid:
         return None, fail(ROLE, fn, "BAD_REQUEST", "missing required argument: id=<issue-number>")
     num = wid[1:] if wid.startswith("#") else wid
     if not num.isdigit():
         return None, fail(ROLE, fn, "BAD_REQUEST", f"id must be an issue number, got {wid!r}")
+    if not FIXTURE:
+        # Live: ask for the one issue. Never infer absence from a page boundary.
+        return _fetch_one(fn, int(num))
+    nodes, err = _issues(fn)
+    if err:
+        return None, err
     for n in nodes:
         if n["number"] == int(num):
             return n, None
-    return None, fail(ROLE, fn, "NOT_FOUND", f"no issue #{num} in {NWO}")
+    return None, fail(ROLE, fn, "NOT_FOUND", f"no issue #{num} in fixture {FIXTURE}")
 
 
 def _status(node):

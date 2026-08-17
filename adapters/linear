@@ -21,6 +21,10 @@ Two modes:
   live     POSTs to api.linear.app/graphql with LINEAR_API_KEY
   fixture  reads a captured response — set REPO_GOVERNOR_LINEAR_FIXTURE
 
+Accepts both raw shapes: the GraphQL API nests state as `state.type`, the
+Linear MCP server flattens it to `statusType`. Shape normalization happens
+at the edge so a single semantic map serves both transports.
+
 NOTE: the live path is implemented but UNVERIFIED — no Linear credentials
 were available when this was written. Only fixture mode has been executed.
 Treat live mode as untested until someone runs it against a real workspace.
@@ -61,12 +65,17 @@ query {
 # --- normalization map, stated explicitly ----------------------------------
 # Linear's `type` is stable across workspaces even when state *names* are
 # customized, so mapping on type rather than name is what keeps this portable.
+# Verified against a real Linear workspace 2026-08-17. The workspace exposed a
+# `duplicate` state type that this map did not have, which would have produced
+# MALFORMED_SOURCE on live data -- correct behaviour for an unknown value, but
+# the wrong outcome, since duplicate is a real and unambiguous Linear state.
 TYPE_AUTHORIZES = {
     "backlog": "ADMITTED",
     "unstarted": "AUTHORIZED",
     "started": "AUTHORIZED",
     "completed": "AUTHORIZED",   # completion is a separate axis (§40)
     "canceled": "CANCELLED",
+    "duplicate": "CANCELLED",    # closed as a duplicate: authority withdrawn
 }
 # `triage` is deliberately absent: it means NOT admitted, which is not a
 # value in the authority vocabulary. It must produce a blocking unknown.
@@ -169,7 +178,13 @@ def get_authority(kw):
     node, err = _find("get_authority", kw)
     if err:
         return err
-    st = node.get("state") or {}
+    # Two raw shapes are accepted, because #18 Q1 turned out to be real:
+    #   GraphQL : {"state": {"name": ..., "type": ...}}   nested
+    #   MCP     : {"status": ..., "statusType": ...}      flat
+    # Normalizing the SHAPE here keeps one semantic map rather than one
+    # normalizer per transport, which is what would have reintroduced #17.
+    st = node.get("state") or ({"name": node.get("status"), "type": node.get("statusType")}
+                               if node.get("statusType") else {})
     stype = st.get("type")
     if stype is None:
         return fail(ROLE, "get_authority", "MALFORMED_SOURCE",
