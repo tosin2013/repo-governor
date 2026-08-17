@@ -10,15 +10,31 @@
       "number": 5,
       "title": "repo-governor",
       "url": "https://github.com/users/tosin2013/projects/5",
-      "fields": ["Status", "Priority", "Size", "Estimate", "Iteration"],
-      "status_options": ["Backlog", "Ready", "In progress", "In review", "Done"]
+      "fields": [
+        "Status",
+        "Priority",
+        "Size",
+        "Estimate",
+        "Iteration"
+      ],
+      "status_options": [
+        "Backlog",
+        "Ready",
+        "In progress",
+        "In review",
+        "Done"
+      ],
+      "auto_add_workflow": true,
+      "items": 13
     },
     "reason": "Linked by the maintainer on 2026-08-17, overriding the complexity-score recommendation of 'none' (score 0/8). Human decision takes precedence; do not re-evaluate.",
-    "revisit_when": "board sits empty with no open issues for an extended period, or the maintainer asks to reconsider"
+    "revisit_when": "board sits empty with no open issues for an extended period, or the maintainer asks to reconsider",
+    "populated_at": "2026-08-17"
   },
   "release": {
-    "decision": "none",
-    "reason": "Pre-implementation; specification only. No code to version yet.",
-    "revisit_when": "first implementation milestone (RG-SIM-ONBOARDING-v0.1) passes"
+    "decision": "milestone",
+    "reason": "Gate work is now tracked under milestone RG-SIM-ONBOARDING-v0.1 (0/7). Still no shippable artifact, so no tags, CHANGELOG, or release automation yet.",
+    "revisit_when": "RG-SIM-ONBOARDING-v0.1 reaches 7/7 and implementation produces a versionable artifact",
+    "milestone": "RG-SIM-ONBOARDING-v0.1"
   }
 }
