@@ -25,6 +25,7 @@ All ADRs are **Proposed**. None is accepted. Per §61, the project cannot reach 
 | [013](013-single-canonical-authority-per-role.md) | Single canonical authority per role, halt on conflict | Conflict resolution | Role cardinality; no tie-breaking |
 | [014](014-scope-envelope-as-bounded-execution-contract.md) | ScopeEnvelope as bounded contract + completion firewall | Domain model | How scope boundaries are drawn |
 | [015](015-json-as-canonical-manifest-format.md) | JSON as the canonical manifest format | Configuration | Closes ADR-011's deferred choice; unblocks gate 5 |
+| [016](016-mcp-as-adapter-transport-not-adapter-replacement.md) | MCP as adapter transport, not replacement | Integration | Whether providers route via MCP servers |
 
 ## Dependency order
 
@@ -40,6 +41,7 @@ All ADRs are **Proposed**. None is accepted. Per §61, the project cannot reach 
 011 (runtime) ─┘
 012 (untrusted input) — cross-cutting, constrains 003, 004, 009, 010
 015 (JSON manifest) — resolves 011's deferred choice; unblocks gate 5
+016 (MCP transport) — constrains 003; engine never calls MCP directly
 009 (evidence chain) — depends on 002, 004; enables INV-005, INV-008
 ```
 

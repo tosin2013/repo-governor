@@ -37,7 +37,7 @@ Landscape research found no open-source unified abstraction over Jira / Linear /
    $ADAPTER query <role> <function> --json  → typed response or typed error
    ```
 
-   This keeps adapters language-agnostic. A Go adapter for Beads, a Python adapter for ADRs, and a shell adapter for Git all satisfy the same protocol. It also matches ADR-011's stdlib-only constraint: the engine never imports a provider SDK.
+   This keeps adapters language-agnostic. **How an adapter obtains state — HTTP, a CLI, a file, an MCP server — is behind this boundary and invisible to the engine (ADR-016).** A Go adapter for Beads, a Python adapter for ADRs, and a shell adapter for Git all satisfy the same protocol. It also matches ADR-011's stdlib-only constraint: the engine never imports a provider SDK.
 
 3. **`describe` separates capabilities from properties.** *(Added 2026-08-17 from implementation.)* `capabilities` are claims a conformance probe MUST be able to exercise; `properties` are declarative traits no probe can reach — `persistence`, `provenance_quality`. The first Layer 1 run failed on exactly this: `persistence: true` was advertised as a capability with no possible probe, which makes an honest-advertisement check vacuous. Untestable claims now have their own field.
 
