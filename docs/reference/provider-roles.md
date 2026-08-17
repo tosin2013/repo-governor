@@ -16,6 +16,7 @@ Repo Governor treats all external systems as pluggable providers. Seven categori
 5. `ChangeSignalProvider`
 6. `RetirementEvidenceProvider`
 7. `DecisionHistoryProvider`
+8. `AcceptanceCriteriaProvider` *(added by ADR-017, 2026-08-17 — what counts as done; distinct from architecture evidence, which is how work must be built)*
 
 ## §11 — RoadmapAuthorityProvider
 

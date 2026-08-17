@@ -26,6 +26,7 @@ All ADRs are **Proposed**. None is accepted. Per §61, the project cannot reach 
 | [014](014-scope-envelope-as-bounded-execution-contract.md) | ScopeEnvelope as bounded contract + completion firewall | Domain model | How scope boundaries are drawn |
 | [015](015-json-as-canonical-manifest-format.md) | JSON as the canonical manifest format | Configuration | Closes ADR-011's deferred choice; unblocks gate 5 |
 | [016](016-mcp-as-adapter-transport-not-adapter-replacement.md) | MCP as adapter transport, not replacement | Integration | Whether providers route via MCP servers |
+| [017](017-completion-evidence-from-repo-local-acceptance-artifact.md) | Completion evidence from a repo-local acceptance artifact | Domain model | Makes `STOP_COMPLETE` derivable; unblocks gate 7 |
 
 ## Dependency order
 
@@ -42,6 +43,7 @@ All ADRs are **Proposed**. None is accepted. Per §61, the project cannot reach 
 012 (untrusted input) — cross-cutting, constrains 003, 004, 009, 010
 015 (JSON manifest) — resolves 011's deferred choice; unblocks gate 5
 016 (MCP transport) — constrains 003; engine never calls MCP directly
+017 (acceptance artifact) — adds 8th role; unblocks gate 7, fixes #2 root cause
 009 (evidence chain) — depends on 002, 004; enables INV-005, INV-008
 ```
 
@@ -85,6 +87,6 @@ Questions 3 and 4 are the ones that could invalidate the product. Both should be
 | 4. Detection does not assign authority | 🟡 Designed | ADR-010 |
 | 5. Manifest semantics stable | 🟡 Designed | ADR-004 + ADR-015; **unblocked** |
 | 6. One viable adapter per required core role | 🟡 Partial — 5 of 6 | `adapters/git`, `adapters/adr`, `adapters/file-roadmap`, `github-projects`, `linear` pass [Layer 1](../../conformance/layer1.py) 59/59; [Layer 2](../../conformance/layer2.py) 9/9 EQUIVALENT across 3 roadmap providers. Execution, change-signal, retirement adapters still missing |
-| 7. `UNKNOWN` and failure behavior defined | 🟡 Designed | ADR-007, ADR-002 |
+| 7. `UNKNOWN` and failure behavior defined | 🟡 Designed | ADR-007, ADR-002 + ADR-017; **unblocked** |
 
 Designed ≠ validated. Every 🟡 becomes ✅ only when the corresponding fixture passes.
