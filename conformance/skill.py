@@ -100,6 +100,22 @@ def main():
         fails += check("an ungoverned repository yields AUTHORITY_SOURCE_MISSING naming its path",
                        "AUTHORITY_SOURCE_MISSING" in out and td in out, out[:120])
 
+    print("\nThe decision index accounts for every decision\n")
+
+    # A reader who finds ADR-024 and ADR-027 and nothing between has to guess
+    # whether two decisions were deleted -- which would be the INV-005 failure
+    # this project exists to prevent, reported by absence rather than by error.
+    index = (ROOT / "docs" / "adrs" / "README.md").read_text()
+    files = sorted(p.name[:3] for p in (ROOT / "docs" / "adrs").glob("[0-9][0-9][0-9]-*.md"))
+    unindexed = [n for n in files if f"({n}-" not in index and f"~~{n}~~" not in index]
+    fails += check(f"all {len(files)} ADR files appear in the index", not unindexed, str(unindexed))
+
+    lo, hi = int(files[0]), int(files[-1])
+    gaps = [f"{n:03d}" for n in range(lo, hi + 1) if f"{n:03d}" not in files]
+    undocumented = [g for g in gaps if f"~~{g}~~" not in index]
+    fails += check(f"every gap in the sequence is explained ({len(gaps)} gap(s))",
+                   not undocumented, f"unexplained: {undocumented}")
+
     print("\nThe surface does not cite decisions that have moved\n")
 
     for doc, text in (("SKILL.md", skill), ("AGENTS.md", agents),

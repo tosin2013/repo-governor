@@ -34,6 +34,7 @@ Generated 2026-08-17 from PRD v0.2 (provider-oriented draft) using the MCP ADR A
 | [022](022-repo-governor-does-not-own-roadmap-state.md) | Repo Governor does not own roadmap state | Product boundary | **Section 54 reproduced inside the tool**; roadmap rebound to GitHub |
 | [023](023-completion-firewall.md) | The completion firewall | Policy engine | Split from 014 — the half that shipped |
 | [024](024-scope-envelope-compiler.md) | ScopeEnvelope is compiled, not authored | Policy engine | Split from 014 — **the half that did not**; held Proposed |
+| ~~025~~ ~~026~~ | **never written.** Reserved in a plan that proposed a dialect ADR and an identity ADR; only the second was written, and it landed as 028. Nothing was deleted — recorded so a gap in the sequence does not read as two missing decisions. | — | — |
 | [027](027-the-governed-repository-is-not-the-install-directory.md) | The governed repository is not the install directory | Portability | The engine governed **itself** whatever it was pointed at |
 | [028](028-provider-identity-is-never-defaulted.md) | Provider identity is never defaulted | Safety | Adapters named the author's repository as a fallback |
 
