@@ -322,6 +322,7 @@ These were all hit while building this skill.
   ['gist','read:org','read:project','repo','workflow'] scopes.
   ```
 - **`$?` after a pipe is the last command's status.** `gh ... | head` always reports `head`'s exit code. Capture first: `out=$(gh ... 2>&1); rc=$?`.
+- **A trailing `[ a != b ] && echo …` sets the script's exit status.** Found in this driver: the "recorded decision diverges from computed" lines were the last commands, so every *healthy* run where the two agreed exited 1 — indistinguishable from a failure, on a script whose exit codes are contractual (3 = degraded API). End such a script with an explicit `exit 0`.
 - **`git describe --tags` exits non-zero on a repo with no tags.** Always `2>/dev/null` with a fallback, or the whole script dies under `set -e`.
 - **`date -d` is GNU-only.** macOS needs `date -v-30d`. Use `date -v-30d +%Y-%m-%d 2>/dev/null || date -d '30 days ago' +%Y-%m-%d`.
 - **During a GitHub incident, writes report success and silently do not take.** Verified 2026-08-17 during a partial outage: `gh issue reopen 17` printed `✓ Reopened issue` and exited 0, and three subsequent reads showed the issue still `CLOSED`. Never trust a write's success message during degraded service — read the state back before reporting.

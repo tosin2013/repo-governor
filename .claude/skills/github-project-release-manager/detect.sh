@@ -191,3 +191,9 @@ else
     echo "release process    : $REL_REC"
   fi
 fi
+
+# The divergence lines above use `[ a != b ] && echo`, which leaves $? = 1 when
+# the decision matches the computation. That is the script's last command, so a
+# healthy run exited 1 and was indistinguishable from a failure. Exit codes here
+# are contractual (3 = degraded API); say success explicitly.
+exit 0
