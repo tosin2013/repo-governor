@@ -29,11 +29,48 @@ SUITE = [
                       "get_non_goals", "get_parent_or_goal"],
         # Raw payloads that look plausible but are not the real thing. Each must
         # be refused, never normalized (#18 Q2).
+        "probe_id": "ENG-102",
         "substitutes": [
             ('{"summary": "ENG-102 is ready to start"}', "an LLM summary"),
             ('{"data": {"other": []}}', "the wrong query"),
             ("not json at all", "non-JSON"),
             ('{"data": {"issues": {}}}', "truncated payload"),
+        ],
+    },
+    {
+        # No fetcher process: the fixture IS a captured GraphQL response, so
+        # catting it is a faithful stand-in for whatever obtained it. That is
+        # precisely option C's claim — the source of the bytes is irrelevant.
+        "adapter": "adapters/github-projects",
+        "fetcher_file": "conformance/fixtures/github-projects-scenarios.json",
+        "role": "roadmap_authority",
+        "env": {"REPO_GOVERNOR_GH_FIXTURE": "conformance/fixtures/github-projects-scenarios.json",
+                "REPO_GOVERNOR_GH_ADMISSION": "project_status"},
+        "ids": ["1", "3", "101", "102", "103"],
+        "functions": ["get_authority", "get_status", "get_work", "get_non_goals",
+                      "get_parent_or_goal"],
+        "probe_id": "102",
+        "substitutes": [
+            ('{"summary": "issue 102 is authorized"}', "an LLM summary"),
+            ('{"data": {"repository": {"pullRequests": {"nodes": []}}}}', "the wrong query"),
+            ("not json at all", "non-JSON"),
+            ('{"data": {"repository": {"issue": {"number": 7}}}}', "the wrong issue"),
+        ],
+    },
+    {
+        "adapter": "adapters/decision-history-github",
+        "fetcher_file": "conformance/fixtures/decision-history-github-901.json",
+        "role": "decision_history",
+        "env": {"REPO_GOVERNOR_GH_DECISIONS_FIXTURE": "conformance/fixtures/decision-history-github.json"},
+        "ids": ["901"],
+        "functions": ["get_disposition", "get_decisions", "get_reversal_condition"],
+        "probe_id": "901",
+        "substitutes": [
+            ('{"summary": "901 was declined"}', "an LLM summary"),
+            ('{"repository": {"issue": {"number": 901}}}', "no data envelope"),
+            ("not json at all", "non-JSON"),
+            ('{"data": {"repository": {"issue": {"number": 902, "state": "CLOSED", '
+             '"stateReason": "COMPLETED"}}}}', "the wrong issue"),
         ],
     },
 ]
@@ -51,12 +88,16 @@ def main():
     checks = 0
     for spec in SUITE:
         a_path = str(ROOT / spec["adapter"])
-        f_path = str(ROOT / spec["fetcher"])
         env = spec["env"]
-        print(f"{spec['adapter']}  <->  {spec['fetcher']}")
+        if "fetcher" in spec:
+            source = spec["fetcher"]
+            raw = run([sys.executable, str(ROOT / spec["fetcher"])], env).stdout
+        else:
+            source = spec["fetcher_file"]
+            raw = (ROOT / spec["fetcher_file"]).read_text()
+        print(f"{spec['adapter']}  <->  {source}")
 
-        raw = run([sys.executable, f_path], env).stdout
-
+        before = failures
         for wid in spec["ids"]:
             for fn in spec["functions"]:
                 base = [sys.executable, a_path, "query", spec["role"], fn, f"id={wid}"]
@@ -66,13 +107,14 @@ def main():
                 if a != c:
                     failures += 1
                     print(f"  [FAIL] {wid} {fn}: A and C differ")
-        print(f"  [{'PASS' if not failures else 'FAIL'}] {checks} A/C comparisons byte-identical")
+        n = len(spec["ids"]) * len(spec["functions"])
+        print(f"  [{'PASS' if failures == before else 'FAIL'}] {n} A/C comparisons byte-identical")
 
         # substitute payloads must be refused
         sub_ok = True
         for payload, label in spec["substitutes"]:
-            base = [sys.executable, a_path, "query", spec["role"], "get_authority",
-                    "id=ENG-102", "--input", "-"]
+            base = [sys.executable, a_path, "query", spec["role"], spec["functions"][0],
+                    f"id={spec['probe_id']}", "--input", "-"]
             out = run(base, env, stdin=payload).stdout
             if '"MALFORMED_SOURCE"' not in out:
                 print(f"  [FAIL] accepted {label} instead of refusing it")

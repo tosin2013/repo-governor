@@ -142,6 +142,57 @@ def _fetch(fn):
         return None, fail(ROLE, fn, "MALFORMED_SOURCE", f"gh returned non-JSON: {e}")
 
 
+def _raw_from_stdin():
+    """Option C (#18): the agent supplies raw provider output; we only normalize."""
+    if "--input" not in sys.argv:
+        return None
+    i = sys.argv.index("--input")
+    src = sys.argv[i + 1] if len(sys.argv) > i + 1 else "-"
+    return sys.stdin.read() if src == "-" else Path(src).read_text()
+
+
+def _find_in_raw(fn, num, raw):
+    """One normalizer, two payload shapes — #18 Q1, answered structurally.
+
+    GitHub's list query returns `repository.issues.nodes`; the single-issue query
+    returns `repository.issue`. An agent holding either an MCP connection or `gh`
+    may hand over either. They are told apart by shape, not by a transport flag,
+    which is why this does not reintroduce the per-transport matrix from #17:
+    the variance is in the payload, and the payload describes itself.
+
+    A response about the wrong issue is refused rather than normalized (#18 Q2).
+    """
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as e:
+        return None, fail(ROLE, fn, "MALFORMED_SOURCE", f"supplied input is not valid JSON: {e}")
+    repo = ((data.get("data") or {}).get("repository") or {}) if isinstance(data, dict) else {}
+    if not repo:
+        return None, fail(ROLE, fn, "MALFORMED_SOURCE",
+                          "supplied input is not a GitHub repository GraphQL response")
+    if "issue" in repo:
+        node = repo.get("issue")
+        if node is None:
+            return None, fail(ROLE, fn, "NOT_FOUND", f"supplied input contains no issue #{num}")
+        if node.get("number") != num:
+            return None, fail(ROLE, fn, "MALFORMED_SOURCE",
+                              f"supplied input is about issue #{node.get('number')}, "
+                              f"not the requested #{num}")
+        return node, None
+    nodes = (repo.get("issues") or {}).get("nodes")
+    if nodes is None:
+        return None, fail(ROLE, fn, "MALFORMED_SOURCE",
+                          "supplied input has neither `issue` nor `issues.nodes`")
+    for n in nodes:
+        if n.get("number") == num:
+            return n, None
+    # A list payload is a page. Absence within it is not absence in the provider
+    # — the same page-boundary trap _fetch_one exists to avoid.
+    return None, fail(ROLE, fn, "NOT_FOUND",
+                      f"issue #{num} is not in the supplied page of {len(nodes)} issue(s); "
+                      "supply a single-issue response to assert absence")
+
+
 def _issues(fn):
     data, err = _fetch(fn)
     if err:
@@ -159,6 +210,9 @@ def _find(fn, kw):
     num = wid[1:] if wid.startswith("#") else wid
     if not num.isdigit():
         return None, fail(ROLE, fn, "BAD_REQUEST", f"id must be an issue number, got {wid!r}")
+    raw = _raw_from_stdin()
+    if raw is not None:
+        return _find_in_raw(fn, int(num), raw)
     if not FIXTURE:
         # Live: ask for the one issue. Never infer absence from a page boundary.
         return _fetch_one(fn, int(num))

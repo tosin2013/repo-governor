@@ -29,6 +29,7 @@ All ADRs are **Proposed**. None is accepted. Per §61, the project cannot reach 
 | [017](017-completion-evidence-from-repo-local-acceptance-artifact.md) | Completion evidence from a repo-local acceptance artifact | Domain model | Makes `STOP_COMPLETE` derivable; unblocks gate 7 |
 | [018](018-admission-signal-is-declared-not-assumed.md) | Admission signal is declared, not assumed | Provider abstraction | Makes GitHub usable without a Project; **found by real-data testing** |
 | [019](019-database-backed-decision-history.md) | Database-backed decision history | Storage | Closes the last unbound role; amends ADR-009 |
+| [020](020-agent-supplied-transport-with-adapter-as-normalizer.md) | Agent-supplied transport, adapter as normalizer | Transport | Moves credentials out of remote adapters; amends ADR-003 and ADR-016 |
 
 ## Dependency order
 

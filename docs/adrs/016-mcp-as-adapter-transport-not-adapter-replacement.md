@@ -1,6 +1,7 @@
 # 16. MCP as an Adapter Transport, Not an Adapter Replacement
 
 **Status**: Proposed
+**Amended by**: [ADR-020](020-agent-supplied-transport-with-adapter-as-normalizer.md) — transport may now live outside the adapter process entirely. "Transport is invisible to the engine" still holds.
 **Date**: 2026-08-17
 **Domain**: Provider abstraction / integration
 

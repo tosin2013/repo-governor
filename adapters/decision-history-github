@@ -66,7 +66,48 @@ def _probe():
     return shutil.which("gh") is not None
 
 
+def _raw_from_stdin():
+    """Option C (#18): the agent supplies raw provider output; we only normalize."""
+    if "--input" not in sys.argv:
+        return None
+    i = sys.argv.index("--input")
+    src = sys.argv[i + 1] if len(sys.argv) > i + 1 else "-"
+    return sys.stdin.read() if src == "-" else Path(src).read_text()
+
+
+def _issue_from_raw(fn, number, raw):
+    """Normalize supplied raw output, refusing anything that is not what was asked for.
+
+    #18 Q2 asked what stops the agent fetching the wrong thing. Here the adapter
+    can actually check: the payload carries the issue number, so a response about
+    a *different* issue is refused rather than normalized. That is a guard the
+    fetching design never needed and could not have had — under option A the
+    adapter controlled the query, so the question could not arise.
+
+    What it still cannot catch is a payload that is correctly shaped, correctly
+    numbered, and stale. Freshness is not self-describing in GraphQL output.
+    """
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as e:
+        return None, fail(ROLE, fn, "MALFORMED_SOURCE", f"supplied input is not valid JSON: {e}")
+    if not isinstance(data, dict) or "data" not in data:
+        return None, fail(ROLE, fn, "MALFORMED_SOURCE",
+                          "supplied input is not a GitHub GraphQL response")
+    node = ((data.get("data") or {}).get("repository") or {}).get("issue")
+    if node is None:
+        return None, fail(ROLE, fn, "NOT_FOUND", f"supplied input contains no issue #{number}")
+    got = node.get("number")
+    if got != number:
+        return None, fail(ROLE, fn, "MALFORMED_SOURCE",
+                          f"supplied input is about issue #{got}, not the requested #{number}")
+    return node, None
+
+
 def _issue(fn, number):
+    raw = _raw_from_stdin()
+    if raw is not None:
+        return _issue_from_raw(fn, number, raw)
     if FIXTURE:
         p = Path(FIXTURE)
         if not p.exists():
