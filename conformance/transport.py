@@ -11,6 +11,7 @@ Usage:  python3 conformance/transport.py
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -122,6 +123,46 @@ def main():
                 failures += 1
         if sub_ok:
             print(f"  [PASS] {len(spec['substitutes'])} substitute payloads refused as MALFORMED_SOURCE")
+
+    # Two transports of the SAME provider, genuinely different payload shapes.
+    # This is #18 Q1's real test: GitHub's list-vs-single responses share one
+    # schema family, so agreeing there proved less than it looked. Linear MCP and
+    # Linear GraphQL do not -- different field names, different nesting.
+    print("\nadapters/linear  MCP shape  <->  GraphQL shape")
+    gql = (ROOT / "conformance" / "fixtures" / "linear.json").read_text()
+    mcp = (ROOT / "conformance" / "fixtures" / "linear-mcp.json").read_text()
+    ids = ["ENG-100", "ENG-101", "ENG-103", "ENG-104", "ENG-105"]
+    fns = ["get_authority", "get_status", "get_work", "get_non_goals", "get_decision_history"]
+    a_path = str(ROOT / "adapters" / "linear")
+    n = 0
+    for wid in ids:
+        for fn in fns:
+            base = [sys.executable, a_path, "query", "roadmap_authority", fn, f"id={wid}", "--input", "-"]
+            if run(base, {}, stdin=gql).stdout != run(base, {}, stdin=mcp).stdout:
+                failures += 1
+                print(f"  [FAIL] {wid} {fn}: the two transports disagree")
+            n += 1
+    print(f"  [{'PASS' if not failures else 'FAIL'}] {n} typed-fact comparisons byte-identical")
+
+    # And the honest counterpart: where a transport genuinely CANNOT answer, it
+    # must say so rather than fabricate equivalence. MCP names a parent only by
+    # opaque uuid; GraphQL returns the human identifier. Verified real, not
+    # hypothetical -- this is the first per-(provider x transport) capability
+    # difference in the project, which #17 predicted and could not yet exhibit.
+    g_par = ('{"data":{"issues":{"nodes":[{"identifier":"ENG-200","title":"c",'
+             '"state":{"name":"Backlog","type":"backlog"},"project":null,'
+             '"parent":{"identifier":"ENG-42"},"labels":{"nodes":[]}}]}}}')
+    m_par = ('{"issues":[{"id":"ENG-200","title":"c","status":"Backlog","statusType":"backlog",'
+             '"project":null,"parentId":"a3f1c8e2-7b04-4d19-9f2a-6c5e10bd77aa","labels":[]}]}')
+    base = [sys.executable, a_path, "query", "roadmap_authority", "get_parent_or_goal",
+            "id=ENG-200", "--input", "-"]
+    g_out = json.loads(run(base, {}, stdin=g_par).stdout)
+    m_out = json.loads(run(base, {}, stdin=m_par).stdout)
+    ok_g = (g_out.get("value") or {}).get("parent") == "ENG-42"
+    ok_m = (m_out.get("unknown") or {}).get("reason") == "PARENT_NOT_RESOLVABLE_ON_TRANSPORT"
+    failures += not (ok_g and ok_m)
+    print(f"  [{'PASS' if ok_g and ok_m else 'FAIL'}] a capability absent on one transport is "
+          f"declared, never fabricated")
 
     print(f"\nTRANSPORT EQUIVALENCE: {'CONFIRMED' if not failures else f'BROKEN ({failures})'}")
     return 0 if not failures else 1

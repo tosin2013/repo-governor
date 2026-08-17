@@ -96,6 +96,64 @@ def _raw_from_stdin():
     return text
 
 
+# Required MCP fields. Unlike GraphQL -- where `linear-fetch` owns the query and
+# therefore guarantees the shape -- an MCP payload's fields are chosen by the
+# CALLER. That is #18 Q4 ("who owns the query specification?") made concrete: the
+# adapter cannot control what it is handed, so it publishes what it needs and
+# refuses a payload that is merely shaped right but missing meaning.
+MCP_REQUIRED = ("id", "title", "status", "statusType")
+
+
+def _canonical(node):
+    """One MCP issue -> the canonical (GraphQL-shaped) node the rest of this file speaks.
+
+    Normalizing the SHAPE once at the boundary keeps ONE semantic map. The
+    alternative -- an `or` fallback in each of eight functions -- is a normalizer
+    per transport wearing a disguise, which is exactly what #17 warned about.
+    """
+    return {
+        "identifier": node.get("id"),
+        "title": node.get("title"),
+        "state": {"name": node.get("status"), "type": node.get("statusType")},
+        "project": {"name": node["project"]} if node.get("project") else None,
+        # MCP exposes `parentId` (an opaque uuid); GraphQL exposes
+        # `parent.identifier` (a human key such as ENG-42). Verified NOT the same
+        # value, and the MCP tool cannot return the human key in one call. So the
+        # difference is carried, not smoothed: `opaque` marks a parent that names
+        # nothing a human or another provider could correlate. Returning the uuid
+        # as if it answered "what larger goal does this serve?" would be a
+        # confident wrong answer -- capabilities belong to (provider x transport).
+        "parent": {"identifier": node["parentId"], "opaque": True} if node.get("parentId") else None,
+        "labels": {"nodes": [{"name": n} for n in (node.get("labels") or [])]},
+    }
+
+
+def _nodes_from(data, fn):
+    """Accept either Linear transport. Shape is detected structurally, never declared.
+
+    GraphQL : {"data": {"issues": {"nodes": [...]}}}
+    MCP     : {"issues": [...]}
+    """
+    if isinstance(data, dict) and isinstance(data.get("data"), dict) and "issues" in data["data"]:
+        nodes = (data["data"]["issues"] or {}).get("nodes")
+        if not isinstance(nodes, list):
+            return None, fail(ROLE, fn, "MALFORMED_SOURCE", "GraphQL payload has no issues.nodes")
+        return nodes, None
+    if isinstance(data, dict) and isinstance(data.get("issues"), list):
+        raw = data["issues"]
+        missing = sorted({f for n in raw for f in MCP_REQUIRED if f not in n})
+        if missing:
+            return None, fail(ROLE, fn, "MALFORMED_SOURCE",
+                              f"MCP payload is missing required field(s) {missing}. Request them: "
+                              f"fields={list(MCP_REQUIRED)}. Without statusType the semantic state "
+                              "cannot be resolved, and guessing it from the display name would be "
+                              "the adapter deciding what a workflow state means.")
+        return [_canonical(n) for n in raw], None
+    return None, fail(ROLE, fn, "MALFORMED_SOURCE",
+                      "supplied input is neither a Linear GraphQL response "
+                      "({data:{issues:{nodes:[...]}}}) nor an MCP issues payload ({issues:[...]})")
+
+
 def _fetch(fn):
     raw = _raw_from_stdin()
     if raw is not None:
@@ -105,9 +163,7 @@ def _fetch(fn):
             return None, fail(ROLE, fn, "MALFORMED_SOURCE", f"supplied input is not valid JSON: {e}")
         # Guard #18 Q2: refuse a plausible-looking substitute (a summary, the
         # wrong query) rather than normalizing it. The ADR-015 lesson again.
-        if not isinstance(data, dict) or "data" not in data or "issues" not in (data.get("data") or {}):
-            return None, fail(ROLE, fn, "MALFORMED_SOURCE",
-                              "supplied input is not a Linear issues GraphQL response")
+        # _nodes_from does the refusing, and accepts either transport's shape.
         return data, None
     if FIXTURE:
         p = Path(FIXTURE)
@@ -140,10 +196,9 @@ def _find(fn, kw):
     data, err = _fetch(fn)
     if err:
         return None, err
-    try:
-        nodes = data["data"]["issues"]["nodes"]
-    except (KeyError, TypeError):
-        return None, fail(ROLE, fn, "MALFORMED_SOURCE", "unexpected Linear GraphQL shape")
+    nodes, err = _nodes_from(data, fn)
+    if err:
+        return None, err
     wid = kw.get("id")
     if not wid:
         return None, fail(ROLE, fn, "BAD_REQUEST", "missing required argument: id=<identifier>")
@@ -178,13 +233,11 @@ def get_authority(kw):
     node, err = _find("get_authority", kw)
     if err:
         return err
-    # Two raw shapes are accepted, because #18 Q1 turned out to be real:
-    #   GraphQL : {"state": {"name": ..., "type": ...}}   nested
-    #   MCP     : {"status": ..., "statusType": ...}      flat
-    # Normalizing the SHAPE here keeps one semantic map rather than one
-    # normalizer per transport, which is what would have reintroduced #17.
-    st = node.get("state") or ({"name": node.get("status"), "type": node.get("statusType")}
-                               if node.get("statusType") else {})
+    # Both transports were normalized to one shape by _nodes_from, so this reads
+    # `state` unconditionally. The per-function fallback that used to live here
+    # was unreachable anyway -- the envelope check rejected MCP payloads before
+    # any function saw them.
+    st = node.get("state") or {}
     stype = st.get("type")
     if stype is None:
         return fail(ROLE, "get_authority", "MALFORMED_SOURCE",
@@ -244,8 +297,17 @@ def get_parent_or_goal(kw):
     node, err = _find("get_parent_or_goal", kw)
     if err:
         return err
-    parent = (node.get("parent") or {}).get("identifier")
+    pnode = node.get("parent") or {}
     project = (node.get("project") or {}).get("name")
+    if pnode.get("opaque") and not project:
+        return unknown(ROLE, "get_parent_or_goal",
+                       reason="PARENT_NOT_RESOLVABLE_ON_TRANSPORT",
+                       detail=(f"{node['identifier']} has a parent, but this transport names it "
+                               "only by opaque id. Nothing can correlate that with a work item."),
+                       resolution="Read this provider over a transport that returns the parent's "
+                                  "identifier, or resolve the id in a second call.",
+                       blocking=False)
+    parent = None if pnode.get("opaque") else pnode.get("identifier")
     return ok(ROLE, "get_parent_or_goal", {"parent": parent or project},
               [_ref(node, "parent" if parent else "project.name")])
 

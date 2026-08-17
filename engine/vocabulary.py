@@ -64,6 +64,10 @@ REASONS = {
                                       "Provider cannot supply machine-checkable acceptance conditions."),
     "NON_GOALS_UNSTATED":            ("scope", False,
                                       "No non-goals declared; the scope envelope will be thin."),
+    "PARENT_NOT_RESOLVABLE_ON_TRANSPORT": ("scope", False,
+                                      "The bound transport can name the parent only by opaque id. "
+                                      "Capabilities belong to (provider x transport), so this is an "
+                                      "honest absence on this transport, not an absence of parent."),
     "SCOPE_NOT_STRUCTURED":          ("scope", False,
                                       "Scope exists only as free prose, which may not become typed facts."),
 
