@@ -14,7 +14,9 @@ The guardrail literature supplies the framing: separate verdict from action, and
 
 ## Decision
 
-**The disposition vocabulary is closed at nineteen values. Every evaluation terminates in exactly one, and `UNKNOWN` is a legitimate terminal state carrying required diagnostic payload.**
+**The disposition vocabulary is closed at twenty values — twelve governance, eight onboarding. Every evaluation terminates in exactly one, and `UNKNOWN` is a legitimate terminal state carrying required diagnostic payload.**
+
+> *Amended 2026-08-17.* Originally nineteen. Implementing gate 7 showed §42 had no value for *detection complete, proposal written, awaiting acceptance* — precisely where ADR-010's mandatory human step sits — so `PROPOSAL_READY` was added. The count changed because the spec had a hole, not because the set is open.
 
 1. **Closed set, engine-owned.** Profiles select which dispositions are *reachable*; they cannot define new ones. Providers never emit dispositions — they emit typed state, and the engine rules. This is what makes cross-provider portability (§53) testable: two providers can be compared only if the output alphabet is fixed.
 
@@ -51,7 +53,7 @@ The guardrail literature supplies the framing: separate verdict from action, and
 
 **Negative**
 
-- Nineteen dispositions is a large surface for agents to handle correctly. Real-world agent behavior will collapse them — most agents will treat every non-`EXECUTE` value as "stop and ask." That erodes the vocabulary's value in practice, and only real-world observation will show how badly.
+- Twenty dispositions is a large surface for agents to handle correctly. Real-world agent behavior will collapse them — most agents will treat every non-`EXECUTE` value as "stop and ask." That erodes the vocabulary's value in practice, and only real-world observation will show how badly.
 - Closing the set means an unanticipated governance situation has no precise expression and must be forced into `UNKNOWN` or `CONFLICT`. This is deliberate: an extensible vocabulary would destroy portability, which is a core thesis claim. Extension requires a version bump and a deliberate decision.
 - Calibrating blocking vs non-blocking is judgment encoded as policy, and getting it wrong in either direction hits a named failure condition — too blocking hits §54's over-escalation, too permissive hits §53's unauthorized-execution target of zero.
 

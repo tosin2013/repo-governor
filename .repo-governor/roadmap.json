@@ -146,6 +146,13 @@
       "authority": "AUTHORIZED",
       "admitted": true,
       "parent": "RG-SIM-ONBOARDING-v0.1"
+    },
+    "GATE-7": {
+      "title": "UNKNOWN and failure behavior defined",
+      "status": "IN_PROGRESS",
+      "authority": "AUTHORIZED",
+      "admitted": true,
+      "parent": "RG-SIM-ONBOARDING-v0.1"
     }
   }
 }

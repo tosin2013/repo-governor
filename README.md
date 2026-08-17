@@ -12,13 +12,20 @@ It does not replace your existing tools. It connects to them through provider in
 
 ## Status: pre-implementation
 
-This repository currently contains **specification and research only**. There is no implementation yet.
+There is now a working reference implementation: 9 provider adapters, a deterministic engine, and 6 conformance suites.
+
+```bash
+python3 engine/onboard.py <repo>           # assess, detect, propose
+python3 engine/manifest.py --validate      # bind and check
+python3 engine/completion.py <work-id>     # govern
+```
 
 | | |
 | --- | --- |
-| Product state | Specification complete; 14 ADRs, all **Proposed**, none accepted |
-| Gate | `RG-SIM-ONBOARDING-v0.1` must pass before `IMPLEMENTATION_READY` |
-| Gate progress | 0 of 7 conditions validated ([§61](docs/reference/onboarding.md)) |
+| Product state | **`IMPLEMENTATION_READY`** — `RG-SIM-ONBOARDING-v0.1` passes |
+| Gate progress | **7 of 7** conditions met ([§61](docs/reference/onboarding.md)), each engine-verified |
+| Decisions | 17 ADRs, all still **Proposed**, none accepted |
+| Open thesis risks | #1 normalization (weak evidence), #2 envelope thinness (unmeasured) |
 
 ---
 

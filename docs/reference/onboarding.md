@@ -206,12 +206,12 @@ The specification may move to `IMPLEMENTATION_READY` only when:
 
 | # | Condition | Status (2026-08-17) | Evidence |
 | --- | --- | --- | --- |
-| 1 | onboarding simulation passes | ⬜ Not started | §58–§60 fixtures |
-| 2 | provider conflicts handled deterministically | 🟡 Designed | ADR-013 |
-| 3 | low-complexity repositories operate without unnecessary providers | 🟡 Designed | ADR-006, ADR-003 |
-| 4 | provider detection does not assign authority | 🟡 Designed | ADR-010 |
-| 5 | manifest semantics stable enough for implementation | 🟡 Designed | ADR-004 |
-| 6 | at least one provider per required core role has a viable adapter contract | ⬜ Not started | ADR-003 |
-| 7 | `UNKNOWN` and failure behavior defined | 🟡 Designed | ADR-007, ADR-002 |
+| 1 | onboarding simulation passes | ✅ Met | `conformance/onboarding.py` 29/29 |
+| 2 | provider conflicts handled deterministically | ✅ Met | fixture C halts, no ranking |
+| 3 | low-complexity repositories operate without unnecessary providers | ✅ Met | fixture A: Git only, L0 |
+| 4 | provider detection does not assign authority | ✅ Met | proposal written; loader never reads it |
+| 5 | manifest semantics stable enough for implementation | ✅ Met | `conformance/manifest.py` 26/26 |
+| 6 | at least one provider per required core role has a viable adapter contract | ✅ Met | 9 adapters, Layer 1 112/112 |
+| 7 | `UNKNOWN` and failure behavior defined | ✅ Met | `conformance/vocabulary.py`, closed sets enforced |
 
-Designed ≠ validated. Every 🟡 becomes ✅ only when the corresponding fixture passes.
+**Met 2026-08-17**, each verified by `engine/completion.py GATE-N` returning `STOP_COMPLETE`, not by assertion. See the ADR index for what this does *not* mean.

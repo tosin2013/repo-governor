@@ -161,7 +161,7 @@ QUESTION → SPECIFIED → ARCHITECTURE SIMULATED → COMPLEXITY SIMULATED
 → PRD v0.2 → ONBOARDING SIMULATION REQUIRED → IMPLEMENTATION_READY
 ```
 
-State as of 2026-08-17: **PRD v0.2 superseded by ADR-001…ADR-014 (all Proposed). Onboarding simulation not yet run.**
+State as of 2026-08-17: **`IMPLEMENTATION_READY`.** `RG-SIM-ONBOARDING-v0.1` passes and all seven §61 gate conditions are met, each engine-verified. Superseded by ADR-001…ADR-017, all still `Proposed`. The gate says the architecture is stable enough to build on; it does not say the thesis holds — see open questions #1 and #2.
 
 ## §70 — Final Product Principle
 

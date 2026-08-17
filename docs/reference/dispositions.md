@@ -46,9 +46,20 @@ PROVIDER_UNAVAILABLE
 PROVIDER_CONFLICT
 AUTHORITY_SOURCE_MISSING
 READY_FOR_GOVERNANCE
+PROPOSAL_READY
 ```
 
+> **`PROPOSAL_READY` added 2026-08-17 while implementing gate 7.** §42 had no value for *detection complete, proposal written, awaiting human acceptance*. `READY_FOR_GOVERNANCE` is the state after provider validation; `PROVIDER_CONFIGURED` is after binding. The gap sat exactly where ADR-010's mandatory human step lives, so onboarding had no honest way to report where it had stopped. This makes the onboarding alphabet eight values, and the total twenty rather than the nineteen ADR-007 states.
+
 ---
+
+## Closed-set enforcement (gate 7)
+
+The vocabularies live in [`engine/vocabulary.py`](../../engine/vocabulary.py) and are enforced, not merely documented:
+
+* **Adapters name a reason; the engine classifies it.** An adapter does not decide whether its own unknown blocks — `engine/completion.py` looks the reason up and attaches `dimension` and `blocking`. A reason outside the closed set raises, because silently accepting an unclassifiable unknown would let a provider bypass the blocking rule entirely.
+* **Profiles may escalate, never loosen.** `GOVERNOR_HIGH_ASSURANCE` makes `NON_GOALS_UNSTATED` and `ACCEPTANCE_UNSTATED` blocking; nothing may make a blocking reason non-blocking, or a profile could permit `EXECUTE` on evidence the engine could not resolve.
+* **The sets cannot drift from the code.** [`conformance/vocabulary.py`](../../conformance/vocabulary.py) scans every adapter and engine module for emitted reason strings and fails if any is undeclared, or if any declared reason is never emitted.
 
 ## Semantics (ADR-007)
 

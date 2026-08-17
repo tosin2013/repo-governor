@@ -87,6 +87,22 @@ Questions 3 and 4 are the ones that could invalidate the product. Both should be
 | 4. Detection does not assign authority | ✅ **Met** — `completion.py GATE-4` → `STOP_COMPLETE` | Proposal written to `.repo-governor.proposed.json`; asserted the manifest loader never reads it; binding requires human promotion |
 | 5. Manifest semantics stable | ✅ **Met** — verified by `engine/completion.py GATE-5` → `STOP_COMPLETE` | `schemas/manifest-v1.json` frozen; `engine/manifest.py` fails closed; [26/26 refusal cases](../../conformance/manifest.py); `--validate` reaches `READY_FOR_GOVERNANCE`; `engine/migrate.py` stub exists per ADR-004 step 5 |
 | 6. One viable adapter per required core role | ✅ **Met** — verified by `engine/completion.py GATE-6` → `STOP_COMPLETE`, not by assertion | All 9 adapters pass [Layer 1](../../conformance/layer1.py) **112/112**; [Layer 2](../../conformance/layer2.py) 9/9 EQUIVALENT across 3 roadmap providers; criteria in `.repo-governor/acceptance/GATE-6.json` |
-| 7. `UNKNOWN` and failure behavior defined | 🟡 Designed | ADR-007, ADR-002 + ADR-017; unblocked, but the reason vocabulary is not yet closed |
+| 7. `UNKNOWN` and failure behavior defined | ✅ **Met** — `completion.py GATE-7` → `STOP_COMPLETE` | [`engine/vocabulary.py`](../../engine/vocabulary.py) closes 12 governance + 8 onboarding dispositions and 18 reasons; [`conformance/vocabulary.py`](../../conformance/vocabulary.py) proves the sets cannot drift from the code |
 
-Designed ≠ validated. Every 🟡 becomes ✅ only when the corresponding fixture passes.
+**All seven gate conditions are met**, each on `engine/completion.py`'s verdict rather than assertion. Per §61 the specification may move to `IMPLEMENTATION_READY`.
+
+Reproduce the whole thing:
+
+```bash
+for g in 1 2 3 4 5 6 7; do python3 engine/completion.py GATE-$g; done
+for s in layer1 layer2 transport manifest onboarding vocabulary; do python3 conformance/$s.py; done
+```
+
+### What `IMPLEMENTATION_READY` does not mean
+
+The gate asks whether the architecture is stable enough to build on. It does not ask whether the product is worth building, and four things remain open:
+
+* **All 17 ADRs are still `Proposed`.** None has been accepted. The gate was met against decisions nobody has ratified.
+* **#1 (cross-provider normalization) has weak evidence.** 9/9 scenarios agree, but all three adapters were written by the same author against the same map — that measures shared intent as much as portability. A third-party adapter is the real test.
+* **#2 (envelope thinness) is unmeasured** on any real repository.
+* **The criteria-drift weakness is unresolved.** Acceptance criteria were amended twice during implementation. Both amendments were justified and recorded, and nothing but that record distinguishes a legitimate correction from a convenient one.

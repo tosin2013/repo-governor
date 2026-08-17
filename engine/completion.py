@@ -23,6 +23,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import vocabulary as V  # noqa: E402
+
 ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -38,6 +41,18 @@ def call(adapter, role, fn, kw, env_extra=None):
         return {"ok": False, "error": {"type": "NON_JSON", "message": p.stdout[:120]}}
 
 
+def _classify(u, profile="GOVERNOR_LITE"):
+    """Attach dimension and blocking from the closed vocabulary (gate 7).
+
+    An adapter may not decide whether its own unknown blocks. It names a
+    reason; the engine classifies. A reason outside the closed set raises,
+    because silently accepting an unclassifiable unknown would let a
+    provider bypass the blocking rule entirely.
+    """
+    dim, blocking, desc = V.classify(u["reason"], profile)
+    return {**u, "dimension": dim, "blocking": blocking, "meaning": desc}
+
+
 def evaluate(authority_id, roadmap_adapter, roadmap_env):
     """Return the full governance decision for the completion axis."""
     unknowns = []
@@ -51,7 +66,7 @@ def evaluate(authority_id, roadmap_adapter, roadmap_env):
                               "detail": auth["error"]["message"], "blocking": True}],
                 "provenance": []}
     if auth.get("unknown"):
-        u = dict(auth["unknown"]); u["dimension"] = "authority"
+        u = _classify(auth["unknown"])
         return {"decision": "UNKNOWN", "authority_id": authority_id,
                 "unknowns": [u], "provenance": []}
     provenance += auth.get("provenance", [])
@@ -74,7 +89,7 @@ def evaluate(authority_id, roadmap_adapter, roadmap_env):
                 "provenance": provenance}
     if crit.get("unknown"):
         # No criteria declared => no completion bar => CONTINUE, not STOP.
-        u = dict(crit["unknown"]); u["dimension"] = "acceptance"
+        u = _classify(crit["unknown"])
         unknowns.append(u)
         return {"decision": "CONTINUE", "authority_id": authority_id, "authority": authority,
                 "stop_condition": {"acceptance_conditions_satisfied": "UNKNOWN"},
@@ -94,7 +109,7 @@ def evaluate(authority_id, roadmap_adapter, roadmap_env):
             results.append({**c, "satisfied": None})
             continue
         if ev.get("unknown"):
-            u = dict(ev["unknown"]); u["dimension"] = "evidence"
+            u = _classify(ev["unknown"])
             unknowns.append(u)
             results.append({**c, "satisfied": None})
             continue

@@ -1,0 +1,11 @@
+{
+  "$comment": "Acceptance criteria for GATE-7, derived from ADR-007's implementation plan. Declared before the work was called done.",
+  "authority_id": "GATE-7",
+  "criteria": [
+    { "check": "file_exists",  "target": "engine/vocabulary.py" },
+    { "check": "command_exit", "target": "python3 engine/vocabulary.py" },
+    { "check": "command_exit", "target": "python3 conformance/vocabulary.py" },
+    { "check": "command_exit", "target": "python3 conformance/layer1.py" },
+    { "check": "command_exit", "target": "python3 engine/completion.py GATE-5" }
+  ]
+}
