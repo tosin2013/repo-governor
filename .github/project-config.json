@@ -25,8 +25,8 @@
         "Done"
       ],
       "auto_add_workflow": true,
-      "items": 29,
-      "status_snapshot": "20 Done, 9 Backlog (2026-08-17). 0 drift across 29 items.",
+      "items": 30,
+      "status_snapshot": "20 Done, 10 Backlog (2026-08-17). 0 drift across 30 items.",
       "write_scope_acquired": "2026-08-17 \u2014 token now carries 'project'; manual field edits work. Note the refresh REPLACED read:project rather than adding to it."
     },
     "reason": "Linked by the maintainer on 2026-08-17, overriding the computed recommendation of 'none'. The override is correct and the score is not wrong: it measures COORDINATION need \u2014 contributors, open items, activity \u2014 and coordination need genuinely is low for a solo repository. What it does not measure is TRACKING need. This repository carries 19 tracked items across three distinct categories (gate conditions, thesis risks, architecture questions) with real dependencies between them, and that is what the board is for. Two different needs; the score only sees one.",
@@ -65,10 +65,11 @@
       "1": "cross-provider normalization -- the thesis question; Layer 2 has never run on two LIVE providers",
       "25": "adr.get_constraints swallows STATUS_UNSTATED -- RELEASE-BLOCKING",
       "27": "detected ADR location never reaches the adapter; detection over-promises",
-      "28": "adapters/adr reads 16% of real ADRs -- split from 25, not blocking"
+      "28": "adapters/adr reads 16% of real ADRs -- split from 25, not blocking",
+      "30": "governed roadmap writeback -- research question, proposed INV-015; exit is an ADR, not code"
     },
     "milestoned": 0,
-    "note": "Ten open issues. Only 25 is milestoned and it is the last release blocker. The rest are unmilestoned and read NOT_ADMITTED."
+    "note": "Ten open issues, none milestoned, all NOT_ADMITTED. Post-v0.1.0 additions: 30 (writeback research) filed deliberately unadmitted -- the system's rule applied to its own future. docs/workflows/ now teaches humans what to ask."
   },
   "governance_self_binding": {
     "$comment": "This repository is now governed by its own engine off GitHub issues, not off a local file. Recorded because the previous arrangement was a section 54 failure condition that went unnoticed for 40 commits (ADR-022).",
