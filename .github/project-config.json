@@ -25,7 +25,8 @@
         "Done"
       ],
       "auto_add_workflow": true,
-      "items": 17
+      "items": 18,
+      "known_drift": "#17 is OPEN but sits in Done on the board. GitHub auto-set it Done when a commit message accidentally closed it; reopening did not move it back. Needs project scope to fix: gh project item-edit."
     },
     "reason": "Linked by the maintainer on 2026-08-17, overriding the complexity-score recommendation of 'none' (score 0/8). Human decision takes precedence; do not re-evaluate.",
     "revisit_when": "board sits empty with no open issues for an extended period, or the maintainer asks to reconsider",
