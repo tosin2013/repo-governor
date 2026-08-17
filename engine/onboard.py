@@ -1,0 +1,257 @@
+#!/usr/bin/env python3
+"""Repository onboarding — assess, detect, propose (spec §18–§20, ADR-006, ADR-010).
+
+Three phases, deliberately separate:
+
+    assess    repository condition L0–L4 -> suggested profile
+    detect    candidate providers, each citing its evidence
+    propose   write .repo-governor.proposed.json for a human to accept
+
+The engine NEVER reads the proposal. Binding requires a human to promote it
+to .repo-governor.json and commit (INV-013, ADR-010 rule 1). That separation
+is why silent binding is unimplementable rather than merely forbidden.
+
+Detection is filesystem-only. It does not authenticate or probe remote
+systems — a probe that succeeds because a token happens to be present is
+capability implying permission, which ADR-005 forbids (ADR-010 rule 4).
+
+Usage:  python3 engine/onboard.py <repo-path> [--json] [--write]
+"""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+PROPOSAL = ".repo-governor.proposed.json"
+
+# --- condition indicators (§23). Evidence, not a weighted score (ADR-006 rule 2).
+# Certain indicators raise a FLOOR that may not be overridden downward (rule 3).
+FLOOR_INDICATORS = ("public_api_surface", "release_branches", "generated_consumers")
+
+
+def _git(repo, *args):
+    try:
+        p = subprocess.run(["git", "-C", str(repo), *args],
+                           capture_output=True, text=True, timeout=30)
+        return p.returncode, p.stdout
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return 127, ""
+
+
+def assess(repo: Path):
+    """Report observed indicators and a SUGGESTED level. A human decides."""
+    ind = {}
+    files = [p for p in repo.rglob("*") if p.is_file() and ".git/" not in str(p)]
+    src = [p for p in files if p.suffix in (".py", ".js", ".ts", ".go", ".rs", ".java", ".rb")]
+    ind["source_files"] = len(src)
+
+    pkgs = [p for p in repo.rglob("package.json") if "node_modules" not in str(p)]
+    pkgs += list(repo.rglob("pyproject.toml")) + list(repo.rglob("go.mod"))
+    ind["packages"] = len(pkgs)
+    ind["multi_package"] = len(pkgs) > 1
+
+    ind["migrations"] = any(p.is_dir() and p.name in ("migrations", "migrate")
+                            for p in repo.rglob("*"))
+    ind["feature_flags"] = any("flag" in p.name.lower() for p in files)
+    ind["architecture_history"] = any(
+        (repo / d).is_dir() for d in ("docs/adr", "docs/adrs", "docs/decisions"))
+    ind["ci_workflows"] = len(list((repo / ".github" / "workflows").glob("*"))) if (
+        repo / ".github" / "workflows").is_dir() else 0
+
+    # Floor indicators.
+    ind["public_api_surface"] = any(
+        "export " in p.read_text(errors="ignore")[:4000] or "__all__" in p.read_text(errors="ignore")[:4000]
+        for p in src[:60]) if src else False
+    rc, out = _git(repo, "branch", "-r")
+    ind["release_branches"] = sum(
+        1 for b in out.splitlines() if any(k in b for k in ("release/", "v1.", "v2.", "stable"))) > 0
+    ind["generated_consumers"] = any(
+        p.is_dir() and p.name in ("generated", "gen", "clients") for p in repo.rglob("*"))
+
+    floors = [k for k in FLOOR_INDICATORS if ind.get(k)]
+
+    if floors:
+        level, why = "L4", f"floor raised by {', '.join(floors)} — compatibility obligations exist"
+    elif ind["multi_package"] or (ind["migrations"] and ind["architecture_history"]):
+        level, why = "L3", "multiple packages or migrations plus architecture history"
+    elif ind["migrations"] or ind["architecture_history"] or ind["ci_workflows"] > 1:
+        level, why = "L2", "migrations, architecture history, or multiple workflows present"
+    elif ind["source_files"] > 2:
+        level, why = "L1", "one small package, little architecture history"
+    else:
+        level, why = "L0", "nearly empty repository, no architecture history"
+
+    profile = {"L0": "GOVERNOR_GREENFIELD", "L1": "GOVERNOR_LITE", "L2": "GOVERNOR_STANDARD",
+               "L3": "GOVERNOR_FULL", "L4": "GOVERNOR_HIGH_ASSURANCE"}[level]
+    return {"suggested": level, "profile": profile, "reason": why,
+            "floor": floors or None, "indicators": ind}
+
+
+# --- detection (§19). Filesystem evidence only; never credentials. -----------
+def _cite(repo, rel, note):
+    return f"{rel}: {note}"
+
+
+def detect(repo: Path):
+    """Return candidates per role, each with cited evidence and a disposition."""
+    cands = {}
+
+    def add(role, type_, adapter, disposition, evidence, not_evidence=None, **extra):
+        cands.setdefault(role, []).append({
+            "role": role, "type": type_, "adapter": adapter,
+            "disposition": disposition, "evidence": evidence,
+            "not_evidence": not_evidence or [], **extra})
+
+    # repository — Git
+    rc, _ = _git(repo, "rev-parse", "--git-dir")
+    if rc == 0:
+        add("repository", "git", "adapters/git", "PROVIDER_DETECTED",
+            [_cite(repo, ".git", "valid git repository")])
+
+    # architecture — ADR directory
+    for d in ("docs/adr", "docs/adrs", "docs/decisions"):
+        p = repo / d
+        if p.is_dir():
+            md = sorted(p.glob("*.md"))
+            numbered = [f for f in md if f.name[:4].isdigit()]
+            with_status = [f for f in numbered if "## Status" in f.read_text(errors="ignore")
+                           or "**Status**" in f.read_text(errors="ignore")]
+            strong = len(numbered) >= 2 and len(with_status) >= max(1, len(numbered) // 2)
+            add("architecture", "adr", "adapters/adr",
+                "PROVIDER_DETECTED" if strong else "PROVIDER_UNCONFIRMED",
+                [_cite(repo, d, f"{len(numbered)} numbered file(s)"),
+                 _cite(repo, d, f"{len(with_status)} declare a Status")],
+                [] if strong else [_cite(repo, d, "too few files, or Status lines absent")],
+                path=d)
+
+    # change_signals — Renovate / Dependabot
+    for f, t in (("renovate.json", "renovate"), (".renovaterc.json", "renovate"),
+                 (".github/dependabot.yml", "dependabot")):
+        if (repo / f).exists():
+            add("change_signals", t, "adapters/change-signals-file", "PROVIDER_DETECTED",
+                [_cite(repo, f, "configuration present")])
+
+    # execution — Beads
+    if (repo / ".beads").is_dir():
+        add("execution", "beads", "adapters/execution-file", "PROVIDER_DETECTED",
+            [_cite(repo, ".beads/", "beads database directory present")])
+
+    # roadmap_authority — Linear
+    for f in (".linear.json", ".linear.yml", "linear.json"):
+        if (repo / f).exists():
+            add("roadmap_authority", "linear", "adapters/linear", "PROVIDER_DETECTED",
+                [_cite(repo, f, "Linear configuration present")])
+
+    # roadmap_authority — GitHub Projects.
+    # Cannot be confirmed without an authenticated call, and ADR-010 rule 4
+    # forbids probing with credentials during detection. So: UNCONFIRMED.
+    rc, remotes = _git(repo, "remote", "-v")
+    has_gh = "github.com" in remotes
+    marker = (repo / ".github" / "PROJECTS.md").exists() or (repo / ".github").is_dir()
+    if has_gh or marker:
+        ev = []
+        if has_gh:
+            ev.append(_cite(repo, "git remote", "origin points at github.com"))
+        if marker:
+            ev.append(_cite(repo, ".github/", "GitHub metadata directory present"))
+        add("roadmap_authority", "github-projects", "adapters/github-projects",
+            "PROVIDER_UNCONFIRMED", ev,
+            [_cite(repo, "-", "whether a Project exists cannot be seen without an "
+                              "authenticated call, which detection must not make")])
+
+    return cands
+
+
+def onboard(repo: Path):
+    condition = assess(repo)
+    candidates = detect(repo)
+
+    conflicts, halted = [], False
+    for role in ("roadmap_authority", "execution", "repository", "acceptance_criteria"):
+        if len(candidates.get(role, [])) > 1:
+            conflicts.append({
+                "role": role,
+                "candidates": [c["type"] for c in candidates[role]],
+                "disposition": "PROVIDER_CONFLICT",
+                "required": f"Select one canonical {role} provider. No ranking is applied — "
+                            "any automatic tie-break would silently confer authority (INV-013).",
+            })
+            if role == "roadmap_authority":
+                halted = True
+
+    roles_found = sorted(candidates)
+    if halted:
+        state = "PROVIDER_CONFLICT"
+    elif "roadmap_authority" not in candidates:
+        state = "AUTHORITY_SOURCE_MISSING"
+    else:
+        state = "PROPOSAL_READY"
+
+    return {
+        "repository": str(repo),
+        "state": state,
+        "condition": condition,
+        "candidates": candidates,
+        "conflicts": conflicts,
+        "roles_detected": roles_found,
+        "execution_required": False,
+        "notes": [
+            "Detection proposes; only an accepted manifest binds (INV-013).",
+            "No credentials were used. Remote systems were not probed.",
+        ] + ([ "No roadmap authority detected. A manual/file provider or explicit "
+               "configuration is required before any EXECUTE disposition." ]
+             if "roadmap_authority" not in candidates else []),
+    }
+
+
+def main(argv):
+    if not argv:
+        print("usage: onboard.py <repo-path> [--json] [--write]", file=sys.stderr)
+        return 2
+    repo = Path(argv[0]).resolve()
+    if not repo.is_dir():
+        print(f"FATAL: {repo} is not a directory", file=sys.stderr)
+        return 2
+    result = onboard(repo)
+
+    if "--write" in argv:
+        out = repo / PROPOSAL
+        out.write_text(json.dumps(
+            {"$comment": "PROPOSAL ONLY. The engine never reads this file. To bind these "
+                         "providers, review it, rename to .repo-governor.json, and commit "
+                         "(ADR-010 rule 1).", **result}, indent=2) + "\n")
+        print(f"wrote {out}")
+
+    if "--json" in argv:
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return 0
+
+    c = result["condition"]
+    print(f"repository : {result['repository']}")
+    print(f"STATE      : {result['state']}")
+    print(f"condition  : {c['suggested']} / {c['profile']}  ({c['reason']})")
+    if c["floor"]:
+        print(f"  floor    : {', '.join(c['floor'])} — may not be overridden downward")
+    print("candidates :")
+    for role in sorted(result["candidates"]):
+        for cand in result["candidates"][role]:
+            print(f"  {role:<20} {cand['type']:<16} {cand['disposition']}")
+            for e in cand["evidence"]:
+                print(f"      evidence: {e}")
+            for e in cand["not_evidence"]:
+                print(f"      not evidence: {e}")
+    if not result["candidates"]:
+        print("  (none)")
+    for cf in result["conflicts"]:
+        print(f"\nPROVIDER_CONFLICT on {cf['role']}: {', '.join(cf['candidates'])}")
+        print(f"  {cf['required']}")
+    for n in result["notes"]:
+        print(f"note: {n}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

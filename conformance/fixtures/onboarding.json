@@ -1,0 +1,69 @@
+{
+  "$comment": "Onboarding fixtures A-C from reference/onboarding.md 58-60, declared as file specs rather than committed trees. The harness materializes each into a temp dir and runs `git init`, so every fixture is a genuinely isolated repository. Committing the trees instead let the parent repo's git remote leak into fixture A and produce a false roadmap candidate.",
+  "fixtures": {
+    "A-greenfield": {
+      "spec": "58",
+      "description": "Git only. No roadmap, no task tracker, no ADRs, no Renovate.",
+      "remote": null,
+      "files": {
+        "README.md": "# a\n",
+        "src/main.py": "print('hello')\n"
+      },
+      "expect": {
+        "condition": "L0",
+        "profile": "GOVERNOR_GREENFIELD",
+        "state": "AUTHORITY_SOURCE_MISSING",
+        "roles_detected": ["repository"],
+        "must_not_detect": ["roadmap_authority", "execution", "architecture", "change_signals"],
+        "pass_requirement": "must not force unnecessary infrastructure"
+      }
+    },
+    "B-growing": {
+      "spec": "59",
+      "description": "GitHub Projects, docs/adr/, Renovate, Git.",
+      "remote": "https://github.com/example/b.git",
+      "files": {
+        "package.json": "{\"name\":\"b\",\"version\":\"1.0.0\"}\n",
+        "renovate.json": "{\"extends\":[\"config:base\"]}\n",
+        "docs/adr/0001-use-postgres.md": "# 1. Use Postgres\n\n**Status**: Accepted\n",
+        "docs/adr/0002-event-bus.md": "# 2. Event bus\n\n**Status**: Accepted\n",
+        "src/app.js": "const app = 1;\n",
+        ".github/workflows/ci.yml": "name: ci\non: push\n"
+      },
+      "expect": {
+        "condition": "L2",
+        "state": "PROPOSAL_READY",
+        "roles_detected": ["architecture", "change_signals", "repository", "roadmap_authority"],
+        "must_not_detect": ["execution"],
+        "dispositions": {
+          "architecture": "PROVIDER_DETECTED",
+          "change_signals": "PROVIDER_DETECTED",
+          "roadmap_authority": "PROVIDER_UNCONFIRMED"
+        },
+        "pass_requirement": "execution provider remains optional"
+      }
+    },
+    "C-complex": {
+      "spec": "60",
+      "description": "Linear, GitHub Projects, Beads, ADRs, Renovate, Git.",
+      "remote": "https://github.com/example/c.git",
+      "files": {
+        ".linear.json": "{\"linear\":{\"teamId\":\"ENG\"}}\n",
+        ".beads/config.json": "{\"db\":\"beads.db\"}\n",
+        "renovate.json": "{\"extends\":[\"config:base\"]}\n",
+        "docs/adrs/0001-split.md": "# 1. Split services\n\n**Status**: Accepted\n",
+        "docs/adrs/0002-api.md": "# 2. Public API\n\n**Status**: Accepted\n",
+        "packages/api/package.json": "{\"name\":\"api\"}\n",
+        "packages/web/package.json": "{\"name\":\"web\"}\n",
+        "migrations/001.sql": "-- 001\n"
+      },
+      "expect": {
+        "state": "PROVIDER_CONFLICT",
+        "conflict_role": "roadmap_authority",
+        "conflict_candidates": ["linear", "github-projects"],
+        "roles_detected": ["architecture", "change_signals", "execution", "repository", "roadmap_authority"],
+        "pass_requirement": "must halt onboarding until one roadmap authority is explicitly selected"
+      }
+    }
+  }
+}

@@ -118,6 +118,34 @@
         "remote manifest resolution"
       ],
       "parent": "RG-SIM-ONBOARDING-v0.1"
+    },
+    "GATE-2": {
+      "title": "Provider conflicts handled deterministically",
+      "status": "IN_PROGRESS",
+      "authority": "AUTHORIZED",
+      "admitted": true,
+      "parent": "RG-SIM-ONBOARDING-v0.1"
+    },
+    "GATE-3": {
+      "title": "Low-complexity repositories operate without unnecessary providers",
+      "status": "IN_PROGRESS",
+      "authority": "AUTHORIZED",
+      "admitted": true,
+      "parent": "RG-SIM-ONBOARDING-v0.1"
+    },
+    "GATE-4": {
+      "title": "Provider detection does not assign authority",
+      "status": "IN_PROGRESS",
+      "authority": "AUTHORIZED",
+      "admitted": true,
+      "parent": "RG-SIM-ONBOARDING-v0.1"
+    },
+    "GATE-1": {
+      "title": "Onboarding simulation passes",
+      "status": "IN_PROGRESS",
+      "authority": "AUTHORIZED",
+      "admitted": true,
+      "parent": "RG-SIM-ONBOARDING-v0.1"
     }
   }
 }

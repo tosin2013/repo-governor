@@ -81,10 +81,10 @@ Questions 3 and 4 are the ones that could invalidate the product. Both should be
 
 | Gate condition | Status | Evidence |
 | --- | --- | --- |
-| 1. Onboarding simulation passes | ⬜ Not started | ADR-010 step 3 — fixtures §58–60 |
-| 2. Provider conflicts handled deterministically | 🟡 Designed | ADR-013 |
-| 3. Low-complexity repos need no extra providers | 🟡 Designed | ADR-006, ADR-003 rule 4 |
-| 4. Detection does not assign authority | 🟡 Designed | ADR-010 |
+| 1. Onboarding simulation passes | ✅ **Met** — `completion.py GATE-1` → `STOP_COMPLETE` | [`conformance/onboarding.py`](../../conformance/onboarding.py) **29/29**, `RG-SIM-ONBOARDING-v0.1: PASS`. Fixtures A–C materialized into isolated temp repos |
+| 2. Provider conflicts handled deterministically | ✅ **Met** — `completion.py GATE-2` → `STOP_COMPLETE` | Fixture C raises `PROVIDER_CONFLICT` on `roadmap_authority`, names both candidates, applies no ranking |
+| 3. Low-complexity repos need no extra providers | ✅ **Met** — `completion.py GATE-3` → `STOP_COMPLETE` | Fixture A detects only `repository`; condition L0; state `AUTHORITY_SOURCE_MISSING` |
+| 4. Detection does not assign authority | ✅ **Met** — `completion.py GATE-4` → `STOP_COMPLETE` | Proposal written to `.repo-governor.proposed.json`; asserted the manifest loader never reads it; binding requires human promotion |
 | 5. Manifest semantics stable | ✅ **Met** — verified by `engine/completion.py GATE-5` → `STOP_COMPLETE` | `schemas/manifest-v1.json` frozen; `engine/manifest.py` fails closed; [26/26 refusal cases](../../conformance/manifest.py); `--validate` reaches `READY_FOR_GOVERNANCE`; `engine/migrate.py` stub exists per ADR-004 step 5 |
 | 6. One viable adapter per required core role | ✅ **Met** — verified by `engine/completion.py GATE-6` → `STOP_COMPLETE`, not by assertion | All 9 adapters pass [Layer 1](../../conformance/layer1.py) **112/112**; [Layer 2](../../conformance/layer2.py) 9/9 EQUIVALENT across 3 roadmap providers; criteria in `.repo-governor/acceptance/GATE-6.json` |
 | 7. `UNKNOWN` and failure behavior defined | 🟡 Designed | ADR-007, ADR-002 + ADR-017; unblocked, but the reason vocabulary is not yet closed |
