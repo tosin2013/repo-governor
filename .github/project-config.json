@@ -69,7 +69,22 @@
       "30": "governed roadmap writeback -- research question, proposed INV-015; exit is an ADR, not code"
     },
     "milestoned": 0,
-    "note": "Ten open issues, none milestoned, all NOT_ADMITTED. Post-v0.1.0 additions: 30 (writeback research) filed deliberately unadmitted -- the system's rule applied to its own future. docs/workflows/ now teaches humans what to ask."
+    "note": "Ten open issues, none milestoned, all NOT_ADMITTED. Post-v0.1.0 additions: 30 (writeback research) filed deliberately unadmitted -- the system's rule applied to its own future. docs/workflows/ now teaches humans what to ask.",
+    "review_2026_08_17": {
+      "$comment": "Full review of all ten open issues post-v0.1.0, at the maintainer's request. Outcome: ZERO closeable. Every claim re-verified live against the code.",
+      "why_deferrals_stay_open": "Closing 6 or 14 as NOT_PLANNED would be read back by decision-history-github as a recorded REJECTED decision -- this repository's own semantics make closure-reason a decision record, and deferral is not rejection. Unmilestoned-open IS the deferred state: the engine already reads them NOT_ADMITTED.",
+      "verified_live": {
+        "1": "layer2 still runs both trackers on fixtures; thesis bar unmet",
+        "2": "blocked on 23; nothing compiles an envelope",
+        "5": "activation unmeasured; instrument improved by AGENTS.md but experiment not run",
+        "20": "engine never passes --input; ADR-020 held partly on this",
+        "23": "engine never calls get_scope; ADR-024 acceptance conditions unmet",
+        "27": "adapter reads no binding path; onboard.py still substring-counts statuses",
+        "28": "STATUS_RE still single-dialect; 16% coverage stands",
+        "30": "filed this session; research not started"
+      },
+      "v02_candidates": "Coherent slate if admitted together: 27+28 (make the ADR provider work on real repositories -- shared surface, 28 depends on 27's path threading landing first) and 23 (unlocks 2, satisfies ADR-024's acceptance conditions). Research track: 30, 20, 1, 5. Standing deferrals: 6, 14. Admission is the maintainer's act."
+    }
   },
   "governance_self_binding": {
     "$comment": "This repository is now governed by its own engine off GitHub issues, not off a local file. Recorded because the previous arrangement was a section 54 failure condition that went unnoticed for 40 commits (ADR-022).",
