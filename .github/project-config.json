@@ -25,8 +25,8 @@
         "Done"
       ],
       "auto_add_workflow": true,
-      "items": 23,
-      "status_snapshot": "15 Done, 8 Backlog (2026-08-17). Reconciled against issue state: 0 drift across 23 items.",
+      "items": 25,
+      "status_snapshot": "15 Done, 10 Backlog (2026-08-17). 0 drift across 25 items.",
       "write_scope_acquired": "2026-08-17 \u2014 token now carries 'project'; manual field edits work. Note the refresh REPLACED read:project rather than adding to it."
     },
     "reason": "Linked by the maintainer on 2026-08-17, overriding the computed recommendation of 'none'. The override is correct and the score is not wrong: it measures COORDINATION need \u2014 contributors, open items, activity \u2014 and coordination need genuinely is low for a solo repository. What it does not measure is TRACKING need. This repository carries 19 tracked items across three distinct categories (gate conditions, thesis risks, architecture questions) with real dependencies between them, and that is what the board is for. Two different needs; the score only sees one.",
@@ -37,16 +37,18 @@
     "decision": "milestone",
     "reason": "Gate work is now tracked under milestone RG-SIM-ONBOARDING-v0.1 (0/7). Still no shippable artifact, so no tags, CHANGELOG, or release automation yet.",
     "revisit_when": "A release is now unblocked on licensing but still blocked on ADR status. Revisit when the ADRs are moved from Proposed to Accepted.",
-    "milestone": "RG-THESIS-v0.2 (closed 2/2); RG-SIM-ONBOARDING-v0.1 (closed 10/10)",
+    "milestone": "RG-RATIFY-v0.1.0 (open); RG-THESIS-v0.2 (closed 2/2); RG-SIM-ONBOARDING-v0.1 (closed 10/10)",
     "milestone_scope": "Expanded 2026-08-17 from 7 gate conditions to 10. Rule: an issue belongs in RG-SIM-ONBOARDING-v0.1 if it blocks IMPLEMENTATION_READY. #15/#17/#18 block gate conditions and were added; #1/#2/#16 are product-viability and positioning questions and were kept out.",
     "milestone_items": 10,
     "milestone_progress": "RG-THESIS-v0.2 2/2 \u2014 21 (engine resolves providers through the manifest) and 19 (roadmap of record moved to GitHub).",
     "implementation_gate": "MET 2026-08-17, re-verified against live GitHub issues 7-13. Met against 22 ADRs that are all still Proposed; architecture ratification is now the release gate (docs/adrs/RATIFICATION-v0.1.0.md).",
     "shippable_artifact": "Now exists: 12 adapters, 7 engine modules, 6 conformance suites, SKILL.md. Release decision stays 'milestone' \u2014 no version cut yet, and commits are not conventional, so any version recommendation is judgment-based rather than derivable.",
-    "milestone_state": "Both milestones CLOSED 2026-08-17.",
+    "milestone_state": "RG-RATIFY-v0.1.0 OPEN. Ratification done; the tag it gates is withheld.",
     "version_recommendation": "v0.1.0, judgment-based. 0 feat / 0 fix / 0 breaking across 42 commits because this repository does not use conventional commits, so the count is not evidence of a patch release \u2014 it is evidence the heuristic does not apply here.",
-    "release_blocker": "Architecture ratification (issue 22). All 22 ADRs are still Proposed. The release condition is NOT 22/22 Accepted -- it is that every decision the runtime depends on is Accepted and no Proposed ADR is silently normative. Review recommends 20 accept / 2 hold (014 half-shipped, 020 unexercised by the engine). See docs/adrs/RATIFICATION-v0.1.0.md. Licensing resolved.",
-    "license": "Apache-2.0, applied 2026-08-17. Chosen for the patent grant and contribution terms because ADR-003's adapter protocol invites third-party adapters. Ownership (section 68, Tosin Open Source) was decided separately and is recorded in NOTICE."
+    "release_blocker": "THREE release-blocking findings from the real-repository evidence run against mcp-adr-analysis-server: issue 24 (engine governs the repo it is installed in and reports confidently about the wrong one; provenance cannot disambiguate) and issue 25 (adr.get_constraints returns DEFINED while dropping 19 of 22 unreadable decisions, violating ADR-003 rule 6 which was accepted the same day). Architecture ratification is NO LONGER the blocker -- it completed.",
+    "license": "Apache-2.0, applied 2026-08-17. Chosen for the patent grant and contribution terms because ADR-003's adapter protocol invites third-party adapters. Ownership (section 68, Tosin Open Source) was decided separately and is recorded in NOTICE.",
+    "adr_status": "21 of 24 Accepted 2026-08-17 by Tosin Akinosho (section 68). ADR-020 and ADR-024 held Proposed. ADR-014 Superseded, split into 023 (accepted) and 024 (proposed).",
+    "tag_decision": "NOT TAGGED 2026-08-17. The directive was 'tag only if no release-blocking finding remains'; three remain. No tag, no draft release. The findings were also NOT fixed: discovery confers no authority (INV-001), so 24 and 25 read NOT_ADMITTED until the maintainer admits them."
   },
   "open_work": {
     "$comment": "Post-milestone. None of these block anything; all are open questions or backlog.",
@@ -58,15 +60,26 @@
       "6": "monorepo governance -- deferred past v1",
       "5": "skill activation reliability across hosts -- governance logic is not governance enforcement",
       "2": "ScopeEnvelope thinness -- UNANSWERABLE as written; nothing compiles an envelope. Blocked on 23",
-      "1": "cross-provider normalization -- the thesis question; Layer 2 has never run on two LIVE providers"
+      "1": "cross-provider normalization -- the thesis question; Layer 2 has never run on two LIVE providers",
+      "25": "adr.get_constraints swallows STATUS_UNSTATED -- RELEASE-BLOCKING",
+      "24": "engine governs the repo it is installed in -- RELEASE-BLOCKING"
     },
     "milestoned": 0,
-    "note": "All eight deliberately unmilestoned, therefore NOT_ADMITTED under the declared admission signal. Admitting 22 is the next decision and it is the maintainer's, not the agent's: section 68 makes acceptance a human authority."
+    "note": "Issues 22 and 23 are milestoned to RG-RATIFY-v0.1.0; 22 is assigned and therefore AUTHORIZED. The other eight are unmilestoned and read NOT_ADMITTED, including the two release blockers -- admitting them is the maintainer's decision, not the agent's."
   },
   "governance_self_binding": {
     "$comment": "This repository is now governed by its own engine off GitHub issues, not off a local file. Recorded because the previous arrangement was a section 54 failure condition that went unnoticed for 40 commits (ADR-022).",
     "roadmap_authority": "adapters/github-projects",
     "admission_signal": "milestone",
     "consequence": "An issue with no milestone reads NOT_ADMITTED and blocks. Correct for the deferrals (6, 14) and for the open questions (1, 2, 5, 20), which are not admitted work."
+  },
+  "evidence_run": {
+    "$comment": "Step 5-6 of the ratification directive. First run against a repository this project does not own.",
+    "target": "tosin2013/mcp-adr-analysis-server",
+    "scale": "22 ADRs, 24 open issues, 100 closed (84 NOT_PLANNED / 16 COMPLETED), 2 live milestones",
+    "assessment": "L4 / GOVERNOR_HIGH_ASSURANCE, floor raised by public_api_surface, release_branches, generated_consumers",
+    "worked": "Onboarding assessed a foreign repository correctly. Adapters accept targeting via env. decision-history-github read real NOT_PLANNED closures as REJECTED.",
+    "failed": "Governance itself cannot target a foreign repository and does not say so -- it answers about its own. See issue 24.",
+    "structural_finding": "Second real-repo run to find a format assumption in adapters/adr. Both were invisible to conformance because the fixtures share the implementation's conventions. Layer 1 and Layer 2 cannot catch a convention the fixtures and the code agree on -- the strongest argument yet for the third-party adapter issue 1 asks for."
   }
 }
