@@ -133,6 +133,20 @@ Repo Governor should reuse existing tools rather than rebuild mature functionali
 
 Repo Governor consumes provider responses through normalized contracts. The policy engine evaluates normalized state and produces a governance disposition.
 
+> **Access modality, added 2026-08-17 from the #16 research.** The diagram above shows providers as uniform peers, which is false in one important way: they differ not only in *schema* but in *how they are reached*.
+>
+> | Provider | Modality |
+> | --- | --- |
+> | Linear | remote MCP, OAuth — often already connected in the agent host |
+> | Beads | `bd` CLI, local, Git-backed |
+> | ADRs, acceptance criteria | filesystem |
+> | GitHub | `gh` CLI / GraphQL |
+> | Renovate | config file + API |
+>
+> Normalizing across modalities is a different job from normalizing across schemas, and it places Repo Governor in a **middleware position**. ADR-003's adapter protocol is already that middleware bus; it was built before the position was named.
+>
+> The position is accepted; the **middleware mandate is refused**. Repo Governor normalizes access only as far as ruling requires, and never takes responsibility for integration as a product concern — §8 disclaims that, and §54 now names the failure modes the middle brings. The public positioning in §66 stays governance-first: "skill" keeps expectations right where "middleware" invites an integration product.
+
 ---
 
 ## §66 — Public Positioning

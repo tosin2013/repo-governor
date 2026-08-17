@@ -35,15 +35,24 @@ references/
   lifecycles.md               # admission / maintenance / retirement state machines
   dispositions.md             # full disposition semantics
 policies/
-  greenfield.yaml             # GOVERNOR_GREENFIELD
-  lite.yaml                   # GOVERNOR_LITE
-  standard.yaml               # GOVERNOR_STANDARD
-  full.yaml                   # GOVERNOR_FULL
-  high-assurance.yaml         # GOVERNOR_HIGH_ASSURANCE
-scripts/
-  evaluate.py                 # deterministic engine (see ADR-002, ADR-011)
+  greenfield.json             # GOVERNOR_GREENFIELD
+  lite.json                   # GOVERNOR_LITE
+  standard.json               # GOVERNOR_STANDARD
+  full.json                   # GOVERNOR_FULL
+  high-assurance.json         # GOVERNOR_HIGH_ASSURANCE
+engine/
+  completion.py               # deterministic engine (see ADR-002, ADR-011)
   onboard.py                  # repository attachment and detection
+  manifest.py vocabulary.py amendments.py
+adapters/                     # 10 provider adapters, any language
+conformance/                  # 7 suites — the evidence behind every claim
 ```
+
+> **Two deviations from this sketch, both recorded when the skill was built 2026-08-17.**
+>
+> *Policy packs are JSON, not YAML.* ADR-011 leaves the engine with no YAML parser and ADR-015 made JSON canonical after a spike showed a hand-rolled YAML subset silently mis-typed 7 of 10 realistic values. The packs are loaded by `engine/vocabulary.py` at import, so they are live configuration rather than documentation.
+>
+> *`scripts/` became `engine/` plus `adapters/`.* The sketch assumed two scripts; the implementation is an engine with a separate adapter layer, which ADR-003's subprocess protocol requires. `SKILL.md` references those paths directly.
 
 Secondary surfaces — MCP server, standalone CLI, CI action — are explicitly deferred. They may later wrap the same `scripts/` core, but none is required for MVP (§63) and none may fork the policy logic.
 

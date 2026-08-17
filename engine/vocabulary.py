@@ -105,15 +105,34 @@ DIMENSIONS = ("authority", "acceptance", "scope", "architecture", "execution",
 # Profiles may only make a non-blocking reason blocking, never the reverse.
 # Loosening a blocking reason would let a profile permit EXECUTE on evidence
 # the engine could not resolve.
-PROFILE_ESCALATIONS = {
-    "GOVERNOR_HIGH_ASSURANCE": ("NON_GOALS_UNSTATED", "ACCEPTANCE_UNSTATED",
-                                "NO_CRITERIA_DECLARED", "NO_ACCEPTED_DECISIONS"),
-    "GOVERNOR_FULL": ("NO_CRITERIA_DECLARED",),
-}
-
-
 class VocabularyError(ValueError):
     pass
+
+
+def _load_profiles():
+    """Escalations come from policies/*.json, not from a literal here.
+
+    ADR-006 rule 4: profiles are declarative policy packs loaded on demand,
+    which is what lets an L1 repository never pay for L4 policy detail.
+    JSON rather than the YAML ADR-001 sketched, because ADR-011 leaves the
+    engine with no YAML parser and ADR-015 made JSON canonical.
+    """
+    import json
+    from pathlib import Path
+    out = {}
+    d = Path(__file__).resolve().parent.parent / "policies"
+    if not d.is_dir():
+        return out
+    for p in sorted(d.glob("*.json")):
+        try:
+            pol = json.loads(p.read_text())
+        except json.JSONDecodeError as e:
+            raise VocabularyError(f"{p} is not valid JSON: {e}") from None
+        out[pol["profile"]] = tuple(pol.get("escalate_to_blocking", []))
+    return out
+
+
+PROFILE_ESCALATIONS = _load_profiles()
 
 
 def classify(reason, profile="GOVERNOR_LITE"):

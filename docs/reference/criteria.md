@@ -59,6 +59,12 @@ Repo Governor fails if:
 * it allows deletion from weak evidence;
 * it silently interprets provider availability as provider authority.
 
+*Added 2026-08-17 from the #16 research. Occupying a position between the agent and heterogeneous systems brings failure modes the original list, written for a pure policy layer, did not anticipate:*
+
+* it becomes a bottleneck on every agent action;
+* it is blamed for provider outages it merely relays;
+* it accretes integration surface until it competes with iPaaS tooling.
+
 ## §55 — Stop / Simplification Conditions
 
 Simplify or stop development if testing shows:
