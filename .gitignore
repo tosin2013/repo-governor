@@ -1,0 +1,20 @@
+# Auto-generated MCP server context (added automatically)
+.mcp-server-context.md
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Python (ADR-011 engine, once implemented)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
