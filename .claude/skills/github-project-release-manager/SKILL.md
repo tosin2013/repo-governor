@@ -294,6 +294,13 @@ These were all hit while building this skill.
     --jq '.data.repository.projectsV2.nodes[]?'
   ```
 - **`gh release list`, `gh issue list`, and `gh pr list` print nothing and exit 0 when empty.** Never branch on their exit code. Count lines: `gh release list | grep -c .`.
+- **`read:project` covers more than it looks, but not board mutations.** Verified on this repo: `gh project link` and every `list`/`view` command succeed with `read:project` alone, because linking is a repository-side operation. **`gh project item-edit` fails**, because setting a field value is a Project mutation:
+  ```text
+  $ gh project item-edit --id PVTI_... --field-id PVTSSF_... --single-select-option-id ...
+  exit=1
+  error: your authentication token is missing required scopes [project]
+  ```
+  So "can I read the board?" and "can I change the board?" are different questions. Test the actual write before promising it.
 - **`read:project` is not enough to write.** The failure is a GraphQL error, not a non-zero CLI exit in every path:
   ```text
   INSUFFICIENT_SCOPES ... The 'updateProjectV2' field requires one of the
