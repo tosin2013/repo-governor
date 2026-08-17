@@ -1,0 +1,8 @@
+{
+  "$comment": "Acceptance criteria for GATE-1 (onboarding simulation, spec 58-60).",
+  "authority_id": "GATE-1",
+  "criteria": [
+    { "check": "file_exists",  "target": "conformance/fixtures/onboarding-a-greenfield" },
+    { "check": "command_exit", "target": "python3 conformance/onboarding.py" }
+  ]
+}

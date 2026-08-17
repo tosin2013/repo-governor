@@ -37,6 +37,7 @@ SUITE = {
             "git_state": ("get_state", {}),
             "file_listing": ("get_files", {}),
             "dependency_manifests": ("get_manifests", {}),
+            "evaluate_check": ("evaluate_check", {"check": "file_exists", "target": "README.md"}),
         },
         "break_env": {"REPO_GOVERNOR_REPO": "/nonexistent-path-xyz"},
         "unknown_fn": ("get_entry_points", {}),
@@ -86,6 +87,17 @@ SUITE = {
         "break_env": {"REPO_GOVERNOR_GH_FIXTURE": "/nonexistent-fixture-xyz.json"},
         "unknown_fn": ("get_non_goals", {"id": "1"}),
         "absence_fn": ("get_work", {"id": "9999"}),
+    },
+    "adapters/acceptance-file": {
+        "role": "acceptance_criteria",
+        "probe": {"id": "GATE-6"},
+        "capability_fn": {
+            "criteria": ("get_criteria", {"id": "GATE-6"}),
+            "provenance": ("get_provenance", {}),
+            "machine_checkable": ("get_criteria", {"id": "GATE-6"}),
+        },
+        "break_env": {"REPO_GOVERNOR_ACCEPTANCE_DIR": "/nonexistent-path-xyz"},
+        "unknown_fn": ("get_criteria", {"id": "NOSUCH"}),
     },
     "adapters/linear": {
         "role": "roadmap_authority",

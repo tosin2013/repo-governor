@@ -1,0 +1,9 @@
+{
+  "$comment": "Acceptance criteria for GATE-6. Declared, never inferred (ADR-017).",
+  "authority_id": "GATE-6",
+  "criteria": [
+    { "check": "command_exit", "target": "python3 conformance/layer1.py" },
+    { "check": "file_exists",  "target": "adapters/acceptance-file" },
+    { "check": "file_exists",  "target": "adapters/beads" }
+  ]
+}
