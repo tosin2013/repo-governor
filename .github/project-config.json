@@ -26,7 +26,7 @@
       ],
       "auto_add_workflow": true,
       "items": 18,
-      "status_snapshot": "8 Done, 10 Backlog (2026-08-17). Board and issues fully reconciled, 0 drift across 18 items.",
+      "status_snapshot": "10 Done, 9 Backlog (2026-08-17). Board and issues reconciled, 0 drift across 19 items.",
       "write_scope_acquired": "2026-08-17 \u2014 token now carries 'project'; manual field edits work. Note the refresh REPLACED read:project rather than adding to it."
     },
     "reason": "Linked by the maintainer on 2026-08-17, overriding the complexity-score recommendation of 'none' (score 0/8). Human decision takes precedence; do not re-evaluate.",
@@ -40,7 +40,8 @@
     "milestone": "RG-SIM-ONBOARDING-v0.1",
     "milestone_scope": "Expanded 2026-08-17 from 7 gate conditions to 10. Rule: an issue belongs in RG-SIM-ONBOARDING-v0.1 if it blocks IMPLEMENTATION_READY. #15/#17/#18 block gate conditions and were added; #1/#2/#16 are product-viability and positioning questions and were kept out.",
     "milestone_items": 10,
-    "milestone_progress": "7/10 \u2014 all seven section-61 gate conditions closed, each engine-verified. Remaining: #15 #17 #18.",
-    "implementation_gate": "MET 2026-08-17. RG-SIM-ONBOARDING-v0.1 passes. Note: met against 17 ADRs that are all still Proposed."
+    "milestone_progress": "9/11 \u2014 all seven section-61 gate conditions closed and engine-verified, plus #15 (STOP_COMPLETE derivability) and #4 (redaction default). Remaining: #17 and #18, both partly done.",
+    "implementation_gate": "MET 2026-08-17. RG-SIM-ONBOARDING-v0.1 passes. Note: met against 17 ADRs that are all still Proposed.",
+    "shippable_artifact": "Now exists: 12 adapters, 7 engine modules, 6 conformance suites, SKILL.md. Release decision stays 'milestone' \u2014 no version cut yet, and commits are not conventional, so any version recommendation is judgment-based rather than derivable."
   }
 }
