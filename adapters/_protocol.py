@@ -117,13 +117,24 @@ def parse_args(argv):
 
 
 def main(role, capabilities, functions, describe_extra=None, properties=None, probe=None,
-         writers=None):
+         writers=None, writers_probe=None, transports=None):
     """Standard entry point. `functions` maps name -> callable(kw) -> response.
 
     `capabilities` are claims that MUST be exercisable by a conformance probe
     (ADR-008 C2). `properties` are declarative traits that cannot be probed —
     persistence, provenance quality. Keeping them apart is what makes an
     honest-advertisement check meaningful rather than vacuous.
+
+    `transports` maps a transport name to the capability set that transport can
+    serve, for `describe --transport=<name>`. A capability set is a property of
+    (provider x transport), not of the provider alone (issue #17). Omit it when
+    every transport offers the same set, and say so rather than implying variance
+    that does not exist.
+
+    `writers_probe` gates the WRITE half separately. A reachable transport is not
+    necessarily a writable one -- a read-only Dolt database is readable and
+    advertising `record_decision` against it is the same dishonesty as
+    advertising reads against an absent one.
 
     `probe` is a zero-arg callable returning whether the transport is usable.
     When it returns false, `describe` advertises NO capabilities. This follows
@@ -137,7 +148,26 @@ def main(role, capabilities, functions, describe_extra=None, properties=None, pr
         emit(fail(role, "-", "BAD_REQUEST", "usage: describe | query <role> <function> [k=v]"))
         return 0
     if argv[0] == "describe":
+        # `describe --transport=<name>` answers "what could THAT transport serve?"
+        want = None
+        for a in argv[1:]:
+            if a.startswith("--transport="):
+                want = a.split("=", 1)[1]
+        if want is not None:
+            known = transports or {}
+            if want not in known:
+                emit(fail(role, "describe", "BAD_REQUEST",
+                          f"transport {want!r} is not one this adapter supports: "
+                          f"{sorted(known) or '(none declared; capabilities do not vary by transport)'}"))
+                return 0
+            emit({"contract_version": CONTRACT_VERSION, "role": role,
+                  "transport": {"name": want, "hypothetical": True},
+                  "capabilities": known[want].get("capabilities", capabilities),
+                  "writers": sorted(known[want].get("writers", writers or {})),
+                  "properties": properties or {}})
+            return 0
         reachable = True if probe is None else bool(probe())
+        writable = reachable and (True if writers_probe is None else bool(writers_probe()))
         d = {
             "contract_version": CONTRACT_VERSION,
             "role": role,
@@ -145,8 +175,9 @@ def main(role, capabilities, functions, describe_extra=None, properties=None, pr
             "capabilities": capabilities if reachable else {},
             "properties": properties or {},
             "functions": sorted(functions),
-            "writers": sorted(writers or {}),
-            "transport": {"reachable": reachable},
+            "writers": sorted(writers or {}) if writable else [],
+            "transport": {"reachable": reachable, "writable": writable,
+                          "supports": sorted(transports or {})},
         }
         if describe_extra:
             d.update(describe_extra)

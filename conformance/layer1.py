@@ -14,6 +14,7 @@ Checks, from ADR-008:
   C6  unsupported function is rejected, not silently absorbed
   C7  determinism — same input, byte-identical output
   C8  an unreachable transport advertises NO capabilities (LSP missing=absent)
+  C9  a reachable but UNWRITABLE transport advertises no writers (issue #17)
 
 Usage:  python3 conformance/layer1.py [adapter ...]
 """
@@ -151,6 +152,7 @@ SUITE = {
             "revision_history": ("get_history", {"id": "RBAC-1"}),
         },
         "break_env": {"REPO_GOVERNOR_DECISIONS_DB": "/nonexistent-path-xyz"},
+        "readonly_env": {"REPO_GOVERNOR_DECISIONS_DB": "conformance/fixtures/readonly-db"},
         "unknown_fn": ("get_disposition", {"id": "NEVER-DECIDED"}),
     },
     "adapters/decision-history-github": {
@@ -308,6 +310,20 @@ def check_adapter(adapter, spec, rep):
                 "" if good else f"advertised {len(d2.get('capabilities', {}))} capabilities while unreachable")
     except json.JSONDecodeError:
         rep.add(adapter, "C8 unreachable transport claims nothing", False, "describe not JSON")
+
+    # C9 writers are gated on writability, not merely on reachability (#17)
+    if spec.get("readonly_env"):
+        ro = dict(base or {}); ro.update(spec["readonly_env"])
+        rc3, out3, _ = run(adapter, ["describe"], ro)
+        try:
+            d3 = json.loads(out3)
+            t = d3.get("transport", {})
+            good = t.get("reachable") is True and t.get("writable") is False and d3.get("writers") == []
+            rep.add(adapter, "C9 unwritable transport advertises no writers", good,
+                    "" if good else f"reachable={t.get('reachable')} writable={t.get('writable')} "
+                                    f"writers={d3.get('writers')}")
+        except json.JSONDecodeError:
+            rep.add(adapter, "C9 unwritable transport advertises no writers", False, "describe not JSON")
 
     # C7 determinism
     fn, kw = next(iter(spec["capability_fn"].values()))

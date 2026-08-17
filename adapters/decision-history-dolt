@@ -71,6 +71,21 @@ def _probe():
     return shutil.which("dolt") is not None and (DB_DIR / ".dolt").is_dir()
 
 
+def _writable():
+    """Reachable is not writable. A read-only Dolt database answers reads fine
+    and fails every write, so advertising record_decision against one is the
+    same dishonesty as advertising reads against an absent one (issue #17)."""
+    return _probe() and os.access(DB_DIR, os.W_OK) and os.access(DB_DIR / ".dolt", os.W_OK)
+
+
+# Capabilities are a property of (provider x transport). Reads are identical
+# either way; only the write half differs, so that is all this declares.
+TRANSPORTS = {
+    "cli":        {"writers": {"record_decision": None}},
+    "cli-readonly": {"writers": {}},
+}
+
+
 def _sql(query):
     """Run one query. Returns (rows, error_message).
 
@@ -308,4 +323,5 @@ if __name__ == "__main__":
     sys.exit(main(ROLE, CAPABILITIES, FUNCTIONS,
                   {"name": "decision-history-dolt",
                    "permissions": {"read": True, "write": True}},
-                  properties=PROPERTIES, probe=_probe, writers=WRITERS))
+                  properties=PROPERTIES, probe=_probe, writers=WRITERS,
+                  writers_probe=_writable, transports=TRANSPORTS))

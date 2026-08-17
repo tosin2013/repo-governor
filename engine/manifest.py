@@ -208,6 +208,13 @@ def check_adapters(manifest):
             if not d.get("transport", {}).get("reachable", True):
                 findings.append((role, adapter, "TRANSPORT_UNREACHABLE",
                                  "adapter advertises no capabilities; transport is not configured"))
+            # Drift: the manifest grants a write the transport cannot serve.
+            # Capabilities belong to (provider x transport), so a grant made when
+            # the transport was writable can silently stop being honourable (#17).
+            granted, _ = permitted(manifest, role, "write")
+            if granted and d.get("transport", {}).get("writable") is False:
+                findings.append((role, adapter, "WRITE_GRANTED_BUT_TRANSPORT_READONLY",
+                                 "manifest grants write; the bound transport reports writable=false"))
     return findings
 
 
