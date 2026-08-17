@@ -129,6 +129,8 @@ Retirement:        repository-analysis fixture
 
 A second provider should then be implemented for at least one category to prove portability.
 
+> **Amended 2026-08-17.** ADR-017 added `AcceptanceCriteriaProvider` as an eighth role, so this minimum set is now **seven** items, not six — add an acceptance-criteria adapter. The portability requirement is **satisfied**: `github-projects` and `linear` are both real second/third providers for `roadmap_authority`.
+
 ## §63 — MVP Requirements
 
 1. repository attachment; 2. repository-condition assessment; 3. provider detection; 4. provider selection; 5. manifest generation; 6. provider connectivity validation; 7. authority resolution; 8. scope envelope generation; 9. discovery capture; 10. architecture-state resolution; 11. withdrawn-authority detection; 12. completion stop; 13. `UNKNOWN`; 14. provider provenance; 15. one real roadmap provider; 16. one real execution provider; 17. Git repository evidence.
