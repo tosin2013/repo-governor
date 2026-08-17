@@ -25,7 +25,7 @@
         "Done"
       ],
       "auto_add_workflow": true,
-      "items": 13
+      "items": 17
     },
     "reason": "Linked by the maintainer on 2026-08-17, overriding the complexity-score recommendation of 'none' (score 0/8). Human decision takes precedence; do not re-evaluate.",
     "revisit_when": "board sits empty with no open issues for an extended period, or the maintainer asks to reconsider",
@@ -35,6 +35,8 @@
     "decision": "milestone",
     "reason": "Gate work is now tracked under milestone RG-SIM-ONBOARDING-v0.1 (0/7). Still no shippable artifact, so no tags, CHANGELOG, or release automation yet.",
     "revisit_when": "RG-SIM-ONBOARDING-v0.1 reaches 7/7 and implementation produces a versionable artifact",
-    "milestone": "RG-SIM-ONBOARDING-v0.1"
+    "milestone": "RG-SIM-ONBOARDING-v0.1",
+    "milestone_scope": "Expanded 2026-08-17 from 7 gate conditions to 10. Rule: an issue belongs in RG-SIM-ONBOARDING-v0.1 if it blocks IMPLEMENTATION_READY. #15/#17/#18 block gate conditions and were added; #1/#2/#16 are product-viability and positioning questions and were kept out.",
+    "milestone_items": 10
   }
 }
