@@ -10,7 +10,7 @@ It does not replace your existing tools. It connects to them through provider in
 
 ---
 
-## Status: pre-implementation
+## Status: implementation-ready
 
 There is now a working reference implementation: 9 provider adapters, a deterministic engine, and 6 conformance suites.
 
@@ -47,7 +47,7 @@ The governing principle:
 
 ## How it works
 
-Seven pluggable provider roles, each answering a different governance question:
+Eight pluggable provider roles, each answering a different governance question:
 
 | Role | Question | Example implementations |
 | --- | --- | --- |
@@ -58,21 +58,35 @@ Seven pluggable provider roles, each answering a different governance question:
 | `ChangeSignalProvider` | What changed outside the repository? | Renovate, Dependabot |
 | `RetirementEvidenceProvider` | What obligations block removal? | static analysis, telemetry |
 | `DecisionHistoryProvider` | What was already decided about this? | built-in decision log |
+| `AcceptanceCriteriaProvider` | What counts as done? | repo-local declared criteria |
 
 Keeping these separate is the point — it's what stops *"the task says READY"* from implying *"the work is authorized."*
 
-A deterministic engine reconciles their state and returns one bounded disposition: `EXECUTE`, `CONTINUE`, `STOP_COMPLETE`, `CAPTURE_ONLY`, `AUTHORITY_WITHDRAWN`, `UNKNOWN`, and thirteen others. It returns a verdict; it never performs the action.
+A deterministic engine reconciles their state and returns one bounded disposition: `EXECUTE`, `CONTINUE`, `STOP_COMPLETE`, `CAPTURE_ONLY`, `AUTHORITY_WITHDRAWN`, `UNKNOWN`, and fourteen others. It returns a verdict; it never performs the action.
 
 Governance depth scales with repository condition (L0 greenfield → L4 mature/high-assurance), so a two-file repository needs Git, a ten-line manifest, and four invariants — nothing more.
 
 ## Repository layout
 
 ```text
+adapters/      9 provider adapters, subprocess protocol, any language
+engine/        deterministic policy engine, Python stdlib only
+conformance/   6 suites — the evidence behind every gate claim
+schemas/       manifest v1 JSON Schema
 docs/
-  adrs/        14 architectural decisions (all Proposed) + index
+  adrs/        17 architectural decisions (all Proposed) + index
   reference/   normative specification, §1–§70, INV-001…INV-014
-  research/    external landscape sweep, 2026-08-17
+  research/    external landscape sweep + transport/capability research
 ```
+
+| Suite | Asserts |
+| --- | --- |
+| `layer1.py` | 112 contract checks across 9 adapters |
+| `layer2.py` | cross-provider equivalence — **the thesis test** |
+| `transport.py` | agent-as-transport produces identical results |
+| `manifest.py` | 26 refusal cases; the loader's value is what it rejects |
+| `onboarding.py` | `RG-SIM-ONBOARDING-v0.1`, fixtures A–C |
+| `vocabulary.py` | closed sets cannot drift from the code |
 
 **Start here:**
 
