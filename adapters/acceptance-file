@@ -72,6 +72,24 @@ def _load(fn, kw):
     if not isinstance(data, dict) or not isinstance(data.get("criteria"), list):
         return None, fail(ROLE, fn, "MALFORMED_SOURCE",
                           f"{p} must be an object with a 'criteria' array")
+    # Amendment integrity (ADR-017 open weakness). An un-cited amendment makes
+    # the criteria unfalsifiable, so the adapter refuses to serve them at all
+    # rather than returning a bar that may have been edited to fit.
+    for i, a in enumerate(data.get("amendments") or []):
+        if not isinstance(a, dict) or not a.get("cites"):
+            return None, fail(ROLE, fn, "MALFORMED_SOURCE",
+                              f"{p}: amendment {i + 1} has no 'cites'. An amendment without a "
+                              "verifiable citation cannot be distinguished from editing the bar "
+                              "to fit the work.")
+        if a.get("effect") not in ("added", "removed", "weakened", "strengthened", "corrected"):
+            return None, fail(ROLE, fn, "MALFORMED_SOURCE",
+                              f"{p}: amendment {i + 1} declares effect {a.get('effect')!r}, "
+                              "which is outside the closed set.")
+    if d_legacy := (data.get("amended") or data.get("amendment_reason")):
+        return None, fail(ROLE, fn, "MALFORMED_SOURCE",
+                          f"{p}: free-prose amendment record ({str(d_legacy)[:40]}...). "
+                          "Use the structured 'amendments' array so the justification is checkable.")
+
     if data.get("authority_id") != wid:
         return None, fail(ROLE, fn, "MALFORMED_SOURCE",
                           f"{p} declares authority_id={data.get('authority_id')!r}, expected {wid!r}")
@@ -92,6 +110,7 @@ def get_criteria(kw):
     return ok(ROLE, "get_criteria",
               {"authority_id": kw["id"],
                "criteria": data["criteria"],
+               "amendments": len(data.get("amendments") or []),
                "count": len(data["criteria"]),
                "machine_checkable": True},
               [cite("acceptance-file", str(p), "criteria")])

@@ -1,11 +1,29 @@
 {
   "$comment": "Acceptance criteria for GATE-1 (onboarding simulation, spec 57-60).",
   "authority_id": "GATE-1",
-  "amended": "2026-08-17",
-  "amendment_reason": "Original criterion required file_exists conformance/fixtures/onboarding-a-greenfield, assuming fixtures would be committed trees. They are not: committing the trees let the parent repository's git remote leak into fixture A and produce a false roadmap candidate, so fixtures became declarative specs in fixtures/onboarding.json materialized into isolated temp repos. The criterion described an implementation that turned out to be wrong, not a lowered bar.",
   "criteria": [
-    { "check": "file_exists",  "target": "engine/onboard.py" },
-    { "check": "file_exists",  "target": "conformance/fixtures/onboarding.json" },
-    { "check": "command_exit", "target": "python3 conformance/onboarding.py" }
+    {
+      "check": "file_exists",
+      "target": "engine/onboard.py"
+    },
+    {
+      "check": "file_exists",
+      "target": "conformance/fixtures/onboarding.json"
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/onboarding.py"
+    }
+  ],
+  "amendments": [
+    {
+      "date": "2026-08-17",
+      "effect": "corrected",
+      "cites": [
+        "conformance/fixtures/onboarding.json",
+        "\u00a758"
+      ],
+      "reason": "Original criterion required file_exists conformance/fixtures/onboarding-a-greenfield, assuming fixtures would be committed trees. Committing them let the parent repository's git remote resolve inside fixture A and produce a false github-projects roadmap candidate, which \u00a758 forbids ('no providers silently assigned'). Fixtures became declarative specs materialized into isolated temp repos. The criterion described an implementation that was wrong, not a bar that was too high."
+    }
   ]
 }

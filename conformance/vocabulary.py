@@ -158,6 +158,37 @@ def main():
     else:
         print("  [PASS] only AUTHORIZED reaches STOP_COMPLETE or EXECUTE (INV-002)")
 
+    print("\nAmendment integrity (ADR-017 weakness)\n")
+    sys.path.insert(0, str(ROOT / "engine"))
+    import amendments as A
+    findings, records = A.audit()
+    if findings:
+        fails += 1
+        for wid, kind, detail in findings:
+            print(f"  [FAIL] {kind}: {detail[:88]}")
+    else:
+        amended = sum(1 for _, n, _, _ in records if n)
+        print(f"  [PASS] all {amended} amendment(s) carry a resolvable citation")
+
+    # Negative: an un-cited amendment must make the adapter refuse.
+    import copy, json as _j, subprocess, tempfile
+    acc = ROOT / ".repo-governor" / "acceptance" / "GATE-6.json"
+    orig = acc.read_text()
+    try:
+        d = _j.loads(orig)
+        if d.get("amendments"):
+            d["amendments"][0].pop("cites", None)
+            acc.write_text(_j.dumps(d))
+            r = subprocess.run([sys.executable, str(ROOT / "adapters" / "acceptance-file"),
+                                "query", "acceptance_criteria", "get_criteria", "id=GATE-6"],
+                               capture_output=True, text=True, cwd=ROOT)
+            out = _j.loads(r.stdout)
+            good = out.get("ok") is False and out["error"]["type"] == "MALFORMED_SOURCE"
+            fails += not good
+            print(f"  [{'PASS' if good else 'FAIL'}] adapter refuses criteria whose amendment lacks a citation")
+    finally:
+        acc.write_text(orig)
+
     print(f"\nvocabulary: {len(V.DISPOSITIONS)} governance + {len(V.ONBOARDING)} onboarding "
           f"dispositions, {len(V.REASONS)} reasons "
           f"({sum(1 for r in V.REASONS if V.REASONS[r][1])} blocking)")
