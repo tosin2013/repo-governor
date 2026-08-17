@@ -1,2 +1,0 @@
-{ "authority_id": "GATE-X",
-  "criteria": [ { "check": "file_exists", "target": "README.md" } ] }

@@ -305,9 +305,21 @@ def get_authority(kw):
                                   "'milestone' signal, milestone membership is admission.",
                            resolution="Assign the issue to a milestone, or change the declared signal.",
                            blocking=True)
+        # Authorization within the milestone signal: an assignee, or the issue
+        # having been closed. Closure is included because the alternative reads
+        # finished work as "admitted but not cleared to execute", which is
+        # actively wrong -- and because assignees are routinely absent on closed
+        # issues, so assignee alone makes authority evaporate at completion.
+        # Completion is a separate axis and must not retract authority (section 40).
+        # This is not a fallback across signals, which ADR-018 forbids; it is the
+        # milestone signal's own definition, stated rather than assumed.
         assigned = bool((node.get("assignees") or {}).get("nodes"))
-        mapped = "AUTHORIZED" if assigned else "ADMITTED"
-        return ok(ROLE, "get_authority", {"authority": mapped, "admitted": True},
+        closed = node.get("state") == "CLOSED"
+        if assigned or closed:
+            return ok(ROLE, "get_authority", {"authority": "AUTHORIZED", "admitted": True},
+                      [_ref(node, "milestone.title"),
+                       _ref(node, "assignees" if assigned else "state")])
+        return ok(ROLE, "get_authority", {"authority": "ADMITTED", "admitted": True},
                   [_ref(node, "milestone.title"), _ref(node, "assignees")])
 
     if ADMISSION == "label":

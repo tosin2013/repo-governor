@@ -65,6 +65,10 @@ Repo Governor fails if:
 * it is blamed for provider outages it merely relays;
 * it accretes integration surface until it competes with iPaaS tooling.
 
+*Added 2026-08-17 from ADR-022, after the first condition on this list came true in this repository:*
+
+* **a provider fixture is bound as a repository's provider of record.**
+
 ## §55 — Stop / Simplification Conditions
 
 Simplify or stop development if testing shows:

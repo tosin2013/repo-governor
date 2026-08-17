@@ -1,6 +1,6 @@
 {
-  "$comment": "Acceptance criteria for GATE-6. Declared, never inferred (ADR-017).",
-  "authority_id": "GATE-6",
+  "$comment": "Acceptance criteria for AUTHORIZED-1. Declared, never inferred (ADR-017).",
+  "authority_id": "AUTHORIZED-1",
   "criteria": [
     {
       "check": "command_exit",

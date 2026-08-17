@@ -1,0 +1,30 @@
+{
+  "$comment": "Acceptance criteria for GitHub issue #11 (Gate 5). Re-keyed from '11' when the roadmap authority moved from the file provider to GitHub (ADR-022). Criteria and amendment history unchanged; only the authority id is.",
+  "authority_id": "11",
+  "criteria": [
+    {
+      "check": "file_exists",
+      "target": "schemas/manifest-v1.json"
+    },
+    {
+      "check": "file_exists",
+      "target": "engine/manifest.py"
+    },
+    {
+      "check": "file_exists",
+      "target": "engine/migrate.py"
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 engine/manifest.py"
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 engine/manifest.py --validate"
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/manifest.py"
+    }
+  ]
+}

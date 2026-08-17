@@ -1,37 +1,7 @@
 {
-  "$comment": "Reference roadmap for the file-roadmap adapter (spec 11, ADR-015). JSON is canonical.",
+  "$comment": "CONFORMANCE FIXTURE for the file-roadmap adapter (spec 11, ADR-015). Every id here is synthetic and names the STATE it demonstrates. This file is not any repository's roadmap and must never be bound as one: it lived at .repo-governor/roadmap.json, acquired real gate items, and became this project's roadmap of record while GitHub tracked the same work -- the exact failure section 54 names. See ADR-022.",
   "version": 1,
   "items": {
-    "GATE-6": {
-      "title": "One viable adapter per required core role",
-      "status": "IN_PROGRESS",
-      "authority": "AUTHORIZED",
-      "admitted": true,
-      "required_outcome": "Each required core role has an adapter passing Layer 1 conformance.",
-      "in_scope": [
-        "adapters/git",
-        "adapters/adr",
-        "adapters/file-roadmap",
-        "conformance/layer1.py"
-      ],
-      "non_goals": [
-        "Linear adapter",
-        "Beads adapter",
-        "the evaluation engine itself"
-      ],
-      "acceptance_conditions": [
-        {
-          "check": "conformance_layer1_passes",
-          "target": "all bound adapters"
-        },
-        {
-          "check": "second_provider_in_one_category",
-          "target": "deferred to GATE-6b"
-        }
-      ],
-      "parent": "RG-SIM-ONBOARDING-v0.1",
-      "decision_history": []
-    },
     "RBAC-1": {
       "title": "Organization RBAC",
       "status": "CLOSED",
@@ -101,58 +71,33 @@
       ],
       "$comment": "INV-009 fixture: completed work must not read as authorized-to-execute."
     },
-    "GATE-X": {
-      "title": "Equivalence probe",
-      "status": "IN_PROGRESS",
-      "authority": "AUTHORIZED",
-      "admitted": true
-    },
-    "GATE-5": {
-      "title": "Manifest semantics stable enough for implementation",
+    "AUTHORIZED-1": {
+      "title": "Admitted and cleared to execute",
       "status": "IN_PROGRESS",
       "authority": "AUTHORIZED",
       "admitted": true,
-      "required_outcome": "Manifest v1 schema frozen and a loader that fails closed.",
-      "non_goals": [
-        "v2 schema",
-        "remote manifest resolution"
+      "required_outcome": "The AUTHORIZED branch of INV-002 is exercised end to end.",
+      "in_scope": [
+        "a synthetic in-scope path",
+        "another synthetic in-scope path"
       ],
-      "parent": "RG-SIM-ONBOARDING-v0.1"
-    },
-    "GATE-2": {
-      "title": "Provider conflicts handled deterministically",
-      "status": "IN_PROGRESS",
-      "authority": "AUTHORIZED",
-      "admitted": true,
-      "parent": "RG-SIM-ONBOARDING-v0.1"
-    },
-    "GATE-3": {
-      "title": "Low-complexity repositories operate without unnecessary providers",
-      "status": "IN_PROGRESS",
-      "authority": "AUTHORIZED",
-      "admitted": true,
-      "parent": "RG-SIM-ONBOARDING-v0.1"
-    },
-    "GATE-4": {
-      "title": "Provider detection does not assign authority",
-      "status": "IN_PROGRESS",
-      "authority": "AUTHORIZED",
-      "admitted": true,
-      "parent": "RG-SIM-ONBOARDING-v0.1"
-    },
-    "GATE-1": {
-      "title": "Onboarding simulation passes",
-      "status": "IN_PROGRESS",
-      "authority": "AUTHORIZED",
-      "admitted": true,
-      "parent": "RG-SIM-ONBOARDING-v0.1"
-    },
-    "GATE-7": {
-      "title": "UNKNOWN and failure behavior defined",
-      "status": "IN_PROGRESS",
-      "authority": "AUTHORIZED",
-      "admitted": true,
-      "parent": "RG-SIM-ONBOARDING-v0.1"
+      "non_goals": [
+        "a synthetic non-goal",
+        "a second synthetic non-goal"
+      ],
+      "acceptance_conditions": [
+        {
+          "check": "conformance_layer1_passes",
+          "target": "all bound adapters"
+        },
+        {
+          "check": "second_provider_in_one_category",
+          "target": "a deliberately unsatisfiable synthetic target"
+        }
+      ],
+      "parent": "SYNTHETIC-PARENT",
+      "decision_history": [],
+      "$comment": "The AUTHORIZED fixture. Named for the state it demonstrates, not for a work item -- an id shared with real work is how this file became a second roadmap (ADR-022)."
     }
   }
 }

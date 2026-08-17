@@ -30,6 +30,8 @@ All ADRs are **Proposed**. None is accepted. Per §61, the project cannot reach 
 | [018](018-admission-signal-is-declared-not-assumed.md) | Admission signal is declared, not assumed | Provider abstraction | Makes GitHub usable without a Project; **found by real-data testing** |
 | [019](019-database-backed-decision-history.md) | Database-backed decision history | Storage | Closes the last unbound role; amends ADR-009 |
 | [020](020-agent-supplied-transport-with-adapter-as-normalizer.md) | Agent-supplied transport, adapter as normalizer | Transport | Moves credentials out of remote adapters; amends ADR-003 and ADR-016 |
+| [021](021-every-provider-resolved-through-the-manifest.md) | Every provider resolved through the manifest | Engine architecture | Builds ADR-005 rule 2, specified and never implemented |
+| [022](022-repo-governor-does-not-own-roadmap-state.md) | Repo Governor does not own roadmap state | Product boundary | **Section 54 reproduced inside the tool**; roadmap rebound to GitHub |
 
 ## Dependency order
 

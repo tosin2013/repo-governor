@@ -12,14 +12,18 @@ Deterministic (ADR-002): given the same provider responses this returns the
 same disposition every time. It performs no I/O of its own beyond invoking
 adapters, and reads no clock.
 
-Usage:  python3 engine/completion.py <authority-id> [--roadmap <adapter>]
+Every provider is reached through `engine/bindings.py`, which resolves the role
+from the manifest and checks the permission before spawning anything (ADR-021).
+This module names roles and never adapters; that is what makes the providers
+actually interchangeable rather than merely described as such.
+
+Usage:  python3 engine/completion.py <authority-id>
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -27,6 +31,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import vocabulary as V  # noqa: E402
 import manifest as MF  # noqa: E402
+import bindings as B  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 ENGINE_VERSION = "0.1.0"
@@ -34,18 +39,6 @@ try:
     MF_HASH = hashlib.sha256((ROOT / ".repo-governor.json").read_bytes()).hexdigest()[:16]
 except OSError:
     MF_HASH = None
-
-
-def call(adapter, role, fn, kw, env_extra=None, verb="query"):
-    env = dict(os.environ)
-    env.update(env_extra or {})
-    args = [sys.executable, str(ROOT / adapter), verb, role, fn]
-    args += [f"{k}={v}" for k, v in kw.items()]
-    p = subprocess.run(args, capture_output=True, text=True, cwd=ROOT, env=env, timeout=310)
-    try:
-        return json.loads(p.stdout)
-    except json.JSONDecodeError:
-        return {"ok": False, "error": {"type": "NON_JSON", "message": p.stdout[:120]}}
 
 
 def _classify(u, profile="GOVERNOR_LITE"):
@@ -60,13 +53,17 @@ def _classify(u, profile="GOVERNOR_LITE"):
     return {**u, "dimension": dim, "blocking": blocking, "meaning": desc}
 
 
-def evaluate(authority_id, roadmap_adapter, roadmap_env):
-    """Return the full governance decision for the completion axis."""
+def evaluate(authority_id, manifest=None):
+    """Return the full governance decision for the completion axis.
+
+    Named by role throughout. Which adapter answers `roadmap_authority` is the
+    manifest's business, not this function's.
+    """
     unknowns = []
     provenance = []
 
     # 1. authority — is this authorized at all?
-    auth = call(roadmap_adapter, "roadmap_authority", "get_authority", {"id": authority_id}, roadmap_env)
+    auth = B.call("roadmap_authority", "get_authority", {"id": authority_id}, manifest=manifest)
     if not auth.get("ok"):
         return {"decision": "UNKNOWN", "authority_id": authority_id,
                 "unknowns": [{"dimension": "authority", "reason": auth["error"]["type"],
@@ -88,7 +85,7 @@ def evaluate(authority_id, roadmap_adapter, roadmap_env):
                 "unknowns": [], "provenance": provenance}
 
     # 2. criteria — what counts as done?
-    crit = call("adapters/acceptance-file", "acceptance_criteria", "get_criteria", {"id": authority_id})
+    crit = B.call("acceptance_criteria", "get_criteria", {"id": authority_id}, manifest=manifest)
     if not crit.get("ok"):
         return {"decision": "UNKNOWN", "authority_id": authority_id, "authority": authority,
                 "unknowns": [{"dimension": "acceptance", "reason": crit["error"]["type"],
@@ -107,8 +104,8 @@ def evaluate(authority_id, roadmap_adapter, roadmap_env):
     # 3. evaluation — is it actually done?
     results = []
     for c in criteria:
-        ev = call("adapters/git", "repository", "evaluate_check",
-                  {"check": c["check"], "target": c["target"]})
+        ev = B.call("repository", "evaluate_check",
+                    {"check": c["check"], "target": c["target"]}, manifest=manifest)
         if not ev.get("ok"):
             unknowns.append({"dimension": "evidence", "reason": ev["error"]["type"],
                              "detail": f"{c['check']} {c['target']}: {ev['error']['message']}",
@@ -168,7 +165,7 @@ def _redact(decision, provenance, public):
     return sha, facts, True, ["provider_snapshots"]
 
 
-def record(decision, roadmap_adapter):
+def record(decision, manifest=None):
     """Append the decision to the bound decision-history store, if permitted.
 
     Returns a dict describing what happened. Recording NEVER changes the
@@ -179,18 +176,18 @@ def record(decision, roadmap_adapter):
     reads in the evaluation path, and a content-derived id also makes recording
     idempotent: re-evaluating an unchanged state rewrites the same row.
     """
-    m, errs = MF.load()
-    if errs:
-        return {"recorded": False, "why": "manifest invalid; refusing to record"}
-    allowed, why = MF.permitted(m, "decision_history", "write")
-    if not allowed:
-        # ADR-005 rule 5: a permission failure is a disposition, not an exception.
-        return {"recorded": False, "why": f"not permitted: {why}"}
+    m = manifest
+    if m is None:
+        m, errs = MF.load()
+        if errs:
+            return {"recorded": False, "why": "manifest invalid; refusing to record"}
 
-    bindings = (m.get("providers") or {}).get("decision_history") or []
-    writable = [b for b in bindings if b.get("type", "").startswith("decision-history-dolt")]
-    if not writable:
-        return {"recorded": False, "why": "no writable decision-history backend is bound"}
+    # Which backend can be written to is a question for the adapter's advertised
+    # writers, not for its name. `describe` gates that list on a real writability
+    # probe (#17), so a reachable-but-read-only store is correctly not chosen.
+    binding, err = B.writer_for("decision_history", "record_decision", m)
+    if err:
+        return {"recorded": False, "why": err["error"]["message"]}
 
     public = _repo_is_public()
     sha, facts, redacted, fields = _redact(decision, decision.get("provenance", []), public)
@@ -209,7 +206,8 @@ def record(decision, roadmap_adapter):
           "snapshot_sha256": sha, "typed_facts": json.dumps(facts, sort_keys=True),
           "redacted": str(redacted).lower(),
           "fields_redacted": json.dumps(fields) if fields else ""}
-    r = call(writable[0]["adapter"], "decision_history", "record_decision", kw, verb="write")
+    r = B.call("decision_history", "record_decision", kw, verb="write",
+               manifest=m, binding=binding)
     if not r.get("ok"):
         return {"recorded": False, "why": r.get("error", {}).get("message", "write failed")}
     return {"recorded": True, "decision_id": did, "redacted": redacted,
@@ -221,17 +219,12 @@ def main(argv):
         print(__doc__.strip().splitlines()[-1], file=sys.stderr)
         return 2
     authority_id = argv[0]
-    adapter = "adapters/file-roadmap"
-    env = {}
-    if "--roadmap" in argv:
-        adapter = argv[argv.index("--roadmap") + 1]
-    if adapter == "adapters/linear":
-        env = {"REPO_GOVERNOR_LINEAR_FIXTURE": "conformance/fixtures/linear.json"}
-    elif adapter == "adapters/github-projects":
-        env = {"REPO_GOVERNOR_GH_FIXTURE": "conformance/fixtures/github-projects-scenarios.json"}
-    result = evaluate(authority_id, adapter, env)
+    # No --roadmap flag and no adapter-specific environment. Which provider
+    # answers a role is declared in the manifest; an override here would be a
+    # second binding surface, which is the shadow-system shape ADR-022 forbids.
+    result = evaluate(authority_id)
     if "--record" in argv:
-        result["record"] = record(result, adapter)
+        result["record"] = record(result)
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0
 

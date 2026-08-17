@@ -1,0 +1,26 @@
+{
+  "$comment": "Acceptance criteria for GitHub issue #13 (Gate 7). Re-keyed from '13' when the roadmap authority moved from the file provider to GitHub (ADR-022). Criteria and amendment history unchanged; only the authority id is.",
+  "authority_id": "13",
+  "criteria": [
+    {
+      "check": "file_exists",
+      "target": "engine/vocabulary.py"
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 engine/vocabulary.py"
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/vocabulary.py"
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/layer1.py"
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 engine/completion.py GATE-5"
+    }
+  ]
+}

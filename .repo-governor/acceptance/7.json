@@ -1,6 +1,6 @@
 {
-  "$comment": "Acceptance criteria for GATE-1 (onboarding simulation, spec 57-60).",
-  "authority_id": "GATE-1",
+  "$comment": "Acceptance criteria for GitHub issue #7 (Gate 1). Re-keyed from '7' when the roadmap authority moved from the file provider to GitHub (ADR-022). Criteria and amendment history unchanged; only the authority id is.",
+  "authority_id": "7",
   "criteria": [
     {
       "check": "file_exists",

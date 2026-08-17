@@ -1,0 +1,14 @@
+{
+  "$comment": "Acceptance criteria for GitHub issue #10 (Gate 4). Re-keyed from '10' when the roadmap authority moved from the file provider to GitHub (ADR-022). Criteria and amendment history unchanged; only the authority id is.",
+  "authority_id": "10",
+  "criteria": [
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/onboarding.py"
+    },
+    {
+      "check": "file_exists",
+      "target": "engine/onboard.py"
+    }
+  ]
+}

@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parent.parent
 PROVIDERS = {
     "file-roadmap": {
         "adapter": "adapters/file-roadmap",
-        "env": {"REPO_GOVERNOR_ROADMAP": ".repo-governor/roadmap.json"},
+        "env": {"REPO_GOVERNOR_ROADMAP": "conformance/fixtures/roadmap.json"},
     },
     "github-projects": {
         "adapter": "adapters/github-projects",
@@ -68,7 +68,7 @@ SCENARIOS = [
         "meaning": "Admitted and cleared to execute.",
         "function": "get_authority",
         "expect": {"authority": "AUTHORIZED", "admitted": True},
-        "in": {"file-roadmap": "GATE-6", "github-projects": "102", "linear": "ENG-103"},
+        "in": {"file-roadmap": "AUTHORIZED-1", "github-projects": "102", "linear": "ENG-103"},
     },
     {
         "id": "admitted_not_authorized",

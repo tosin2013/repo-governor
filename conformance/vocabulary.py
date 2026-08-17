@@ -18,11 +18,16 @@ Usage:  python3 conformance/vocabulary.py
 
 from __future__ import annotations
 
+import os
 import re
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+
+# File providers read fixtures from conformance/, never from .repo-governor/,
+# which holds only this repository's real governance state (ADR-022).
+ACCEPTANCE_ENV = {"REPO_GOVERNOR_ACCEPTANCE_DIR": "conformance/fixtures/acceptance"}
 sys.path.insert(0, str(ROOT / "engine"))
 import vocabulary as V  # noqa: E402
 
@@ -172,7 +177,7 @@ def main():
 
     # Negative: an un-cited amendment must make the adapter refuse.
     import copy, json as _j, subprocess, tempfile
-    acc = ROOT / ".repo-governor" / "acceptance" / "GATE-6.json"
+    acc = ROOT / "conformance" / "fixtures" / "acceptance" / "AUTHORIZED-1.json"
     orig = acc.read_text()
     try:
         d = _j.loads(orig)
@@ -180,8 +185,9 @@ def main():
             d["amendments"][0].pop("cites", None)
             acc.write_text(_j.dumps(d))
             r = subprocess.run([sys.executable, str(ROOT / "adapters" / "acceptance-file"),
-                                "query", "acceptance_criteria", "get_criteria", "id=GATE-6"],
-                               capture_output=True, text=True, cwd=ROOT)
+                                "query", "acceptance_criteria", "get_criteria", "id=AUTHORIZED-1"],
+                               capture_output=True, text=True, cwd=ROOT,
+                               env={**os.environ, **ACCEPTANCE_ENV})
             out = _j.loads(r.stdout)
             good = out.get("ok") is False and out["error"]["type"] == "MALFORMED_SOURCE"
             fails += not good

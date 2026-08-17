@@ -20,7 +20,7 @@ import re
 SUPPORTED = {
     "$schema", "$id", "$comment", "title", "$defs", "$ref",
     "type", "const", "enum", "pattern", "minimum",
-    "required", "properties", "additionalProperties", "items",
+    "required", "properties", "additionalProperties", "propertyNames", "items",
 }
 
 TYPES = {
@@ -89,6 +89,13 @@ def validate(instance, schema, root=None, path="$"):
         for key in schema.get("required", []):
             if key not in instance:
                 errs.append(f"{path}: missing required property {key!r}")
+        # propertyNames constrains the KEYS. Used to keep `binding.env` to
+        # shell-variable shape, so a manifest cannot smuggle arbitrary names
+        # into an adapter's environment.
+        if "propertyNames" in schema:
+            for key in instance:
+                errs += [e.replace(f"{path}.{key}", f"{path} key {key!r}", 1)
+                         for e in validate(key, schema["propertyNames"], root, f"{path}.{key}")]
         props = schema.get("properties", {})
         for key, value in instance.items():
             if key in props:

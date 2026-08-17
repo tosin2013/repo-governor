@@ -183,7 +183,10 @@ def check_adapters(manifest):
     A manifest can declare contract_version 1 for an adapter that implements
     something else. The declaration is a claim; this verifies it.
     """
-    import subprocess
+    # Spawning happens in bindings.py and nowhere else (ADR-021), so this asks
+    # it rather than running the adapter itself. Imported here, not at module
+    # scope, because bindings.py imports this module.
+    import bindings as B  # noqa: PLC0415
     findings = []
     for role, binding in (manifest.get("providers") or {}).items():
         if role.startswith("$"):
@@ -191,12 +194,10 @@ def check_adapters(manifest):
         for b in (binding if isinstance(binding, list) else [binding]):
             adapter = b["adapter"]
             declared = b.get("contract_version")
-            try:
-                p = subprocess.run([sys.executable, str(ROOT / adapter), "describe"],
-                                   capture_output=True, text=True, cwd=ROOT, timeout=30)
-                d = json.loads(p.stdout)
-            except Exception as e:  # noqa: BLE001
-                findings.append((role, adapter, "UNREACHABLE", str(e)[:60]))
+            d = B.describe(b, use_cache=False)
+            if not d:
+                findings.append((role, adapter, "UNREACHABLE",
+                                 "describe returned nothing parseable"))
                 continue
             if d.get("role") != role:
                 findings.append((role, adapter, "ROLE_MISMATCH",

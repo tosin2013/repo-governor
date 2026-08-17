@@ -10,9 +10,18 @@ It does not replace your existing tools. It connects to them through provider in
 
 ---
 
-## Status: implementation-ready
+## Status: architecture ready, thesis under validation
 
-There is now a working reference implementation: 9 provider adapters, a deterministic engine, and 6 conformance suites.
+These are two different claims and were previously reported as one.
+
+| | | |
+| --- | --- | --- |
+| **Implementation architecture** | **READY** | 12 adapters, a deterministic engine, 7 conformance suites. `RG-SIM-ONBOARDING-v0.1` passes; all 7 gate conditions ([§61](docs/reference/onboarding.md)) are engine-verified against live GitHub issues. |
+| **Core product thesis** | **UNDER VALIDATION** | Whether one governance layer can rule identically across genuinely different trackers. Not shown yet. |
+
+The thesis bar is stated in [#1](https://github.com/tosin2013/repo-governor/issues/1) and is **not met**: Layer 2 has never run against two *live* providers. `github-projects` and `linear` both run on recorded fixtures there, so what it currently proves is that the normalizers are self-consistent — not that they agree about a real system. The one genuinely live pairing is `decision_history`, a Dolt database against a GitHub fixture.
+
+That distinction matters because semantic normalization is what decides whether this is tool-independent or merely adapter-shaped.
 
 ```bash
 python3 engine/onboard.py <repo>           # assess, detect, propose
@@ -22,10 +31,9 @@ python3 engine/completion.py <work-id>     # govern
 
 | | |
 | --- | --- |
-| Product state | **`IMPLEMENTATION_READY`** — `RG-SIM-ONBOARDING-v0.1` passes |
-| Gate progress | **7 of 7** conditions met ([§61](docs/reference/onboarding.md)), each engine-verified |
-| Decisions | 17 ADRs, all still **Proposed**, none accepted |
-| Open thesis risks | #1 normalization (weak evidence), #2 envelope thinness (unmeasured) |
+| Roadmap authority | GitHub issues, admission by milestone ([ADR-018](docs/adrs/018-admission-signal-is-declared-not-assumed.md), [ADR-022](docs/adrs/022-repo-governor-does-not-own-roadmap-state.md)) |
+| Decisions | 22 ADRs, all still **Proposed**, none accepted |
+| Open thesis risks | [#1](https://github.com/tosin2013/repo-governor/issues/1) normalization (fixtures only), [#2](https://github.com/tosin2013/repo-governor/issues/2) envelope thinness (measured: *always* thin on real trackers), [#5](https://github.com/tosin2013/repo-governor/issues/5) skill activation (unmeasured) |
 
 ---
 
@@ -117,11 +125,13 @@ Two could invalidate the product, and both are being answered early while changi
 
 Full list, plus the standing [stop conditions](docs/reference/criteria.md), in the [ADR index](docs/adrs/README.md#open-questions).
 
-## Ownership
+## License and ownership
 
-Public open-source under **Tosin Open Source**. Human owner and final acceptance authority: Tosin Akinosho.
+Licensed under the **Apache License 2.0** — see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE). Chosen for its patent grant and explicit contribution terms, because [ADR-003](docs/adrs/003-seven-provider-roles-with-normalized-contracts.md)'s adapter protocol is designed to invite third-party adapters and those need terms.
 
-Decision Crafters retains research provenance, reference-application provenance, and nonexclusive upstream use, subject to this project's future license and separately accepted relationships. ([§68](docs/reference/product-scope.md))
+Ownership and license are separate questions and were decided separately. Public open-source under **Tosin Open Source**. Human owner and final acceptance authority: Tosin Akinosho.
+
+Decision Crafters retains research provenance, reference-application provenance, and nonexclusive upstream use, subject to this license and separately accepted relationships. ([§68](docs/reference/product-scope.md))
 
 ---
 

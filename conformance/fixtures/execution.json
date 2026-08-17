@@ -2,19 +2,19 @@
   "$comment": "Synthetic ExecutionStateProvider fixture (spec 62). Execution state beneath an authority item. INV-002: none of this confers roadmap authority.",
   "version": 1,
   "roots": {
-    "GATE-6": {
-      "authority_id": "GATE-6",
-      "root_id": "GATE-6/root",
+    "AUTHORIZED-1": {
+      "authority_id": "AUTHORIZED-1",
+      "root_id": "AUTHORIZED-1/root",
       "tasks": [
-        {"id": "GATE-6/t1", "title": "git adapter", "status": "DONE"},
-        {"id": "GATE-6/t2", "title": "adr adapter", "status": "DONE"},
-        {"id": "GATE-6/t3", "title": "roadmap adapters", "status": "DONE"},
-        {"id": "GATE-6/t4", "title": "acceptance-file adapter", "status": "DONE"},
-        {"id": "GATE-6/t5", "title": "execution adapter", "status": "IN_PROGRESS"},
-        {"id": "GATE-6/t6", "title": "change-signal adapter", "status": "READY"},
-        {"id": "GATE-6/t7", "title": "retirement adapter", "status": "READY"}
+        {"id": "AUTHORIZED-1/t1", "title": "git adapter", "status": "DONE"},
+        {"id": "AUTHORIZED-1/t2", "title": "adr adapter", "status": "DONE"},
+        {"id": "AUTHORIZED-1/t3", "title": "roadmap adapters", "status": "DONE"},
+        {"id": "AUTHORIZED-1/t4", "title": "acceptance-file adapter", "status": "DONE"},
+        {"id": "AUTHORIZED-1/t5", "title": "execution adapter", "status": "IN_PROGRESS"},
+        {"id": "AUTHORIZED-1/t6", "title": "change-signal adapter", "status": "READY"},
+        {"id": "AUTHORIZED-1/t7", "title": "retirement adapter", "status": "READY"}
       ],
-      "dependencies": [["GATE-6/t5", "GATE-6/t3"], ["GATE-6/t6", "GATE-6/t3"]],
+      "dependencies": [["AUTHORIZED-1/t5", "AUTHORIZED-1/t3"], ["AUTHORIZED-1/t6", "AUTHORIZED-1/t3"]],
       "failures": [],
       "discoveries": [
         {"id": "DISC-1", "type": "TECHNICAL_DEBT",
