@@ -86,6 +86,22 @@ SUITE = {
         "unknown_fn": ("get_non_goals", {"id": "1"}),
         "absence_fn": ("get_work", {"id": "9999"}),
     },
+    "adapters/linear": {
+        "role": "roadmap_authority",
+        "probe": {"id": "ENG-101"},
+        "capability_fn": {
+            "work_lookup": ("get_work", {"id": "ENG-101"}),
+            "status": ("get_status", {"id": "ENG-101"}),
+            "authority": ("get_authority", {"id": "ENG-101"}),
+            "cancellation_detection": ("get_authority", {"id": "ENG-104"}),
+            "decision_history": ("get_decision_history", {"id": "ENG-104"}),
+            "admission_distinction": ("get_authority", {"id": "ENG-100"}),
+        },
+        "env": {"REPO_GOVERNOR_LINEAR_FIXTURE": "conformance/fixtures/linear.json"},
+        "break_env": {"REPO_GOVERNOR_LINEAR_FIXTURE": "/nonexistent-fixture-xyz.json"},
+        "unknown_fn": ("get_authority", {"id": "ENG-100"}),
+        "absence_fn": ("get_work", {"id": "ENG-999"}),
+    },
 }
 
 

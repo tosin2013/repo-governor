@@ -30,6 +30,10 @@ PROVIDERS = {
         "adapter": "adapters/github-projects",
         "env": {"REPO_GOVERNOR_GH_FIXTURE": "conformance/fixtures/github-projects-scenarios.json"},
     },
+    "linear": {
+        "adapter": "adapters/linear",
+        "env": {"REPO_GOVERNOR_LINEAR_FIXTURE": "conformance/fixtures/linear.json"},
+    },
 }
 
 # Equivalence is asserted over DISPOSITION-RELEVANT facts only. A provider's
@@ -46,42 +50,42 @@ SCENARIOS = [
         "meaning": "Work was admitted, then cancelled. §38: roadmap admission governs.",
         "function": "get_authority",
         "expect": {"authority": "CANCELLED", "admitted": False},
-        "in": {"file-roadmap": "CANCELLED-1", "github-projects": "101"},
+        "in": {"file-roadmap": "CANCELLED-1", "github-projects": "101", "linear": "ENG-104"},
     },
     {
         "id": "authorized_executing",
         "meaning": "Admitted and cleared to execute.",
         "function": "get_authority",
         "expect": {"authority": "AUTHORIZED", "admitted": True},
-        "in": {"file-roadmap": "GATE-6", "github-projects": "102"},
+        "in": {"file-roadmap": "GATE-6", "github-projects": "102", "linear": "ENG-103"},
     },
     {
         "id": "admitted_not_authorized",
         "meaning": "On the roadmap but not cleared to execute. INV-002.",
         "function": "get_authority",
         "expect": {"authority": "ADMITTED", "admitted": True},
-        "in": {"file-roadmap": "ADMITTED-1", "github-projects": "1"},
+        "in": {"file-roadmap": "ADMITTED-1", "github-projects": "1", "linear": "ENG-101"},
     },
     {
         "id": "not_governable",
         "meaning": "No admission state readable. Must be UNKNOWN+blocking, never EXECUTE.",
         "function": "get_authority",
         "expect": {"__unknown__": True, "blocking": True},
-        "in": {"file-roadmap": "NOAUTH-1", "github-projects": "103"},
+        "in": {"file-roadmap": "NOAUTH-1", "github-projects": "103", "linear": "ENG-100"},
     },
     {
         "id": "absent_item",
         "meaning": "The work item does not exist. NOT_FOUND, not UNKNOWN.",
         "function": "get_work",
         "expect": {"__error__": "NOT_FOUND"},
-        "in": {"file-roadmap": "NO-SUCH", "github-projects": "9999"},
+        "in": {"file-roadmap": "NO-SUCH", "github-projects": "9999", "linear": "ENG-999"},
     },
     {
         "id": "thin_envelope",
         "meaning": "No non-goals declared. Non-blocking unknown (issue #2).",
         "function": "get_non_goals",
         "expect": {"__unknown__": True, "blocking": False},
-        "in": {"file-roadmap": "THIN-1", "github-projects": "1"},
+        "in": {"file-roadmap": "THIN-1", "github-projects": "1", "linear": "ENG-101"},
     },
     {
         "id": "completed_work_authority",
@@ -89,7 +93,7 @@ SCENARIOS = [
                     "STOP_COMPLETE is composed by the engine from authority + acceptance (§40)."),
         "function": "get_authority",
         "expect": {"authority": "AUTHORIZED", "admitted": True},
-        "in": {"file-roadmap": "DONE-1", "github-projects": "3"},
+        "in": {"file-roadmap": "DONE-1", "github-projects": "3", "linear": "ENG-105"},
     },
     {
         "id": "completion_verifiable",
@@ -97,7 +101,16 @@ SCENARIOS = [
         "function": "get_acceptance_conditions",
         "needs": "acceptance_conditions",
         "expect": {},
-        "in": {"file-roadmap": "DONE-1", "github-projects": "3"},
+        "in": {"file-roadmap": "DONE-1", "github-projects": "3", "linear": "ENG-105"},
+    },
+    {
+        "id": "not_admitted",
+        "meaning": ("Filed but never admitted. INV-002 needs this distinct from admitted-not-authorized. "
+                    "Linear expresses it as triage; most trackers cannot."),
+        "function": "get_authority",
+        "needs": "admission_distinction",
+        "expect": {"__unknown__": True, "blocking": True},
+        "in": {"github-projects": "103", "linear": "ENG-100"},
     },
 ]
 

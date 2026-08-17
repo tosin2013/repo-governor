@@ -77,8 +77,20 @@ Possible fallback — **Repo Governor Lite**, with only: authority check; scope 
 | Input | Bears on | Current assessment |
 | --- | --- | --- |
 | Beads issue [#1150](https://github.com/gastownhall/beads/issues/1150) requests plugin-based tracker integrations | "existing products already implement the model"; "provider abstraction adds more burden than value" | **Not triggered.** Beads federating trackers aggregates state without ruling on authority, which makes it a better `ExecutionStateProvider`, not a competitor. Monitor. |
-| ADR-008 Layer 2 cross-provider equivalence | "cross-provider semantic normalization is not reliable" | **Not triggered on first evidence (2026-08-17).** 8/8 scenarios EQUIVALENT across `file-roadmap` and `github-projects`, 0 divergences, 1 honestly-advertised capability gap. Weak evidence — two providers, one a trivial baseline, roadmap role only, 3 of 8 GitHub cases synthetic. Re-run as providers are added. |
-| ScopeEnvelope thinness on real roadmap items | "governance causes material friction without benefit" | **Unresolved.** Most trackers lack explicit non-goals. |
+| ADR-008 Layer 2 cross-provider equivalence | "cross-provider semantic normalization is not reliable" | **Not triggered (2026-08-17).** 9/9 EQUIVALENT across `file-roadmap`, `github-projects`, `linear`; 0 divergences; 2 honestly-advertised capability gaps. Evidence still weak — see limits below. |
+| **Acceptance conditions absent from every real tracker** | "governance causes material friction without benefit"; INV-009 enforceability | **NEW, unresolved.** Neither GitHub Projects nor Linear can supply machine-checkable acceptance conditions. `STOP_COMPLETE` is composed from authority + acceptance (§40), so the completion firewall — one of the four always-on invariants — is **not derivable from either real tracker**. Only the file provider can supply it. |
+| ScopeEnvelope thinness on real roadmap items | "governance causes material friction without benefit" | **Unresolved, and worse than assumed.** Both real tracker adapters return `NON_GOALS_UNSTATED` and `ACCEPTANCE_UNSTATED` for every item — not "often thin" but "always thin" absent custom fields. |
+
+#### Limits of the current Layer 2 evidence
+
+Stated plainly so the result is not over-read:
+
+* Three providers, but `file-roadmap` is a baseline designed to agree, so effectively two.
+* **All three adapters were written by the same author against the same normalization map.** Convergence partly measures that shared intent, not independent agreement. A third-party adapter is the real test.
+* The Linear fixture is **entirely synthetic** — no credentials were available. Shaped to Linear's schema, but not recorded from a live workspace.
+* 3 of the GitHub cases are synthetic nodes.
+* Only the `roadmap_authority` role. Architecture, execution, and retirement normalization are untested.
+* Jira — the hardest case, with per-project configurable workflow states — is backlogged (#14).
 
 ## §56 — Research Evidence
 
