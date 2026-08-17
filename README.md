@@ -70,29 +70,32 @@ Eight pluggable provider roles, each answering a different governance question:
 
 Keeping these separate is the point — it's what stops *"the task says READY"* from implying *"the work is authorized."*
 
-A deterministic engine reconciles their state and returns one bounded disposition: `EXECUTE`, `CONTINUE`, `STOP_COMPLETE`, `CAPTURE_ONLY`, `AUTHORITY_WITHDRAWN`, `UNKNOWN`, and fourteen others. It returns a verdict; it never performs the action.
+A deterministic engine reconciles their state and returns one bounded disposition from a closed vocabulary of twelve. It returns a verdict; it never performs the action.
+
+**What v0.1.0 actually emits is five of those twelve:** `STOP_COMPLETE`, `CONTINUE`, `UNKNOWN`, `AUTHORITY_WITHDRAWN`, `NO_EXECUTION_AUTHORITY`. The engine answers *is this finished?* and *is authority absent or withdrawn?* — it does not yet issue the affirmative `EXECUTE`, and the discovery path that produces `CAPTURE_ONLY` is specified ([ADR-014](docs/adrs/014-scope-envelope-as-bounded-execution-contract.md)) and unbuilt. The completion firewall is the half that shipped, and it is the harder half. See the [ratification review](docs/adrs/RATIFICATION-v0.1.0.md).
 
 Governance depth scales with repository condition (L0 greenfield → L4 mature/high-assurance), so a two-file repository needs Git, a ten-line manifest, and four invariants — nothing more.
 
 ## Repository layout
 
 ```text
-adapters/      9 provider adapters, subprocess protocol, any language
+adapters/      12 provider adapters, subprocess protocol, any language
 engine/        deterministic policy engine, Python stdlib only
-conformance/   6 suites — the evidence behind every gate claim
+conformance/   7 suites — the evidence behind every gate claim
 schemas/       manifest v1 JSON Schema
 docs/
-  adrs/        17 architectural decisions (all Proposed) + index
+  adrs/        22 architectural decisions (all Proposed) + index + ratification review
   reference/   normative specification, §1–§70, INV-001…INV-014
   research/    external landscape sweep + transport/capability research
 ```
 
 | Suite | Asserts |
 | --- | --- |
-| `layer1.py` | 112 contract checks across 9 adapters |
+| `layer1.py` | 136 contract checks across 12 adapters |
 | `layer2.py` | cross-provider equivalence — **the thesis test** |
-| `transport.py` | agent-as-transport produces identical results |
-| `manifest.py` | 26 refusal cases; the loader's value is what it rejects |
+| `transport.py` | agent-as-transport produces byte-identical results (70 comparisons) |
+| `bindings.py` | the engine holds no adapter knowledge, and the permission gate is a gate |
+| `manifest.py` | 28 checks — 20 refusal cases; the loader's value is what it rejects |
 | `onboarding.py` | `RG-SIM-ONBOARDING-v0.1`, fixtures A–C |
 | `vocabulary.py` | closed sets cannot drift from the code |
 

@@ -21,11 +21,13 @@ Keeping these apart is the point: it stops *"the task says READY"* implying *"th
 ```bash
 $ADAPTER describe                                  # capabilities + contract version
 $ADAPTER query <role> <function> [k=v ...]         # typed response on stdout
-$ADAPTER query <role> <fn> ... --input -           # option C: caller supplies raw
+$ADAPTER query <role> <fn> ... --input -           # option C -- EXPERIMENTAL, see below
 ```
 
 Any language. The engine never imports a provider SDK. How an adapter reaches its
 backend — HTTP, CLI, file, MCP — is invisible to the engine (ADR-016).
+
+**`--input -` is experimental.** It rests on [ADR-020](../docs/adrs/020-agent-supplied-transport-with-adapter-as-normalizer.md), which is `Proposed` and not accepted, and the engine never uses it — only `conformance/transport.py` does. The authority-boundary question it raises is open ([#20](https://github.com/tosin2013/repo-governor/issues/20)). Build against it only if you are prepared for the contract to change.
 
 ## Rules an adapter must honour
 

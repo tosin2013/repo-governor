@@ -99,15 +99,17 @@ Questions 3 and 4 are the ones that could invalidate the product. Both should be
 Reproduce the whole thing:
 
 ```bash
-for g in 1 2 3 4 5 6 7; do python3 engine/completion.py GATE-$g; done
-for s in layer1 layer2 transport manifest onboarding vocabulary; do python3 conformance/$s.py; done
+for n in 7 8 9 10 11 12 13; do python3 engine/completion.py $n; done   # GitHub issues, live
+for s in layer1 layer2 transport manifest onboarding vocabulary bindings; do python3 conformance/$s.py; done
 ```
+
+The gate ids are GitHub issue numbers, not `GATE-N`. They were file-roadmap ids until ADR-022 moved the roadmap of record to GitHub.
 
 ### What `IMPLEMENTATION_READY` does not mean
 
 The gate asks whether the architecture is stable enough to build on. It does not ask whether the product is worth building, and four things remain open:
 
-* **All 17 ADRs are still `Proposed`.** None has been accepted. The gate was met against decisions nobody has ratified.
+* **All 22 ADRs are still `Proposed`.** None has been accepted. The gate was met against decisions nobody has ratified. See [`RATIFICATION-v0.1.0.md`](RATIFICATION-v0.1.0.md) — the release condition is not 22/22 Accepted, it is *no Proposed ADR silently normative in the shipped release*.
 * **#1 (cross-provider normalization) has weak evidence.** 9/9 scenarios agree, but all three adapters were written by the same author against the same map — that measures shared intent as much as portability. A third-party adapter is the real test.
-* **#2 (envelope thinness) is unmeasured** on any real repository.
+* **#2 (envelope thinness) is not merely unmeasured — it is unanswerable as written.** ADR-014's envelope compiler was never built, so nothing compiles an envelope whose thinness could be measured. Found by the ratification sweep.
 * **The criteria-drift weakness is unresolved.** Acceptance criteria were amended twice during implementation. Both amendments were justified and recorded, and nothing but that record distinguishes a legitimate correction from a convenient one.

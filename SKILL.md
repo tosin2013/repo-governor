@@ -55,11 +55,9 @@ These hold at every profile, including a nearly empty repository. The other ten 
 
 Anything you notice that is not the authorized work — a possible feature, a bug, technical debt, a retirement candidate — is a **discovery**. Record it; do not act on it.
 
-```bash
-python3 engine/completion.py <work-id>    # discoveries appear with their own dispositions
-```
-
 `CAPTURE_ONLY` is the default and is a complete, correct outcome. Promoting a discovery requires separate admission through the roadmap provider.
+
+**This one is on you, not on the engine.** The discovery path is specified (ADR-014) and not implemented: no engine module emits `CAPTURE_ONLY`, and `engine/completion.py` governs the completion axis only. Until it is built, INV-001 is a rule you follow rather than a rule the engine enforces — so do not read a clean `completion.py` run as clearance to act on something you discovered.
 
 ## Before deleting anything
 
