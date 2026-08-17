@@ -82,7 +82,7 @@ Questions 3 and 4 are the ones that could invalidate the product. Both should be
 | 3. Low-complexity repos need no extra providers | 🟡 Designed | ADR-006, ADR-003 rule 4 |
 | 4. Detection does not assign authority | 🟡 Designed | ADR-010 |
 | 5. Manifest semantics stable | 🟡 Designed | ADR-004 + ADR-015; **unblocked** |
-| 6. One viable adapter per required core role | ⬜ Not started | ADR-003 step 3 |
+| 6. One viable adapter per required core role | 🟡 Partial — 3 of 6 | `adapters/git`, `adapters/adr`, `adapters/file-roadmap` pass [Layer 1](../../conformance/layer1.py) 34/34. Execution, change-signal, retirement adapters + a second provider for portability still missing |
 | 7. `UNKNOWN` and failure behavior defined | 🟡 Designed | ADR-007, ADR-002 |
 
 Designed ≠ validated. Every 🟡 becomes ✅ only when the corresponding fixture passes.

@@ -1,0 +1,187 @@
+#!/usr/bin/env python3
+"""ArchitectureEvidenceProvider backed by an ADR directory (spec §12, ADR-003).
+
+Resolves architecture state to DEFINED / INFERRED / UNKNOWN (§37) and must
+never manufacture architectural authority. Supersession is resolved *within*
+this provider only (ADR-013 rule 4).
+"""
+
+from __future__ import annotations
+
+import os
+import re
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from _protocol import cite, fail, main, ok, unknown  # noqa: E402
+
+ROLE = "architecture"
+ADR_DIR = Path(os.environ.get("REPO_GOVERNOR_ADR_DIR", "docs/adrs"))
+
+STATUS_RE = re.compile(r"^\*\*Status\*\*:\s*(.+?)\s*$", re.M)
+TITLE_RE = re.compile(r"^#\s*(?:\d+\.\s*)?(.+?)\s*$", re.M)
+SUPERSEDED_RE = re.compile(r"[Ss]uperseded by\s+(ADR-\d+)")
+NUM_RE = re.compile(r"^(\d{3,4})-")
+
+# Statuses that constrain current work vs. those that are provenance only.
+ACTIVE = {"accepted", "proposed"}
+HISTORICAL = {"superseded", "deprecated", "rejected"}
+
+
+def _scan():
+    """Return (records, error). Never conflates unreadable with empty."""
+    if not ADR_DIR.exists():
+        return None, ("PROVIDER_UNAVAILABLE", f"ADR directory {str(ADR_DIR)!r} does not exist")
+    if not ADR_DIR.is_dir():
+        return None, ("PROVIDER_UNAVAILABLE", f"{str(ADR_DIR)!r} is not a directory")
+    try:
+        paths = sorted(ADR_DIR.glob("*.md"))
+    except OSError as e:
+        return None, ("PROVIDER_UNAVAILABLE", f"cannot read {str(ADR_DIR)!r}: {e}")
+
+    records = []
+    for p in paths:
+        if not NUM_RE.match(p.name):
+            continue  # README.md and friends are not decisions
+        try:
+            text = p.read_text(encoding="utf-8")
+        except OSError as e:
+            return None, ("PROVIDER_UNAVAILABLE", f"cannot read {p}: {e}")
+        st = STATUS_RE.search(text)
+        ti = TITLE_RE.search(text)
+        sup = SUPERSEDED_RE.search(text)
+        records.append({
+            "id": f"ADR-{NUM_RE.match(p.name).group(1)}",
+            "path": str(p),
+            "title": ti.group(1) if ti else None,
+            "status": st.group(1).strip() if st else None,
+            "superseded_by": sup.group(1) if sup else None,
+        })
+    return records, None
+
+
+def _guard(fn):
+    recs, err = _scan()
+    if err:
+        return None, fail(ROLE, fn, err[0], err[1])
+    return recs, None
+
+
+def get_active_decisions(kw):
+    recs, err = _guard("get_active_decisions")
+    if err:
+        return err
+    unstated = [r for r in recs if r["status"] is None]
+    active = [r for r in recs
+              if r["status"] and r["status"].split()[0].lower() in ACTIVE
+              and not r["superseded_by"]]
+    u = None
+    if unstated:
+        u = {
+            "reason": "STATUS_UNSTATED",
+            "detail": f"{len(unstated)} decision file(s) have no **Status** line: "
+                      + ", ".join(r["id"] for r in unstated[:5]),
+            "resolution": "Add a '**Status**: Accepted|Proposed|Superseded' line to each.",
+            "blocking": False,
+        }
+    return ok(ROLE, "get_active_decisions",
+              {"decisions": active, "count": len(active)},
+              [cite("adr", r["path"], "**Status**") for r in active] or [cite("adr", str(ADR_DIR))],
+              unknown=u)
+
+
+def get_superseded_decisions(kw):
+    recs, err = _guard("get_superseded_decisions")
+    if err:
+        return err
+    sup = [r for r in recs
+           if r["superseded_by"] or (r["status"] and r["status"].split()[0].lower() in HISTORICAL)]
+    return ok(ROLE, "get_superseded_decisions",
+              {"decisions": sup, "count": len(sup)},
+              [cite("adr", r["path"], "superseded by") for r in sup] or [cite("adr", str(ADR_DIR))])
+
+
+def get_constraints(kw):
+    """Architecture state per §37. Proposed-only => INFERRED, never DEFINED."""
+    recs, err = _guard("get_constraints")
+    if err:
+        return err
+    if not recs:
+        return unknown(ROLE, "get_constraints",
+                       reason="NO_ARCHITECTURE_EVIDENCE",
+                       detail=f"No ADR files found in {str(ADR_DIR)!r}.",
+                       resolution="Add ADRs, bind another architecture provider, or accept UNKNOWN.",
+                       blocking=False)
+    accepted = [r for r in recs
+                if r["status"] and r["status"].split()[0].lower() == "accepted"
+                and not r["superseded_by"]]
+    proposed = [r for r in recs
+                if r["status"] and r["status"].split()[0].lower() == "proposed"
+                and not r["superseded_by"]]
+    if accepted:
+        state, constraints = "DEFINED", accepted
+    elif proposed:
+        state, constraints = "INFERRED", proposed
+    else:
+        state, constraints = "UNKNOWN", []
+    u = None
+    if state == "INFERRED":
+        u = {
+            "reason": "NO_ACCEPTED_DECISIONS",
+            "detail": f"{len(proposed)} decision(s) are Proposed; none Accepted. "
+                      "Proposed decisions do not establish authoritative constraints.",
+            "resolution": "Accept the decisions that should bind, or treat architecture as UNKNOWN.",
+            "blocking": False,
+        }
+    return ok(ROLE, "get_constraints",
+              {"state": state,
+               "constraints": [{"id": r["id"], "title": r["title"]} for r in constraints]},
+              [cite("adr", r["path"], "**Status**") for r in constraints] or [cite("adr", str(ADR_DIR))],
+              unknown=u)
+
+
+def get_provenance(kw):
+    recs, err = _guard("get_provenance")
+    if err:
+        return err
+    return ok(ROLE, "get_provenance",
+              {"source": "adr-directory", "path": str(ADR_DIR), "documents": len(recs)},
+              [cite("adr", str(ADR_DIR))])
+
+
+def get_specs(kw):
+    """This adapter reads ADRs, not specs. Absence, not failure."""
+    recs, err = _guard("get_specs")
+    if err:
+        return err
+    return ok(ROLE, "get_specs", {"specs": [], "count": 0,
+                                  "note": "ADR adapter serves decisions; bind OpenSpec/Spec Kit for specs."},
+              [cite("adr", str(ADR_DIR))])
+
+
+FUNCTIONS = {
+    "get_active_decisions": get_active_decisions,
+    "get_superseded_decisions": get_superseded_decisions,
+    "get_constraints": get_constraints,
+    "get_provenance": get_provenance,
+    "get_specs": get_specs,
+}
+
+PROPERTIES = {
+    "persistence": True,
+    "provenance_quality": "exact",
+}
+
+CAPABILITIES = {
+    "active_decisions": True,
+    "superseded_decisions": True,
+    "constraints": True,
+    "specs": False,             # honest: returns empty by design
+    "provenance": True,
+}
+
+if __name__ == "__main__":
+    sys.exit(main(ROLE, CAPABILITIES, FUNCTIONS,
+                  {"name": "adr", "permissions": {"read": True, "write": False}},
+                  properties=PROPERTIES))

@@ -1,0 +1,80 @@
+{
+  "$comment": "Reference roadmap for the file-roadmap adapter (spec 11, ADR-015). JSON is canonical.",
+  "version": 1,
+  "items": {
+    "GATE-6": {
+      "title": "One viable adapter per required core role",
+      "status": "IN_PROGRESS",
+      "authority": "AUTHORIZED",
+      "admitted": true,
+      "required_outcome": "Each required core role has an adapter passing Layer 1 conformance.",
+      "in_scope": [
+        "adapters/git",
+        "adapters/adr",
+        "adapters/file-roadmap",
+        "conformance/layer1.py"
+      ],
+      "non_goals": [
+        "Linear adapter",
+        "Beads adapter",
+        "the evaluation engine itself"
+      ],
+      "acceptance_conditions": [
+        {
+          "check": "conformance_layer1_passes",
+          "target": "all bound adapters"
+        },
+        {
+          "check": "second_provider_in_one_category",
+          "target": "deferred to GATE-6b"
+        }
+      ],
+      "parent": "RG-SIM-ONBOARDING-v0.1",
+      "decision_history": []
+    },
+    "RBAC-1": {
+      "title": "Organization RBAC",
+      "status": "CLOSED",
+      "authority": "DEFERRED",
+      "admitted": false,
+      "required_outcome": null,
+      "in_scope": [],
+      "decision_history": [
+        {
+          "disposition": "DEFERRED",
+          "reason": "no validated organization-level requirement",
+          "reversal_condition": "validated multi-user organization requirement"
+        }
+      ]
+    },
+    "THIN-1": {
+      "title": "Work item with no non-goals or acceptance conditions",
+      "status": "OPEN",
+      "authority": "AUTHORIZED",
+      "required_outcome": "Deliberately underspecified: fixture for issue #2 (envelope thinness)."
+    },
+    "CANCELLED-1": {
+      "title": "Feature whose authority was withdrawn after execution began",
+      "status": "CLOSED",
+      "authority": "CANCELLED",
+      "admitted": false,
+      "required_outcome": null,
+      "in_scope": [],
+      "non_goals": [],
+      "decision_history": [
+        {
+          "disposition": "CANCELLED",
+          "reason": "superseded by a different approach",
+          "reversal_condition": "none \u2014 do not resurrect without new admission"
+        }
+      ],
+      "$comment": "Fixture for spec 38: roadmap CANCELLED while an execution root may still say READY. Expected disposition AUTHORITY_WITHDRAWN."
+    },
+    "BADAUTH-1": {
+      "title": "Item with an authority value outside the closed vocabulary",
+      "status": "OPEN",
+      "authority": "probably-fine",
+      "$comment": "Fixture: must yield MALFORMED_SOURCE, never be silently coerced."
+    }
+  }
+}
