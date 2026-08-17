@@ -13,7 +13,7 @@ All ADRs are **Proposed**. None is accepted. Per §61, the project cannot reach 
 | [001](001-agent-skill-as-primary-delivery-surface.md) | Agent Skill as the primary delivery surface | Distribution | Delivery form was undecided |
 | [002](002-deterministic-policy-engine-separate-from-model-judgment.md) | Deterministic policy engine separate from model judgment | Policy engine | Makes §53 metrics measurable |
 | [003](003-seven-provider-roles-with-normalized-contracts.md) | Seven provider roles with normalized contracts | Provider abstraction | Adapter wire protocol; partial support |
-| [004](004-governance-manifest-as-sole-binding-artifact.md) | Governance manifest as the sole binding artifact | Configuration | What `.repo-governor.yaml` *means* |
+| [004](004-governance-manifest-as-sole-binding-artifact.md) | Governance manifest as the sole binding artifact | Configuration | What `.repo-governor.json` *means* |
 | [005](005-deny-by-default-permission-model.md) | Deny-by-default permission model | Security | Default for unstated permissions |
 | [006](006-repository-condition-model-drives-governance-profiles.md) | Repository condition drives governance profiles | Policy scaling | How L0–L4 is assessed and who decides |
 | [007](007-closed-disposition-vocabulary-with-unknown-terminal.md) | Closed disposition vocabulary, `UNKNOWN` terminal | Output contract | What `UNKNOWN` means operationally |
@@ -24,6 +24,7 @@ All ADRs are **Proposed**. None is accepted. Per §61, the project cannot reach 
 | [012](012-provider-content-treated-as-untrusted-input.md) | Provider content treated as untrusted input | Security | **Gap in §51** — prompt injection |
 | [013](013-single-canonical-authority-per-role.md) | Single canonical authority per role, halt on conflict | Conflict resolution | Role cardinality; no tie-breaking |
 | [014](014-scope-envelope-as-bounded-execution-contract.md) | ScopeEnvelope as bounded contract + completion firewall | Domain model | How scope boundaries are drawn |
+| [015](015-json-as-canonical-manifest-format.md) | JSON as the canonical manifest format | Configuration | Closes ADR-011's deferred choice; unblocks gate 5 |
 
 ## Dependency order
 
@@ -38,6 +39,7 @@ All ADRs are **Proposed**. None is accepted. Per §61, the project cannot reach 
                │
 011 (runtime) ─┘
 012 (untrusted input) — cross-cutting, constrains 003, 004, 009, 010
+015 (JSON manifest) — resolves 011's deferred choice; unblocks gate 5
 009 (evidence chain) — depends on 002, 004; enables INV-005, INV-008
 ```
 
@@ -60,7 +62,7 @@ These are not deferred decisions — they are things no one can answer yet witho
 
 | # | Question | Where it bites | Resolved by |
 | --- | --- | --- | --- |
-| 1 | Manifest canonical format: JSON, or vendored YAML subset? | 011 | Implementation spike; needs its own ADR |
+| ~~1~~ | ~~Manifest canonical format~~ — **resolved by [ADR-015](015-json-as-canonical-manifest-format.md)**: JSON canonical. Spike showed a 143-line YAML subset silently mis-types 7/10 realistic values. | 011, 004 | ✅ [#3](https://github.com/tosin2013/repo-governor/issues/3) closed |
 | 2 | Decision-record redaction default for public repositories | 009, 012 | Design decision before v1 |
 | 3 | Does cross-provider semantic normalization actually work? | 003, 008 | ADR-008 Layer 2 with two real providers — **this is the thesis test** |
 | 4 | How thin are compiled ScopeEnvelopes on real roadmap items? | 014 | Measurement across real repositories |
@@ -79,7 +81,7 @@ Questions 3 and 4 are the ones that could invalidate the product. Both should be
 | 2. Provider conflicts handled deterministically | 🟡 Designed | ADR-013 |
 | 3. Low-complexity repos need no extra providers | 🟡 Designed | ADR-006, ADR-003 rule 4 |
 | 4. Detection does not assign authority | 🟡 Designed | ADR-010 |
-| 5. Manifest semantics stable | 🟡 Designed | ADR-004; blocked on open question 1 |
+| 5. Manifest semantics stable | 🟡 Designed | ADR-004 + ADR-015; **unblocked** |
 | 6. One viable adapter per required core role | ⬜ Not started | ADR-003 step 3 |
 | 7. `UNKNOWN` and failure behavior defined | 🟡 Designed | ADR-007, ADR-002 |
 

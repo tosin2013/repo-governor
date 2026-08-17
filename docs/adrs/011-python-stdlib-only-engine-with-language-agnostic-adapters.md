@@ -21,7 +21,7 @@ The constraints:
 
 1. **Python 3.11+, zero third-party dependencies.** Present by default on macOS and virtually all Linux, and already the ambient language of the agent tooling ecosystem. 3.11 is the floor for `tomllib` and mature `dataclasses` behaviour. Any dependency that seems necessary is a signal to reduce scope instead.
 
-2. **YAML without PyYAML.** PyYAML is not stdlib and would be the single dependency that breaks the no-install property. Two options are acceptable and the choice is deferred to implementation: restrict manifests to a documented YAML subset parsed by a small vendored parser, or accept JSON as the canonical manifest format with YAML as a convenience input converted during onboarding. The manifest schema (ADR-004) is defined in JSON Schema regardless, so the schema does not depend on this.
+2. **JSON, not YAML.** PyYAML is not stdlib and would be the single dependency that breaks the no-install property. **Resolved by ADR-015: JSON is canonical.** A spike showed a 143-line YAML subset parser silently mis-types 7 of 10 realistic manifest values — `engine_min_version: 1.0` becomes a float, `type: no` becomes `False` — which is disqualifying under ADR-002. The engine reads `.repo-governor.json` with `json.loads` and ships no YAML parser.
 
 3. **Adapters are language-agnostic subprocesses.** The engine invokes `$ADAPTER describe` and `$ADAPTER query ...`, reading JSON from stdout. It never imports a provider SDK. This is what lets a Go Beads adapter, a shell Git adapter, and a Python ADR adapter coexist without the core taking on any of their dependencies — and it is the mechanism by which §54's "must not require a specific tracker" holds at the code level rather than only in principle.
 
@@ -42,7 +42,7 @@ The constraints:
 
 **Negative**
 
-- Avoiding PyYAML for a YAML config file is genuinely awkward, and a hand-rolled subset parser is a classic source of subtle bugs. Accepting JSON as canonical is the safer engineering choice and the worse ergonomic one; this needs deciding early, not drifting.
+- JSON is worse to hand-edit than YAML — no comments, mandatory quoting. ADR-015 accepted this cost because onboarding generates the manifest rather than humans authoring it from scratch. The ergonomic loss is real and lands on occasional edits.
 - Stdlib-only means writing things that libraries do better — JSON Schema validation in particular. Expect a few hundred lines of infrastructure that a dependency would have supplied.
 - Subprocess-per-query has real overhead (tens of milliseconds each). Fine at one evaluation per repository; would need a batch protocol if usage patterns change.
 - Windows support is untested. Bash-invoked scripts and subprocess semantics differ. Out of scope for MVP, but it should be stated rather than discovered.
@@ -56,7 +56,7 @@ The engine/adapter split also matches ADR-005's permission model at the process 
 
 ## Implementation Plan
 
-1. Decide manifest canonical format — JSON with YAML convenience input, or vendored YAML subset — and record it as a follow-up ADR rather than an undocumented implementation detail.
+1. ~~Decide manifest canonical format~~ — **done, ADR-015: JSON canonical.**
 2. Implement a minimal JSON Schema validator covering the subset the schemas use.
 3. Implement the adapter subprocess protocol with typed errors and timeouts.
 4. Add a CI check asserting the engine imports nothing outside a stdlib allowlist, and nothing network-capable.

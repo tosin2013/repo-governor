@@ -68,7 +68,7 @@ No execution should begin until the conflict is resolved where roadmap authority
 
 ## §21 — Repository Governance Manifest
 
-Repository-local configuration artifact: `.repo-governor.yaml`
+Repository-local configuration artifact: **`.repo-governor.json`** (encoding set by ADR-015; the YAML below is illustrative)
 
 ```yaml
 repo_governor:
@@ -121,6 +121,7 @@ permissions:
 
 The manifest defines where Repo Governor retrieves each form of state; which providers are authoritative for which role; and what Repo Governor may read or write. **It must not duplicate provider data.**
 
+> ADR-015 makes JSON canonical — a YAML-subset parser silently mis-typed 7 of 10 realistic values.
 > ADR-004 adds `engine_min_version`, per-binding `contract_version`, and explicit `adapter` paths, and makes this the *sole* binding artifact. ADR-013 resolves the list-vs-scalar cardinality shown above.
 
 ## §22 — Permission Model

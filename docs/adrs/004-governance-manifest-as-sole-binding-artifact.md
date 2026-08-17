@@ -14,7 +14,7 @@ That question is load-bearing for INV-013: "Provider detection does not establis
 
 ## Decision
 
-**`.repo-governor.yaml`, committed to the repository, is the single artifact that binds providers to governance roles. Nothing else confers a binding.**
+**`.repo-governor.json`, committed to the repository, is the single artifact that binds providers to governance roles. Nothing else confers a binding.**
 
 1. **Binding requires presence in the manifest.** A detected, reachable, credentialed provider that is absent from the manifest has no governance role. The engine will not consult it.
 2. **The manifest holds bindings and permissions only** — never provider state. No cached issues, no mirrored ADR text, no status snapshots. If the engine needs state, it queries the adapter.
@@ -39,6 +39,8 @@ providers:
 ```
 
 `contract_version` lets role contracts evolve independently (ADR-003). `adapter` is explicit because implicit adapter discovery would reintroduce exactly the silent-binding problem INV-013 forbids.
+
+> **Encoding decided by ADR-015.** The canonical file is `.repo-governor.json`, read with `json.loads`. Every rule in this ADR is unchanged; only the encoding is settled. YAML examples below remain illustrative.
 
 ## Consequences
 
