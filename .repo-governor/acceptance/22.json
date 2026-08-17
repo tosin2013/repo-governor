@@ -1,0 +1,38 @@
+{
+  "$comment": "Acceptance criteria for GitHub issue #22, the v0.1.0 architecture ratification gate. Declared per ADR-017 so the engine rules on completion rather than the agent asserting it. Note criterion 5: the gate is satisfied by REACHING a tag decision on evidence, not by tagging -- a gate that only passes when it says yes is not a gate.",
+  "authority_id": "22",
+  "criteria": [
+    {
+      "check": "file_exists",
+      "target": "docs/adrs/RATIFICATION-v0.1.0.md"
+    },
+    {
+      "check": "file_exists",
+      "target": "docs/adrs/023-completion-firewall.md"
+    },
+    {
+      "check": "file_exists",
+      "target": "docs/adrs/024-scope-envelope-compiler.md"
+    },
+    {
+      "check": "command_exit",
+      "target": "test $(grep -l '^\\*\\*Status\\*\\*: Accepted' docs/adrs/0*.md | wc -l) -eq 21"
+    },
+    {
+      "check": "command_exit",
+      "target": "test $(grep -l '^\\*\\*Status\\*\\*: Proposed' docs/adrs/0*.md | wc -l) -eq 2"
+    },
+    {
+      "check": "command_exit",
+      "target": "grep -q 'Superseded' docs/adrs/014-scope-envelope-as-bounded-execution-contract.md"
+    },
+    {
+      "check": "command_exit",
+      "target": "jq -e '.release.tag_decision | test(\"NOT TAGGED\")' .github/project-config.json"
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/bindings.py"
+    }
+  ]
+}

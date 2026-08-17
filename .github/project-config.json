@@ -26,7 +26,7 @@
       ],
       "auto_add_workflow": true,
       "items": 25,
-      "status_snapshot": "15 Done, 10 Backlog (2026-08-17). 0 drift across 25 items.",
+      "status_snapshot": "16 Done, 9 Backlog (2026-08-17). 0 drift across 25 items.",
       "write_scope_acquired": "2026-08-17 \u2014 token now carries 'project'; manual field edits work. Note the refresh REPLACED read:project rather than adding to it."
     },
     "reason": "Linked by the maintainer on 2026-08-17, overriding the computed recommendation of 'none'. The override is correct and the score is not wrong: it measures COORDINATION need \u2014 contributors, open items, activity \u2014 and coordination need genuinely is low for a solo repository. What it does not measure is TRACKING need. This repository carries 19 tracked items across three distinct categories (gate conditions, thesis risks, architecture questions) with real dependencies between them, and that is what the board is for. Two different needs; the score only sees one.",
@@ -37,23 +37,24 @@
     "decision": "milestone",
     "reason": "Gate work is now tracked under milestone RG-SIM-ONBOARDING-v0.1 (0/7). Still no shippable artifact, so no tags, CHANGELOG, or release automation yet.",
     "revisit_when": "A release is now unblocked on licensing but still blocked on ADR status. Revisit when the ADRs are moved from Proposed to Accepted.",
-    "milestone": "RG-RATIFY-v0.1.0 (open); RG-THESIS-v0.2 (closed 2/2); RG-SIM-ONBOARDING-v0.1 (closed 10/10)",
+    "milestone": "All three milestones CLOSED: RG-SIM-ONBOARDING-v0.1 10/10, RG-THESIS-v0.2 2/2, RG-RATIFY-v0.1.0 1/1.",
     "milestone_scope": "Expanded 2026-08-17 from 7 gate conditions to 10. Rule: an issue belongs in RG-SIM-ONBOARDING-v0.1 if it blocks IMPLEMENTATION_READY. #15/#17/#18 block gate conditions and were added; #1/#2/#16 are product-viability and positioning questions and were kept out.",
     "milestone_items": 10,
     "milestone_progress": "RG-THESIS-v0.2 2/2 \u2014 21 (engine resolves providers through the manifest) and 19 (roadmap of record moved to GitHub).",
     "implementation_gate": "MET 2026-08-17, re-verified against live GitHub issues 7-13. Met against 22 ADRs that are all still Proposed; architecture ratification is now the release gate (docs/adrs/RATIFICATION-v0.1.0.md).",
     "shippable_artifact": "Now exists: 12 adapters, 7 engine modules, 6 conformance suites, SKILL.md. Release decision stays 'milestone' \u2014 no version cut yet, and commits are not conventional, so any version recommendation is judgment-based rather than derivable.",
-    "milestone_state": "RG-RATIFY-v0.1.0 OPEN. Ratification done; the tag it gates is withheld.",
+    "milestone_state": "None open. Issue 22 closed on ENGINE evidence -- acceptance criteria declared per ADR-017 and completion.py returned STOP_COMPLETE, rather than the agent asserting the work was done.",
     "version_recommendation": "v0.1.0, judgment-based. 0 feat / 0 fix / 0 breaking across 42 commits because this repository does not use conventional commits, so the count is not evidence of a patch release \u2014 it is evidence the heuristic does not apply here.",
-    "release_blocker": "THREE release-blocking findings from the real-repository evidence run against mcp-adr-analysis-server: issue 24 (engine governs the repo it is installed in and reports confidently about the wrong one; provenance cannot disambiguate) and issue 25 (adr.get_constraints returns DEFINED while dropping 19 of 22 unreadable decisions, violating ADR-003 rule 6 which was accepted the same day). Architecture ratification is NO LONGER the blocker -- it completed.",
+    "release_blocker": "Issues 24 and 25, both RELEASE-BLOCKING and both NOT_ADMITTED. The release cannot proceed until the maintainer admits them (milestone membership = admission, ADR-018) and they are fixed. Ratification is complete and is no longer a blocker.",
     "license": "Apache-2.0, applied 2026-08-17. Chosen for the patent grant and contribution terms because ADR-003's adapter protocol invites third-party adapters. Ownership (section 68, Tosin Open Source) was decided separately and is recorded in NOTICE.",
     "adr_status": "21 of 24 Accepted 2026-08-17 by Tosin Akinosho (section 68). ADR-020 and ADR-024 held Proposed. ADR-014 Superseded, split into 023 (accepted) and 024 (proposed).",
-    "tag_decision": "NOT TAGGED 2026-08-17. The directive was 'tag only if no release-blocking finding remains'; three remain. No tag, no draft release. The findings were also NOT fixed: discovery confers no authority (INV-001), so 24 and 25 read NOT_ADMITTED until the maintainer admits them."
+    "tag_decision": "NOT TAGGED 2026-08-17. The directive was 'tag only if no release-blocking finding remains'; three remain. No tag, no draft release. The findings were also NOT fixed: discovery confers no authority (INV-001), so 24 and 25 read NOT_ADMITTED until the maintainer admits them.",
+    "next_milestone_when": "Create a milestone and add 24 and 25 to it. That is the admission act; until then the engine reads both NOT_ADMITTED and no work on them is authorized. Deliberate: discovery confers no authority (INV-001)."
   },
   "open_work": {
     "$comment": "Post-milestone. None of these block anything; all are open questions or backlog.",
     "issues": {
-      "23": "ScopeEnvelope compiler + discovery path specified but unbuilt; blocks 2",
+      "23": "ScopeEnvelope compiler -- REMOVED from RG-RATIFY-v0.1.0 2026-08-17. Milestone membership means admission, so leaving it there admitted work whose ADR (024) is deliberately held Proposed.",
       "22": "architecture ratification gate for v0.1.0 -- the release blocker",
       "20": "manifest does not bound what the host could supply; five-layer authority taxonomy recorded",
       "14": "Jira adapter -- backlogged (relabelled gate -> enhancement; it never was a gate condition)",
@@ -65,7 +66,7 @@
       "24": "engine governs the repo it is installed in -- RELEASE-BLOCKING"
     },
     "milestoned": 0,
-    "note": "Issues 22 and 23 are milestoned to RG-RATIFY-v0.1.0; 22 is assigned and therefore AUTHORIZED. The other eight are unmilestoned and read NOT_ADMITTED, including the two release blockers -- admitting them is the maintainer's decision, not the agent's."
+    "note": "Nine open issues, all unmilestoned and therefore NOT_ADMITTED -- including the two release blockers. No milestone is open. The next admission decision is the maintainer's."
   },
   "governance_self_binding": {
     "$comment": "This repository is now governed by its own engine off GitHub issues, not off a local file. Recorded because the previous arrangement was a section 54 failure condition that went unnoticed for 40 commits (ADR-022).",
