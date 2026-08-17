@@ -25,8 +25,8 @@
         "Done"
       ],
       "auto_add_workflow": true,
-      "items": 25,
-      "status_snapshot": "16 Done, 9 Backlog (2026-08-17). 0 drift across 25 items.",
+      "items": 27,
+      "status_snapshot": "16 Done, 11 Backlog (2026-08-17). 0 drift across 27 items.",
       "write_scope_acquired": "2026-08-17 \u2014 token now carries 'project'; manual field edits work. Note the refresh REPLACED read:project rather than adding to it."
     },
     "reason": "Linked by the maintainer on 2026-08-17, overriding the computed recommendation of 'none'. The override is correct and the score is not wrong: it measures COORDINATION need \u2014 contributors, open items, activity \u2014 and coordination need genuinely is low for a solo repository. What it does not measure is TRACKING need. This repository carries 19 tracked items across three distinct categories (gate conditions, thesis risks, architecture questions) with real dependencies between them, and that is what the board is for. Two different needs; the score only sees one.",
@@ -45,7 +45,7 @@
     "shippable_artifact": "Now exists: 12 adapters, 7 engine modules, 6 conformance suites, SKILL.md. Release decision stays 'milestone' \u2014 no version cut yet, and commits are not conventional, so any version recommendation is judgment-based rather than derivable.",
     "milestone_state": "None open. Issue 22 closed on ENGINE evidence -- acceptance criteria declared per ADR-017 and completion.py returned STOP_COMPLETE, rather than the agent asserting the work was done.",
     "version_recommendation": "v0.1.0, judgment-based. 0 feat / 0 fix / 0 breaking across 42 commits because this repository does not use conventional commits, so the count is not evidence of a patch release \u2014 it is evidence the heuristic does not apply here.",
-    "release_blocker": "Issues 24 and 25, both RELEASE-BLOCKING and both NOT_ADMITTED. The release cannot proceed until the maintainer admits them (milestone membership = admission, ADR-018) and they are fixed. Ratification is complete and is no longer a blocker.",
+    "release_blocker": "THREE release-blocking issues: 24 (engine governs the repo it is installed in), 26 (two adapters default to the author's repository when identity is unset -- survives 24's fix), 25 (adr.get_constraints returns DEFINED while dropping unreadable decisions). All three are NOT_ADMITTED.",
     "license": "Apache-2.0, applied 2026-08-17. Chosen for the patent grant and contribution terms because ADR-003's adapter protocol invites third-party adapters. Ownership (section 68, Tosin Open Source) was decided separately and is recorded in NOTICE.",
     "adr_status": "21 of 24 Accepted 2026-08-17 by Tosin Akinosho (section 68). ADR-020 and ADR-024 held Proposed. ADR-014 Superseded, split into 023 (accepted) and 024 (proposed).",
     "tag_decision": "NOT TAGGED 2026-08-17. The directive was 'tag only if no release-blocking finding remains'; three remain. No tag, no draft release. The findings were also NOT fixed: discovery confers no authority (INV-001), so 24 and 25 read NOT_ADMITTED until the maintainer admits them.",
@@ -63,10 +63,12 @@
       "2": "ScopeEnvelope thinness -- UNANSWERABLE as written; nothing compiles an envelope. Blocked on 23",
       "1": "cross-provider normalization -- the thesis question; Layer 2 has never run on two LIVE providers",
       "25": "adr.get_constraints swallows STATUS_UNSTATED -- RELEASE-BLOCKING",
-      "24": "engine governs the repo it is installed in -- RELEASE-BLOCKING"
+      "24": "engine governs the repo it is installed in -- RELEASE-BLOCKING",
+      "27": "detected ADR location never reaches the adapter; detection over-promises",
+      "26": "adapters default to the author's repository -- RELEASE-BLOCKING"
     },
     "milestoned": 0,
-    "note": "Nine open issues, all unmilestoned and therefore NOT_ADMITTED -- including the two release blockers. No milestone is open. The next admission decision is the maintainer's."
+    "note": "Eleven open issues, none milestoned, all therefore NOT_ADMITTED -- including all three release blockers. No milestone is open. Creating one and adding 24, 25, 26 is the admission act and is the maintainer's."
   },
   "governance_self_binding": {
     "$comment": "This repository is now governed by its own engine off GitHub issues, not off a local file. Recorded because the previous arrangement was a section 54 failure condition that went unnoticed for 40 commits (ADR-022).",
@@ -82,5 +84,18 @@
     "worked": "Onboarding assessed a foreign repository correctly. Adapters accept targeting via env. decision-history-github read real NOT_PLANNED closures as REJECTED.",
     "failed": "Governance itself cannot target a foreign repository and does not say so -- it answers about its own. See issue 24.",
     "structural_finding": "Second real-repo run to find a format assumption in adapters/adr. Both were invisible to conformance because the fixtures share the implementation's conventions. Layer 1 and Layer 2 cannot catch a convention the fixtures and the code agree on -- the strongest argument yet for the third-party adapter issue 1 asks for."
+  },
+  "cross_repo_audit": {
+    "$comment": "Audit of every adapter for assumptions that break on repositories this project did not write. Prompted by issue 25; the ADR dialect turned out to be one of four classes.",
+    "date": "2026-08-17",
+    "corpus": "437 numbered ADRs across 34 collections in ~/workspace and ~/workspaces",
+    "headline": "adapters/adr reads 70 of 437 (16%) and reads 10 of those from the wrong part of the document, while passing 136/136 Layer 1 checks.",
+    "classes": {
+      "1_content_format": "status dialect -- heading 57%, bullet 19%, inline 16% (only form supported). Issue 25.",
+      "2_location": "onboard.py proposes binding path=docs/adr; adapters/adr never reads it and defaults to docs/adrs. Issue 27.",
+      "3_detection_overpromise": "onboard.py substring-counts statuses (20) where the adapter parses (2). Issue 27.",
+      "4_identity_default": "REPO_GOVERNOR_GH_REPO defaults to tosin2013/repo-governor in two shipped adapters. Issue 26. RELEASE-BLOCKING."
+    },
+    "structural_conclusion": "A test cannot detect a convention it shares with the implementation. Layer 1 measures contract conformance and says nothing about input coverage; the suite currently carries only one of those properties. Recorded on issue 1."
   }
 }
