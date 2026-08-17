@@ -36,7 +36,7 @@
   "release": {
     "decision": "milestone",
     "reason": "Gate work is now tracked under milestone RG-SIM-ONBOARDING-v0.1 (0/7). Still no shippable artifact, so no tags, CHANGELOG, or release automation yet.",
-    "revisit_when": "A release is now unblocked on licensing but still blocked on ADR status. Revisit when the ADRs are moved from Proposed to Accepted.",
+    "revisit_when": "v0.2 scope. Open non-blocking bugs 27 and 28, and the thesis questions 1, 2, 5, 20, 23. None is admitted.",
     "milestone": "All four milestones CLOSED. RG-PORTABILITY-v0.1.0 4/4.",
     "milestone_scope": "Expanded 2026-08-17 from 7 gate conditions to 10. Rule: an issue belongs in RG-SIM-ONBOARDING-v0.1 if it blocks IMPLEMENTATION_READY. #15/#17/#18 block gate conditions and were added; #1/#2/#16 are product-viability and positioning questions and were kept out.",
     "milestone_items": 10,
@@ -45,10 +45,10 @@
     "shippable_artifact": "Now exists: 12 adapters, 7 engine modules, 6 conformance suites, SKILL.md. Release decision stays 'milestone' \u2014 no version cut yet, and commits are not conventional, so any version recommendation is judgment-based rather than derivable.",
     "milestone_state": "None open. Every defect blocker from the evidence run is closed.",
     "version_recommendation": "v0.1.0, judgment-based. 0 feat / 0 fix / 0 breaking across 42 commits because this repository does not use conventional commits, so the count is not evidence of a patch release \u2014 it is evidence the heuristic does not apply here.",
-    "release_blocker": "NO DEFECT BLOCKER REMAINS. Issues 24, 25, 26 and 29 are closed. What is left is a RATIFICATION gate, not a defect: ADR-027 and ADR-028 are Proposed and the v0.1.0 runtime DEPENDS on both -- 027 in engine/bindings.py, engine/manifest.py and adapters/_protocol.py; 028 in the two GitHub-backed adapters. The condition recorded in docs/adrs/RATIFICATION-v0.1.0.md is that every decision the runtime depends on is Accepted. By that condition the tag waits on ratifying two ADRs, which is a maintainer decision.",
+    "release_blocker": "None. All defect blockers closed and the ratification gate cleared.",
     "license": "Apache-2.0, applied 2026-08-17. Chosen for the patent grant and contribution terms because ADR-003's adapter protocol invites third-party adapters. Ownership (section 68, Tosin Open Source) was decided separately and is recorded in NOTICE.",
-    "adr_status": "21 of 26 Accepted. Proposed: 020 and 024 (neither referenced by the runtime, correctly held), 027 and 028 (both referenced -- the gate). 014 Superseded.",
-    "tag_decision": "NOT TAGGED 2026-08-17. The directive was 'tag only if no release-blocking finding remains'; three remain. No tag, no draft release. The findings were also NOT fixed: discovery confers no authority (INV-001), so 24 and 25 read NOT_ADMITTED until the maintainer admits them.",
+    "adr_status": "23 of 26 Accepted 2026-08-17. Held: ADR-020 and ADR-024, neither referenced by the runtime. ADR-014 Superseded, split into 023 (Accepted) and 024 (held).",
+    "tag_decision": "TAGGED v0.1.0 on 2026-08-17 after the release condition was met: every decision the runtime depends on is Accepted (23 of 26), and no Proposed ADR is silently normative. Annotated tag pushed. The GitHub release is a DRAFT -- publishing it is a separate, public act and is the maintainer's.",
     "next_milestone_when": "Create a milestone and add 24 and 25 to it. That is the admission act; until then the engine reads both NOT_ADMITTED and no work on them is authorized. Deliberate: discovery confers no authority (INV-001).",
     "not_blocking": "Issues 27 and 28 are open bugs and were assessed NOT release-blocking. 28 (adapters/adr reads 16% of real ADRs) is now correct-but-limited rather than confidently wrong, because issue 25's fix makes the adapter block on a dominated read instead of reporting DEFINED. 27 fails closed (PROVIDER_UNAVAILABLE) and over-promises at onboarding; neither yields a confident wrong governance verdict."
   },
