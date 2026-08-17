@@ -32,8 +32,10 @@ gh auth status 2>&1 | grep -i 'token scopes'
 If `'project'` is absent, board writes will fail. Get it with:
 
 ```bash
-gh auth refresh -s project
+gh auth refresh -s project -h github.com
 ```
+
+**`--hostname` is required whenever this runs non-interactively** — without it `gh` exits with `--hostname required when not running interactively` and prints usage. This is an OAuth device flow: it prints a one-time code to enter at `github.com/login/device`, so an agent cannot complete it. Hand the command to the user rather than attempting it.
 
 ## Step 1 — Always run the driver first
 
@@ -320,6 +322,7 @@ These were all hit while building this skill.
 - **`FATAL: gh not authenticated`** — run `gh auth login`.
 - **`FATAL: no GitHub remote resolved`** — the repo has no GitHub remote. `git remote add origin https://github.com/<owner>/<repo>.git`.
 - **`'owner/repo' has different owner from '@me'`** — replace `@me` with the literal login in `--owner`.
-- **`INSUFFICIENT_SCOPES ... requires ['project']`** — run `gh auth refresh -s project`, then retry.
+- **`INSUFFICIENT_SCOPES ... requires ['project']`** — the user must run `gh auth refresh -s project -h github.com`, then retry. An agent cannot do this: it is a browser device flow.
+- **`--hostname required when not running interactively`** — `gh auth refresh` was run without `-h github.com`. Add it.
 - **Driver reports `setup` on a repo you already configured** — the marker is missing or invalid. Check `jq -e . .github/project-config.json`; recreate it rather than re-running setup analysis.
 - **`could not resolve to a Repository`** — the token lacks `repo` scope for a private repo, or the name is wrong. Verify with `gh repo view --json nameWithOwner`.
