@@ -25,8 +25,8 @@
         "Done"
       ],
       "auto_add_workflow": true,
-      "items": 20,
-      "status_snapshot": "13 Done, 7 Backlog (2026-08-17). Reconciled against issue state: 0 drift across 20 items, no closed issue left un-Done and no open issue marked Done.",
+      "items": 21,
+      "status_snapshot": "15 Done, 6 Backlog (2026-08-17). Reconciled against issue state: 0 drift across 21 items.",
       "write_scope_acquired": "2026-08-17 \u2014 token now carries 'project'; manual field edits work. Note the refresh REPLACED read:project rather than adding to it."
     },
     "reason": "Linked by the maintainer on 2026-08-17, overriding the computed recommendation of 'none'. The override is correct and the score is not wrong: it measures COORDINATION need \u2014 contributors, open items, activity \u2014 and coordination need genuinely is low for a solo repository. What it does not measure is TRACKING need. This repository carries 19 tracked items across three distinct categories (gate conditions, thesis risks, architecture questions) with real dependencies between them, and that is what the board is for. Two different needs; the score only sees one.",
@@ -36,29 +36,35 @@
   "release": {
     "decision": "milestone",
     "reason": "Gate work is now tracked under milestone RG-SIM-ONBOARDING-v0.1 (0/7). Still no shippable artifact, so no tags, CHANGELOG, or release automation yet.",
-    "revisit_when": "TRIGGERED 2026-08-17 \u2014 the milestone completed and a versionable artifact exists. The open question is now whether to cut v0.1.0, which is a maintainer decision and has not been made.",
-    "milestone": "RG-SIM-ONBOARDING-v0.1",
+    "revisit_when": "A release is now unblocked on licensing but still blocked on ADR status. Revisit when the ADRs are moved from Proposed to Accepted.",
+    "milestone": "RG-THESIS-v0.2 (closed 2/2); RG-SIM-ONBOARDING-v0.1 (closed 10/10)",
     "milestone_scope": "Expanded 2026-08-17 from 7 gate conditions to 10. Rule: an issue belongs in RG-SIM-ONBOARDING-v0.1 if it blocks IMPLEMENTATION_READY. #15/#17/#18 block gate conditions and were added; #1/#2/#16 are product-viability and positioning questions and were kept out.",
     "milestone_items": 10,
-    "milestone_progress": "10/10. All seven section-61 gate conditions closed and engine-verified, plus #15 (STOP_COMPLETE derivability), #17 (capabilities per transport) and #18 (agent-supplied transport, ADR-020).",
+    "milestone_progress": "RG-THESIS-v0.2 2/2 \u2014 21 (engine resolves providers through the manifest) and 19 (roadmap of record moved to GitHub).",
     "implementation_gate": "MET 2026-08-17. RG-SIM-ONBOARDING-v0.1 passes. Note: met against 17 ADRs that are all still Proposed.",
     "shippable_artifact": "Now exists: 12 adapters, 7 engine modules, 6 conformance suites, SKILL.md. Release decision stays 'milestone' \u2014 no version cut yet, and commits are not conventional, so any version recommendation is judgment-based rather than derivable.",
-    "milestone_state": "CLOSED 2026-08-17 at 10/10.",
+    "milestone_state": "Both milestones CLOSED 2026-08-17.",
     "version_recommendation": "v0.1.0, judgment-based. 0 feat / 0 fix / 0 breaking across 42 commits because this repository does not use conventional commits, so the count is not evidence of a patch release \u2014 it is evidence the heuristic does not apply here.",
-    "release_blocker": "All 20 ADRs are still Proposed. Tagging v0.1.0 would publish an architecture nothing has accepted. Decide ADR status before or with the first tag."
+    "release_blocker": "All 22 ADRs are still Proposed. Tagging would publish an architecture nothing has accepted. Licensing is no longer a blocker: Apache-2.0 applied 2026-08-17 and detected by GitHub.",
+    "license": "Apache-2.0, applied 2026-08-17. Chosen for the patent grant and contribution terms because ADR-003's adapter protocol invites third-party adapters. Ownership (section 68, Tosin Open Source) was decided separately and is recorded in NOTICE."
   },
   "open_work": {
     "$comment": "Post-milestone. None of these block anything; all are open questions or backlog.",
     "issues": {
-      "20": "manifest no longer bounds what the host could supply (created by ADR-020)",
-      "19": "parallel roadmap \u2014 carries a LIVE section-54 failure condition",
+      "20": "manifest does not bound what the host could supply; five-layer authority taxonomy recorded",
       "14": "Jira adapter \u2014 backlogged",
       "6": "monorepo governance \u2014 deferred past v1",
-      "5": "skill activation reliability across hosts",
-      "2": "ScopeEnvelope thinness \u2014 unresolved and worse than assumed",
-      "1": "cross-provider normalization \u2014 the thesis question"
+      "5": "skill activation reliability across hosts \u2014 governance logic is not governance enforcement",
+      "2": "ScopeEnvelope thinness \u2014 measured: ALWAYS thin on real trackers, not merely often",
+      "1": "cross-provider normalization \u2014 the thesis question; Layer 2 has never run on two LIVE providers"
     },
     "milestoned": 0,
-    "note": "All seven are deliberately unmilestoned. There is no v0.2 milestone and creating one now would invent a scope nobody has decided."
+    "note": "All six deliberately unmilestoned, and therefore NOT_ADMITTED under the declared admission signal. That is the honest reading: open questions are not admitted work. There is no v0.3 milestone and creating one would invent a scope nobody has decided."
+  },
+  "governance_self_binding": {
+    "$comment": "This repository is now governed by its own engine off GitHub issues, not off a local file. Recorded because the previous arrangement was a section 54 failure condition that went unnoticed for 40 commits (ADR-022).",
+    "roadmap_authority": "adapters/github-projects",
+    "admission_signal": "milestone",
+    "consequence": "An issue with no milestone reads NOT_ADMITTED and blocks. Correct for the deferrals (6, 14) and for the open questions (1, 2, 5, 20), which are not admitted work."
   }
 }
