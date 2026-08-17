@@ -1,0 +1,107 @@
+#!/usr/bin/env python3
+"""Manifest loader conformance — gate 5 (#11).
+
+The loader's value is entirely in what it REFUSES. Each case below mutates
+the real manifest into something that must fail, and asserts the specific
+error fires. A loader that accepts a bad manifest is worse than none: it
+produces confident governance from a wrong binding.
+
+Usage:  python3 conformance/manifest.py
+"""
+
+from __future__ import annotations
+
+import copy
+import json
+import sys
+import tempfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "engine"))
+import manifest as M  # noqa: E402
+
+BASE = json.loads((ROOT / ".repo-governor.json").read_text())
+
+
+def mutate(fn):
+    d = copy.deepcopy(BASE)
+    fn(d)
+    return d
+
+
+def _drop_repo(d):
+    del d["providers"]["repository"]
+    d["permissions"].pop("repository", None)
+
+
+CASES = [
+    ("baseline is valid",              lambda d: None,                                    None),
+    ("future version refuses",         lambda d: d["repo_governor"].__setitem__("version", 99), "UNSUPPORTED_VERSION"),
+    ("scalar role given a list",       lambda d: d["providers"].__setitem__("roadmap_authority", [d["providers"]["roadmap_authority"]]), "CARDINALITY"),
+    ("array role given a scalar",      lambda d: d["providers"].__setitem__("architecture", d["providers"]["architecture"][0]), "CARDINALITY"),
+    ("repository role missing",        _drop_repo,                                        "MISSING_ROLE"),
+    ("adapter escapes repository",     lambda d: d["providers"]["repository"].__setitem__("adapter", "../../../etc/passwd"), "ADAPTER"),
+    ("adapter does not exist",         lambda d: d["providers"]["repository"].__setitem__("adapter", "adapters/nope"), "ADAPTER_MISSING"),
+    ("reserved verb execute",          lambda d: d["permissions"]["repository"].__setitem__("execute", True), "PERMISSION_RESERVED"),
+    ("unknown verb",                   lambda d: d["permissions"]["repository"].__setitem__("delete", True), "PERMISSION_UNKNOWN_VERB"),
+    ("permissions for unbound role",   lambda d: d["permissions"].__setitem__("retirement_x", {"read": True}), "PERMISSION_ORPHAN"),
+    ("malformed permission block",     lambda d: d["permissions"].__setitem__("repository", "yes"), "PERMISSION_MALFORMED"),
+    ("github token in manifest",       lambda d: d["providers"]["repository"].__setitem__("project", "ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123"), "SECRET"),
+    ("opaque credential-shaped value", lambda d: d["providers"]["repository"].__setitem__("project", "aGVsbG93b3JsZGhlbGxvd29ybGRoZWxsb3dvcmxk"), "SECRET"),
+    ("key named api_key",              lambda d: d["providers"]["repository"].__setitem__("api_key", "x"), "SECRET"),
+    ("unknown top-level property",     lambda d: d.__setitem__("roadmap", {"items": {}}), "SCHEMA"),
+    ("bad condition level",            lambda d: d["condition"].__setitem__("assessed", "L9"), "SCHEMA"),
+    ("profile not in enum",            lambda d: d["condition"].__setitem__("profile", "GOVERNOR_TURBO"), "SCHEMA"),
+    ("binding without adapter",        lambda d: d["providers"]["repository"].pop("adapter"), "SCHEMA"),
+    ("bad transport kind",             lambda d: d["providers"]["repository"].__setitem__("transport", {"kind": "carrier-pigeon"}), "SCHEMA"),
+    ("contract_version zero",          lambda d: d["providers"]["repository"].__setitem__("contract_version", 0), "SCHEMA"),
+]
+
+# Deny-by-default: (role, verb, expected)
+PERM_CASES = [
+    ("repository", "read", True),
+    ("repository", "write", False),          # explicitly false
+    ("repository", "create", False),         # absent verb => deny
+    ("roadmap_authority", "transition", False),
+    ("decision_history", "read", False),     # unbound role => deny
+    ("nonexistent", "read", False),
+]
+
+
+def main():
+    fails = 0
+    print("Manifest loader — refusal cases\n")
+    for label, fn, expect in CASES:
+        d = mutate(fn)
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+            json.dump(d, f)
+            tmp = f.name
+        m, errs = M.load(tmp)
+        Path(tmp).unlink()
+        if expect is None:
+            ok = not errs and m is not None
+            detail = "" if ok else f"unexpected: {errs[:2]}"
+        else:
+            ok = any(e.startswith(expect) or expect in e for e in errs) and m is None
+            detail = "" if ok else f"expected {expect}, got {errs[:2] or 'no errors'}"
+        fails += not ok
+        print(f"  [{'PASS' if ok else 'FAIL'}] {label:<34}{'  ' + detail if detail else ''}")
+
+    print("\nDeny by default\n")
+    m, errs = M.load()
+    assert not errs, errs
+    for role, verb, expect in PERM_CASES:
+        got, why = M.permitted(m, role, verb)
+        ok = got == expect
+        fails += not ok
+        print(f"  [{'PASS' if ok else 'FAIL'}] {role}.{verb:<11} -> {'ALLOW' if got else 'DENY'}   {why[:56]}")
+
+    total = len(CASES) + len(PERM_CASES)
+    print(f"\n{total - fails}/{total} checks passed")
+    print("MANIFEST LOADER: " + ("CONFORMANT" if not fails else f"NON-CONFORMANT ({fails})"))
+    return 0 if not fails else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

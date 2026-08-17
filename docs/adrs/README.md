@@ -85,7 +85,7 @@ Questions 3 and 4 are the ones that could invalidate the product. Both should be
 | 2. Provider conflicts handled deterministically | 🟡 Designed | ADR-013 |
 | 3. Low-complexity repos need no extra providers | 🟡 Designed | ADR-006, ADR-003 rule 4 |
 | 4. Detection does not assign authority | 🟡 Designed | ADR-010 |
-| 5. Manifest semantics stable | 🟡 Designed | ADR-004 + ADR-015; **unblocked** |
+| 5. Manifest semantics stable | ✅ **Met** — verified by `engine/completion.py GATE-5` → `STOP_COMPLETE` | `schemas/manifest-v1.json` frozen; `engine/manifest.py` fails closed; [26/26 refusal cases](../../conformance/manifest.py); `--validate` reaches `READY_FOR_GOVERNANCE`; `engine/migrate.py` stub exists per ADR-004 step 5 |
 | 6. One viable adapter per required core role | ✅ **Met** — verified by `engine/completion.py GATE-6` → `STOP_COMPLETE`, not by assertion | All 9 adapters pass [Layer 1](../../conformance/layer1.py) **112/112**; [Layer 2](../../conformance/layer2.py) 9/9 EQUIVALENT across 3 roadmap providers; criteria in `.repo-governor/acceptance/GATE-6.json` |
 | 7. `UNKNOWN` and failure behavior defined | 🟡 Designed | ADR-007, ADR-002 + ADR-017; unblocked, but the reason vocabulary is not yet closed |
 

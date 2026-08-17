@@ -106,6 +106,18 @@
       "status": "IN_PROGRESS",
       "authority": "AUTHORIZED",
       "admitted": true
+    },
+    "GATE-5": {
+      "title": "Manifest semantics stable enough for implementation",
+      "status": "IN_PROGRESS",
+      "authority": "AUTHORIZED",
+      "admitted": true,
+      "required_outcome": "Manifest v1 schema frozen and a loader that fails closed.",
+      "non_goals": [
+        "v2 schema",
+        "remote manifest resolution"
+      ],
+      "parent": "RG-SIM-ONBOARDING-v0.1"
     }
   }
 }
