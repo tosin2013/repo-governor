@@ -1,0 +1,286 @@
+#!/usr/bin/env python3
+"""RoadmapAuthorityProvider backed by GitHub Issues + Projects v2 (spec §11).
+
+The SECOND roadmap provider (§62), so ADR-008 Layer 2 can test whether
+semantically equivalent state produces equivalent dispositions across
+providers. That is the thesis test — issue #1.
+
+Two modes:
+  live     shells out to `gh api graphql` (needs gh + read:project)
+  fixture  reads a captured response — set REPO_GOVERNOR_GH_FIXTURE
+
+Conformance runs in fixture mode. ADR-008 rule 1: fixtures are recorded,
+not live, because determinism is only assertable against fixed inputs.
+
+NORMALIZATION IS THE HARD PART. GitHub has no "authority" field. The map
+below is an interpretation, and every judgement call in it is a place the
+two providers can silently diverge. It is written out explicitly rather
+than buried so Layer 2 can argue with it.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from _protocol import cite, fail, main, ok, unknown  # noqa: E402
+
+ROLE = "roadmap_authority"
+FIXTURE = os.environ.get("REPO_GOVERNOR_GH_FIXTURE")
+NWO = os.environ.get("REPO_GOVERNOR_GH_REPO", "tosin2013/repo-governor")
+
+QUERY = """
+query($owner:String!, $repo:String!) {
+  repository(owner:$owner, name:$repo) {
+    issues(first:50, states:[OPEN,CLOSED]) {
+      nodes {
+        number title state stateReason
+        labels(first:10){ nodes{ name } }
+        milestone { title }
+        projectItems(first:5) {
+          nodes {
+            project { number title }
+            fieldValues(first:20) {
+              nodes {
+                ... on ProjectV2ItemFieldSingleSelectValue { name field { ... on ProjectV2SingleSelectField { name } } }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+"""
+
+# --- the normalization map, stated explicitly -------------------------------
+# Board status -> whether execution is authorized. GitHub cannot express
+# "admitted but not authorized" natively; the Status column is the closest
+# proxy, which is itself a judgement.
+STATUS_AUTHORIZES = {
+    "Ready": "AUTHORIZED",
+    "In progress": "AUTHORIZED",
+    "In review": "AUTHORIZED",
+    "Backlog": "ADMITTED",       # on the board, not cleared to execute
+    "Done": "AUTHORIZED",        # was authorized; completion is a separate axis
+}
+# Closed-issue reasons.
+CLOSED_REASON = {
+    "NOT_PLANNED": "CANCELLED",
+    "DUPLICATE": "CANCELLED",
+    "COMPLETED": None,           # defer to board status
+}
+
+
+def _fetch(fn):
+    if FIXTURE:
+        p = Path(FIXTURE)
+        if not p.exists():
+            return None, fail(ROLE, fn, "PROVIDER_UNAVAILABLE", f"fixture {FIXTURE!r} does not exist")
+        try:
+            return json.loads(p.read_text()), None
+        except json.JSONDecodeError as e:
+            return None, fail(ROLE, fn, "MALFORMED_SOURCE", f"fixture is not valid JSON: {e}")
+    owner, _, repo = NWO.partition("/")
+    if not repo:
+        return None, fail(ROLE, fn, "BAD_REQUEST", f"REPO_GOVERNOR_GH_REPO={NWO!r} is not owner/repo")
+    try:
+        p = subprocess.run(
+            ["gh", "api", "graphql", "-f", f"query={QUERY}", "-f", f"owner={owner}", "-f", f"repo={repo}"],
+            capture_output=True, text=True, timeout=60,
+        )
+    except FileNotFoundError:
+        return None, fail(ROLE, fn, "PROVIDER_UNAVAILABLE", "gh CLI is not installed")
+    except subprocess.TimeoutExpired:
+        return None, fail(ROLE, fn, "PROVIDER_UNAVAILABLE", "gh api timed out")
+    if p.returncode != 0:
+        return None, fail(ROLE, fn, "PROVIDER_UNAVAILABLE", f"gh api failed: {p.stderr.strip()[:200]}")
+    try:
+        return json.loads(p.stdout), None
+    except json.JSONDecodeError as e:
+        return None, fail(ROLE, fn, "MALFORMED_SOURCE", f"gh returned non-JSON: {e}")
+
+
+def _issues(fn):
+    data, err = _fetch(fn)
+    if err:
+        return None, err
+    try:
+        return data["data"]["repository"]["issues"]["nodes"], None
+    except (KeyError, TypeError):
+        return None, fail(ROLE, fn, "MALFORMED_SOURCE", "unexpected GraphQL shape")
+
+
+def _find(fn, kw):
+    nodes, err = _issues(fn)
+    if err:
+        return None, err
+    wid = kw.get("id")
+    if not wid:
+        return None, fail(ROLE, fn, "BAD_REQUEST", "missing required argument: id=<issue-number>")
+    num = wid[1:] if wid.startswith("#") else wid
+    if not num.isdigit():
+        return None, fail(ROLE, fn, "BAD_REQUEST", f"id must be an issue number, got {wid!r}")
+    for n in nodes:
+        if n["number"] == int(num):
+            return n, None
+    return None, fail(ROLE, fn, "NOT_FOUND", f"no issue #{num} in {NWO}")
+
+
+def _status(node):
+    for pi in node.get("projectItems", {}).get("nodes", []):
+        for fv in pi.get("fieldValues", {}).get("nodes", []):
+            if fv and fv.get("field", {}).get("name") == "Status":
+                return fv.get("name"), pi["project"]["number"]
+    return None, None
+
+
+def _ref(node, field):
+    return cite("github-projects", f"{NWO}#issues.{node['number']}", field)
+
+
+def get_work(kw):
+    node, err = _find("get_work", kw)
+    if err:
+        return err
+    return ok(ROLE, "get_work",
+              {"id": f"#{node['number']}", "title": node["title"], "exists": True},
+              [_ref(node, "title")])
+
+
+def get_status(kw):
+    node, err = _find("get_status", kw)
+    if err:
+        return err
+    st, _ = _status(node)
+    return ok(ROLE, "get_status",
+              {"status": st or node["state"]},
+              [_ref(node, "projectItems.Status" if st else "state")])
+
+
+def get_authority(kw):
+    """Where normalization actually bites. GitHub has no authority field."""
+    node, err = _find("get_authority", kw)
+    if err:
+        return err
+    st, proj = _status(node)
+
+    if node["state"] == "CLOSED":
+        mapped = CLOSED_REASON.get(node.get("stateReason") or "", "CANCELLED")
+        if mapped:
+            return ok(ROLE, "get_authority", {"authority": mapped, "admitted": False},
+                      [_ref(node, "stateReason")])
+
+    if st is None:
+        return unknown(ROLE, "get_authority",
+                       reason="NOT_ON_BOARD",
+                       detail=f"Issue #{node['number']} is not an item on any Project, so no "
+                              "admission or authorization state can be read.",
+                       resolution="Add the issue to the roadmap Project, or bind a different roadmap authority.",
+                       blocking=True)
+    mapped = STATUS_AUTHORIZES.get(st)
+    if mapped is None:
+        return fail(ROLE, "get_authority", "MALFORMED_SOURCE",
+                    f"board Status {st!r} is not in the normalization map {sorted(STATUS_AUTHORIZES)}")
+    return ok(ROLE, "get_authority",
+              {"authority": mapped, "admitted": True},
+              [_ref(node, f"projectItems[{proj}].Status")])
+
+
+def get_scope(kw):
+    node, err = _find("get_scope", kw)
+    if err:
+        return err
+    return unknown(ROLE, "get_scope",
+                   reason="SCOPE_NOT_STRUCTURED",
+                   detail=f"Issue #{node['number']} has no structured scope. GitHub issue bodies are "
+                          "free prose, which ADR-012 forbids interpreting as typed facts.",
+                   resolution="Use a tracker with structured scope fields, or declare scope in the manifest.",
+                   blocking=False)
+
+
+def get_non_goals(kw):
+    node, err = _find("get_non_goals", kw)
+    if err:
+        return err
+    return unknown(ROLE, "get_non_goals",
+                   reason="NON_GOALS_UNSTATED",
+                   detail=f"Issue #{node['number']} declares no structured non_goals; "
+                          "the scope envelope will be thin.",
+                   resolution="Add explicit non-goals in a structured field.",
+                   blocking=False)
+
+
+def get_acceptance_conditions(kw):
+    node, err = _find("get_acceptance_conditions", kw)
+    if err:
+        return err
+    return unknown(ROLE, "get_acceptance_conditions",
+                   reason="ACCEPTANCE_UNSTATED",
+                   detail=f"Issue #{node['number']} has no machine-checkable acceptance conditions.",
+                   resolution="Add a structured acceptance field, or accept that completion cannot be verified.",
+                   blocking=False)
+
+
+def get_parent_or_goal(kw):
+    node, err = _find("get_parent_or_goal", kw)
+    if err:
+        return err
+    ms = node.get("milestone")
+    return ok(ROLE, "get_parent_or_goal", {"parent": ms["title"] if ms else None},
+              [_ref(node, "milestone")])
+
+
+def get_decision_history(kw):
+    node, err = _find("get_decision_history", kw)
+    if err:
+        return err
+    hist = []
+    if node["state"] == "CLOSED":
+        hist.append({
+            "disposition": CLOSED_REASON.get(node.get("stateReason") or "", "CANCELLED") or "COMPLETED",
+            "reason": f"issue closed as {node.get('stateReason')}",
+            "reversal_condition": None,
+        })
+    return ok(ROLE, "get_decision_history", {"history": hist}, [_ref(node, "stateReason")])
+
+
+FUNCTIONS = {
+    "get_work": get_work,
+    "get_status": get_status,
+    "get_authority": get_authority,
+    "get_scope": get_scope,
+    "get_non_goals": get_non_goals,
+    "get_acceptance_conditions": get_acceptance_conditions,
+    "get_parent_or_goal": get_parent_or_goal,
+    "get_decision_history": get_decision_history,
+}
+
+PROPERTIES = {
+    "persistence": True,
+    # Weaker than file-roadmap: authority is INFERRED from board status,
+    # not read from a field that means authority.
+    "provenance_quality": "inferred",
+}
+
+CAPABILITIES = {
+    "work_lookup": True,
+    "status": True,
+    "authority": True,
+    "cancellation_detection": True,
+    "decision_history": True,
+    "scope": False,                  # honest: always UNKNOWN
+    "non_goals": False,              # honest: always UNKNOWN
+    "acceptance_conditions": False,  # honest: always UNKNOWN
+}
+
+if __name__ == "__main__":
+    sys.exit(main(ROLE, CAPABILITIES, FUNCTIONS,
+                  {"name": "github-projects",
+                   "permissions": {"read": True, "write": False},
+                   "mode": "fixture" if FIXTURE else "live"},
+                  properties=PROPERTIES))

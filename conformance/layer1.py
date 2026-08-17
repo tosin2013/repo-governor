@@ -70,6 +70,22 @@ SUITE = {
         "absence_fn": ("get_work", {"id": "NO-SUCH-ITEM"}),
         "malformed_fn": ("get_authority", {"id": "BADAUTH-1"}),
     },
+    "adapters/github-projects": {
+        "role": "roadmap_authority",
+        "probe": {"id": "1"},
+        "capability_fn": {
+            "work_lookup": ("get_work", {"id": "1"}),
+            "status": ("get_status", {"id": "1"}),
+            "authority": ("get_authority", {"id": "1"}),
+            "cancellation_detection": ("get_authority", {"id": "3"}),
+            "decision_history": ("get_decision_history", {"id": "3"}),
+        },
+        # Fixture mode by default so C7 determinism is assertable (ADR-008 rule 1).
+        "env": {"REPO_GOVERNOR_GH_FIXTURE": "conformance/fixtures/github-projects.json"},
+        "break_env": {"REPO_GOVERNOR_GH_FIXTURE": "/nonexistent-fixture-xyz.json"},
+        "unknown_fn": ("get_non_goals", {"id": "1"}),
+        "absence_fn": ("get_work", {"id": "9999"}),
+    },
 }
 
 
@@ -82,9 +98,11 @@ def run(adapter, args, env_extra=None):
     return p.returncode, p.stdout, p.stderr
 
 
-def q(adapter, role, fn, kw, env_extra=None):
+def q(adapter, role, fn, kw, env_extra=None, base_env=None):
     args = ["query", role, fn] + [f"{k}={v}" for k, v in kw.items()]
-    rc, out, err = run(adapter, args, env_extra)
+    merged = dict(base_env or {})
+    merged.update(env_extra or {})
+    rc, out, err = run(adapter, args, merged or None)
     try:
         return json.loads(out), out, err
     except json.JSONDecodeError:
@@ -104,9 +122,10 @@ class Report:
 
 def check_adapter(adapter, spec, rep):
     role = spec["role"]
+    base = spec.get("env")
 
     # C1 describe well-formed
-    rc, out, err = run(adapter, ["describe"])
+    rc, out, err = run(adapter, ["describe"], base)
     try:
         d = json.loads(out)
         good = (d.get("role") == role and isinstance(d.get("contract_version"), int)
@@ -127,14 +146,14 @@ def check_adapter(adapter, spec, rep):
                     "claimed true but no probe defined — untestable claim")
             continue
         fn, kw = pair
-        r, raw, err = q(adapter, role, fn, kw)
+        r, raw, err = q(adapter, role, fn, kw, base_env=base)
         good = bool(r) and r.get("ok") is True and (r.get("value") is not None or r.get("unknown"))
         rep.add(adapter, f"C2 capability '{cap}' exercised", good,
                 "" if good else f"{fn} -> {str(r)[:100]}")
 
     # C3 typed failure on unreachable backend
     fn, kw = next(iter(spec["capability_fn"].values()))
-    r, raw, err = q(adapter, role, fn, kw, spec["break_env"])
+    r, raw, err = q(adapter, role, fn, kw, spec["break_env"], base_env=base)
     good = bool(r) and r.get("ok") is False and r.get("error", {}).get("type") == "PROVIDER_UNAVAILABLE"
     rep.add(adapter, "C3 unreachable backend -> typed failure", good,
             "" if good else f"expected PROVIDER_UNAVAILABLE, got {str(r)[:110]}")
@@ -142,13 +161,13 @@ def check_adapter(adapter, spec, rep):
     # C4 absence vs unknown are distinct
     if spec.get("absence_fn"):
         fn, kw = spec["absence_fn"]
-        r, _, _ = q(adapter, role, fn, kw)
+        r, _, _ = q(adapter, role, fn, kw, base_env=base)
         good = bool(r) and r.get("ok") is False and r.get("error", {}).get("type") == "NOT_FOUND"
         rep.add(adapter, "C4a absence -> NOT_FOUND", good,
                 "" if good else f"got {str(r)[:110]}")
     if spec.get("unknown_fn"):
         fn, kw = spec["unknown_fn"]
-        r, _, _ = q(adapter, role, fn, kw)
+        r, _, _ = q(adapter, role, fn, kw, base_env=base)
         good = bool(r) and r.get("ok") is True and r.get("unknown") is not None \
             and {"reason", "detail", "resolution", "blocking"} <= set(r["unknown"])
         rep.add(adapter, "C4b unknown carries typed payload", good,
@@ -157,7 +176,7 @@ def check_adapter(adapter, spec, rep):
     # C4c a malformed source value must not be silently coerced (the ADR-015 lesson)
     if spec.get("malformed_fn"):
         fn, kw = spec["malformed_fn"]
-        r, _, _ = q(adapter, role, fn, kw)
+        r, _, _ = q(adapter, role, fn, kw, base_env=base)
         good = bool(r) and r.get("ok") is False and r.get("error", {}).get("type") == "MALFORMED_SOURCE"
         rep.add(adapter, "C4c malformed value -> MALFORMED_SOURCE", good,
                 "" if good else f"got {str(r)[:110]}")
@@ -166,7 +185,7 @@ def check_adapter(adapter, spec, rep):
     missing = []
     for cap, pair in spec["capability_fn"].items():
         fn, kw = pair
-        r, _, _ = q(adapter, role, fn, kw)
+        r, _, _ = q(adapter, role, fn, kw, base_env=base)
         if r and r.get("ok") and r.get("value") is not None:
             if not r.get("provenance"):
                 missing.append(fn)
@@ -178,16 +197,16 @@ def check_adapter(adapter, spec, rep):
             "" if not missing else f"missing on: {missing}")
 
     # C6 unsupported function rejected
-    r, _, _ = q(adapter, role, "get_nonexistent_thing", {})
+    r, _, _ = q(adapter, role, "get_nonexistent_thing", {}, base_env=base)
     good = bool(r) and r.get("ok") is False and r.get("error", {}).get("type") == "UNSUPPORTED_FUNCTION"
     rep.add(adapter, "C6 unsupported function rejected", good,
             "" if good else f"got {str(r)[:110]}")
 
     # C7 determinism
     fn, kw = next(iter(spec["capability_fn"].values()))
-    _, a, _ = q(adapter, role, fn, kw)
-    _, b, _ = q(adapter, role, fn, kw)
-    _, c, _ = q(adapter, role, fn, kw)
+    _, a, _ = q(adapter, role, fn, kw, base_env=base)
+    _, b, _ = q(adapter, role, fn, kw, base_env=base)
+    _, c, _ = q(adapter, role, fn, kw, base_env=base)
     rep.add(adapter, "C7 byte-identical across runs", a == b == c,
             "" if a == b == c else "output varies between identical invocations")
 

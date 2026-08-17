@@ -77,7 +77,7 @@ Possible fallback — **Repo Governor Lite**, with only: authority check; scope 
 | Input | Bears on | Current assessment |
 | --- | --- | --- |
 | Beads issue [#1150](https://github.com/gastownhall/beads/issues/1150) requests plugin-based tracker integrations | "existing products already implement the model"; "provider abstraction adds more burden than value" | **Not triggered.** Beads federating trackers aggregates state without ruling on authority, which makes it a better `ExecutionStateProvider`, not a competitor. Monitor. |
-| ADR-008 Layer 2 cross-provider equivalence | "cross-provider semantic normalization is not reliable" | **Unresolved — highest-priority experiment.** |
+| ADR-008 Layer 2 cross-provider equivalence | "cross-provider semantic normalization is not reliable" | **Not triggered on first evidence (2026-08-17).** 8/8 scenarios EQUIVALENT across `file-roadmap` and `github-projects`, 0 divergences, 1 honestly-advertised capability gap. Weak evidence — two providers, one a trivial baseline, roadmap role only, 3 of 8 GitHub cases synthetic. Re-run as providers are added. |
 | ScopeEnvelope thinness on real roadmap items | "governance causes material friction without benefit" | **Unresolved.** Most trackers lack explicit non-goals. |
 
 ## §56 — Research Evidence

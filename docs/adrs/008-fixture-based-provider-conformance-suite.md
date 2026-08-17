@@ -44,6 +44,12 @@ instantiations:
 
 The suite asserts every instantiation yields the identical decision. Divergence is a normalization defect and is reported as such — it is data for §55, not merely a broken build.
 
+### Two rules learned from the first Layer 2 run *(added 2026-08-17)*
+
+**Equivalence is asserted over disposition-relevant facts, not whole payloads.** The first run flagged a divergence because two providers returned different `reason` codes — `AUTHORITY_UNSTATED` vs `NOT_ON_BOARD` — while agreeing that the outcome was unknown-and-blocking. The dispositions were identical. A provider-specific reason is *diagnostic*, and a more specific one is better, so comparing whole payloads punishes exactly the behaviour we want. Equivalence compares a defined projection: `authority`, `admitted`, `__unknown__`, `blocking`, `__error__`. Reasons are reported, never compared.
+
+**An honestly-advertised capability gap is not a normalization failure.** GitHub Projects cannot express machine-checkable acceptance conditions, and says so (`acceptance_conditions: false`). Scoring that as divergence would conflate "the abstraction leaks" with "this backend genuinely lacks the concept". Scenarios declare which capability they need; a provider advertising it false yields `CAPABILITY_GAP`. This is what makes ADR-003's honest advertisement pay off — the gap becomes recorded, bounded information instead of a mystery failure.
+
 ### Governing rules
 
 1. **Fixtures are recorded, not live.** Conformance runs offline against captured adapter responses. Live API tests are a separate, non-gating suite. Determinism (ADR-002) is only assertable against fixed inputs.

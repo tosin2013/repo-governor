@@ -75,6 +75,31 @@
       "status": "OPEN",
       "authority": "probably-fine",
       "$comment": "Fixture: must yield MALFORMED_SOURCE, never be silently coerced."
+    },
+    "ADMITTED-1": {
+      "title": "Admitted to the roadmap but not cleared to execute",
+      "status": "OPEN",
+      "authority": "ADMITTED",
+      "admitted": true,
+      "$comment": "INV-002 fixture: admission is not authorization."
+    },
+    "NOAUTH-1": {
+      "title": "Work item with no authority field at all",
+      "status": "OPEN",
+      "$comment": "Fixture: must yield a BLOCKING unknown, never EXECUTE."
+    },
+    "DONE-1": {
+      "title": "Work that is finished",
+      "status": "COMPLETE",
+      "authority": "AUTHORIZED",
+      "admitted": true,
+      "acceptance_conditions": [
+        {
+          "check": "tests_pass",
+          "satisfied": true
+        }
+      ],
+      "$comment": "INV-009 fixture: completed work must not read as authorized-to-execute."
     }
   }
 }

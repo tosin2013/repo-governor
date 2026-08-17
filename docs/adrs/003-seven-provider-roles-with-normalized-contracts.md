@@ -39,11 +39,13 @@ Landscape research found no open-source unified abstraction over Jira / Linear /
 
    This keeps adapters language-agnostic. A Go adapter for Beads, a Python adapter for ADRs, and a shell adapter for Git all satisfy the same protocol. It also matches ADR-011's stdlib-only constraint: the engine never imports a provider SDK.
 
-3. **Capability advertisement is mandatory and honest.** Per §45, every adapter's `describe` output declares contract version, supported capabilities, persistence semantics, permissions, failure behavior, and provenance quality. Partial implementations are legal and normal — an adapter that cannot answer `get_non_goals` says so, and the engine records the gap as an unknown rather than treating absence as an empty set.
+3. **`describe` separates capabilities from properties.** *(Added 2026-08-17 from implementation.)* `capabilities` are claims a conformance probe MUST be able to exercise; `properties` are declarative traits no probe can reach — `persistence`, `provenance_quality`. The first Layer 1 run failed on exactly this: `persistence: true` was advertised as a capability with no possible probe, which makes an honest-advertisement check vacuous. Untestable claims now have their own field.
 
-4. **Missing role ≠ error.** Only `RepositoryEvidenceProvider` is always required. `RoadmapAuthorityProvider` is required for any `EXECUTE` disposition. The rest are optional and profile-dependent (ADR-006). An L1 repository with Git and a manual roadmap file is a complete, valid configuration.
+4. **Capability advertisement is mandatory and honest.** Per §45, every adapter's `describe` output declares contract version, supported capabilities, persistence semantics, permissions, failure behavior, and provenance quality. Partial implementations are legal and normal — an adapter that cannot answer `get_non_goals` says so, and the engine records the gap as an unknown rather than treating absence as an empty set.
 
-5. **Absence and unknown are distinct.** "No `ExecutionStateProvider` is bound" is a configuration fact. "The bound provider could not answer" is an operational fact producing `UNKNOWN` (INV-012). They must never collapse into the same code path.
+5. **Missing role ≠ error.** Only `RepositoryEvidenceProvider` is always required. `RoadmapAuthorityProvider` is required for any `EXECUTE` disposition. The rest are optional and profile-dependent (ADR-006). An L1 repository with Git and a manual roadmap file is a complete, valid configuration.
+
+6. **Absence and unknown are distinct.** "No `ExecutionStateProvider` is bound" is a configuration fact. "The bound provider could not answer" is an operational fact producing `UNKNOWN` (INV-012). They must never collapse into the same code path.
 
 ## Consequences
 
