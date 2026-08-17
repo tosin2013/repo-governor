@@ -51,6 +51,9 @@ REASONS = {
                                       "The work item declares no authority value."),
     "NOT_ADMITTED":                  ("authority", True,
                                       "Filed but never admitted to the roadmap (e.g. Linear triage)."),
+    "ADMISSION_SIGNAL_UNDECLARED":    ("authority", True,
+                                      "The binding declares no admission signal; GitHub expresses "
+                                      "admission by convention and the adapter must not choose one."),
     "NOT_ON_BOARD":                  ("authority", True,
                                       "Not an item on any Project, so admission cannot be read."),
 

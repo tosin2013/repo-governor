@@ -186,6 +186,9 @@
         },
         "project": {
           "type": "string"
+        },
+        "admission": {
+          "$ref": "#/$defs/admission"
         }
       }
     },
@@ -238,6 +241,33 @@
         },
         "transition": {
           "type": "boolean"
+        }
+      }
+    },
+    "admission": {
+      "type": "object",
+      "required": [
+        "signal"
+      ],
+      "additionalProperties": false,
+      "$comment": "ADR-018: declared, never assumed. No fallback chain -- trying Projects then milestones then labels would be the adapter deciding what admission means in someone else's repository.",
+      "properties": {
+        "$comment": {
+          "type": "string"
+        },
+        "signal": {
+          "enum": [
+            "project_status",
+            "milestone",
+            "label",
+            "none"
+          ]
+        },
+        "admission_label": {
+          "type": "string"
+        },
+        "authorize_label": {
+          "type": "string"
         }
       }
     }

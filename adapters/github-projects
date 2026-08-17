@@ -33,6 +33,14 @@ ROLE = "roadmap_authority"
 FIXTURE = os.environ.get("REPO_GOVERNOR_GH_FIXTURE")
 NWO = os.environ.get("REPO_GOVERNOR_GH_REPO", "tosin2013/repo-governor")
 
+# ADR-018: the admission signal is DECLARED, never assumed. No fallback chain --
+# trying Projects then milestones then labels would be the adapter deciding what
+# admission means in someone else's repository.
+ADMISSION = os.environ.get("REPO_GOVERNOR_GH_ADMISSION", "")
+ADMISSION_SIGNALS = ("project_status", "milestone", "label", "none")
+ADMISSION_LABEL = os.environ.get("REPO_GOVERNOR_GH_ADMISSION_LABEL", "admitted")
+AUTHORIZE_LABEL = os.environ.get("REPO_GOVERNOR_GH_AUTHORIZE_LABEL", "ready")
+
 # Fetch ONE issue by number. The previous query paged `issues(first:50)` and
 # searched the result, which silently returned NOT_FOUND for any issue outside
 # that window. Verified against a real repository with 380 issues: #1391 exists
@@ -43,8 +51,9 @@ query($owner:String!, $repo:String!, $number:Int!) {
   repository(owner:$owner, name:$repo) {
     issue(number:$number) {
         number title state stateReason
-        labels(first:10){ nodes{ name } }
-        milestone { title }
+        labels(first:20){ nodes{ name } }
+        assignees(first:5){ nodes{ login } }
+        milestone { title state }
         projectItems(first:5) {
           nodes {
             project { number title }
@@ -193,11 +202,30 @@ def get_status(kw):
               [_ref(node, "projectItems.Status" if st else "state")])
 
 
+def _labels(node):
+    return [l["name"] for l in (node.get("labels") or {}).get("nodes", [])]
+
+
 def get_authority(kw):
     """Where normalization actually bites. GitHub has no authority field."""
     node, err = _find("get_authority", kw)
     if err:
         return err
+
+    if not ADMISSION:
+        return unknown(ROLE, "get_authority",
+                       reason="ADMISSION_SIGNAL_UNDECLARED",
+                       detail=("No admission signal declared for this binding. GitHub expresses "
+                               "admission by convention -- a Project column, a milestone, a label -- "
+                               "and choosing one for you would be the adapter deciding what "
+                               "admission means in your repository (ADR-018)."),
+                       resolution="Declare admission.signal in the manifest: "
+                                  + ", ".join(ADMISSION_SIGNALS),
+                       blocking=True)
+    if ADMISSION not in ADMISSION_SIGNALS:
+        return fail(ROLE, "get_authority", "MALFORMED_SOURCE",
+                    f"admission signal {ADMISSION!r} is not in {list(ADMISSION_SIGNALS)}")
+
     st, proj = _status(node)
 
     if node["state"] == "CLOSED":
@@ -205,6 +233,43 @@ def get_authority(kw):
         if mapped:
             return ok(ROLE, "get_authority", {"authority": mapped, "admitted": False},
                       [_ref(node, "stateReason")])
+
+    if ADMISSION == "none":
+        return unknown(ROLE, "get_authority",
+                       reason="NOT_ADMITTED",
+                       detail=f"Issue #{node['number']} exists, but this binding declares "
+                              "admission signal 'none': admission is never inferred here.",
+                       resolution="Declare a real admission signal, or admit work in another provider.",
+                       blocking=True)
+
+    if ADMISSION == "milestone":
+        ms = node.get("milestone")
+        if not ms:
+            return unknown(ROLE, "get_authority",
+                           reason="NOT_ADMITTED",
+                           detail=f"Issue #{node['number']} is in no milestone. Under the declared "
+                                  "'milestone' signal, milestone membership is admission.",
+                           resolution="Assign the issue to a milestone, or change the declared signal.",
+                           blocking=True)
+        assigned = bool((node.get("assignees") or {}).get("nodes"))
+        mapped = "AUTHORIZED" if assigned else "ADMITTED"
+        return ok(ROLE, "get_authority", {"authority": mapped, "admitted": True},
+                  [_ref(node, "milestone.title"), _ref(node, "assignees")])
+
+    if ADMISSION == "label":
+        names = _labels(node)
+        if AUTHORIZE_LABEL in names:
+            return ok(ROLE, "get_authority", {"authority": "AUTHORIZED", "admitted": True},
+                      [_ref(node, f"labels[{AUTHORIZE_LABEL}]")])
+        if ADMISSION_LABEL in names:
+            return ok(ROLE, "get_authority", {"authority": "ADMITTED", "admitted": True},
+                      [_ref(node, f"labels[{ADMISSION_LABEL}]")])
+        return unknown(ROLE, "get_authority",
+                       reason="NOT_ADMITTED",
+                       detail=f"Issue #{node['number']} carries neither {ADMISSION_LABEL!r} nor "
+                              f"{AUTHORIZE_LABEL!r}. Under the declared 'label' signal, those labels are admission.",
+                       resolution=f"Apply {ADMISSION_LABEL!r}, or change the declared signal.",
+                       blocking=True)
 
     if st is None:
         return unknown(ROLE, "get_authority",

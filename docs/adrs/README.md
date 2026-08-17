@@ -27,6 +27,7 @@ All ADRs are **Proposed**. None is accepted. Per §61, the project cannot reach 
 | [015](015-json-as-canonical-manifest-format.md) | JSON as the canonical manifest format | Configuration | Closes ADR-011's deferred choice; unblocks gate 5 |
 | [016](016-mcp-as-adapter-transport-not-adapter-replacement.md) | MCP as adapter transport, not replacement | Integration | Whether providers route via MCP servers |
 | [017](017-completion-evidence-from-repo-local-acceptance-artifact.md) | Completion evidence from a repo-local acceptance artifact | Domain model | Makes `STOP_COMPLETE` derivable; unblocks gate 7 |
+| [018](018-admission-signal-is-declared-not-assumed.md) | Admission signal is declared, not assumed | Provider abstraction | Makes GitHub usable without a Project; **found by real-data testing** |
 
 ## Dependency order
 
