@@ -72,7 +72,34 @@ TYPE_AUTHORIZES = {
 # value in the authority vocabulary. It must produce a blocking unknown.
 
 
+def _raw_from_stdin():
+    """Option C: the agent (or `linear-fetch`) supplies raw provider output.
+
+    The adapter becomes a pure function raw -> typed facts. It performs no I/O
+    of its own, so determinism and mechanical provenance survive while the
+    transport problem moves outside (#18).
+    """
+    if "--input" not in sys.argv:
+        return None
+    i = sys.argv.index("--input")
+    src = sys.argv[i + 1] if len(sys.argv) > i + 1 else "-"
+    text = sys.stdin.read() if src == "-" else Path(src).read_text()
+    return text
+
+
 def _fetch(fn):
+    raw = _raw_from_stdin()
+    if raw is not None:
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as e:
+            return None, fail(ROLE, fn, "MALFORMED_SOURCE", f"supplied input is not valid JSON: {e}")
+        # Guard #18 Q2: refuse a plausible-looking substitute (a summary, the
+        # wrong query) rather than normalizing it. The ADR-015 lesson again.
+        if not isinstance(data, dict) or "data" not in data or "issues" not in (data.get("data") or {}):
+            return None, fail(ROLE, fn, "MALFORMED_SOURCE",
+                              "supplied input is not a Linear issues GraphQL response")
+        return data, None
     if FIXTURE:
         p = Path(FIXTURE)
         if not p.exists():
@@ -220,6 +247,10 @@ def get_decision_history(kw):
     return ok(ROLE, "get_decision_history", {"history": hist}, [_ref(node, "state.type")])
 
 
+def _probe():
+    return bool(FIXTURE and Path(FIXTURE).exists()) or bool(API_KEY)
+
+
 FUNCTIONS = {
     "get_work": get_work,
     "get_status": get_status,
@@ -255,4 +286,4 @@ if __name__ == "__main__":
                   {"name": "linear",
                    "permissions": {"read": True, "write": False},
                    "mode": "fixture" if FIXTURE else ("live" if API_KEY else "unconfigured")},
-                  properties=PROPERTIES))
+                  properties=PROPERTIES, probe=_probe))

@@ -152,6 +152,10 @@ def get_decision_history(kw):
               [cite("file-roadmap", f"{SRC}#items.{kw['id']}", "decision_history")])
 
 
+def _probe():
+    return SRC.exists()
+
+
 FUNCTIONS = {
     "get_work": get_work,
     "get_status": get_status,
@@ -182,4 +186,4 @@ CAPABILITIES = {
 if __name__ == "__main__":
     sys.exit(main(ROLE, CAPABILITIES, FUNCTIONS,
                   {"name": "file-roadmap", "permissions": {"read": True, "write": False}},
-                  properties=PROPERTIES))
+                  properties=PROPERTIES, probe=_probe))

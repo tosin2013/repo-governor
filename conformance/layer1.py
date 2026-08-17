@@ -13,6 +13,7 @@ Checks, from ADR-008:
   C5  provenance on every fact
   C6  unsupported function is rejected, not silently absorbed
   C7  determinism — same input, byte-identical output
+  C8  an unreachable transport advertises NO capabilities (LSP missing=absent)
 
 Usage:  python3 conformance/layer1.py [adapter ...]
 """
@@ -217,6 +218,17 @@ def check_adapter(adapter, spec, rep):
     good = bool(r) and r.get("ok") is False and r.get("error", {}).get("type") == "UNSUPPORTED_FUNCTION"
     rep.add(adapter, "C6 unsupported function rejected", good,
             "" if good else f"got {str(r)[:110]}")
+
+    # C8 unreachable transport must advertise nothing (issue #17)
+    broken = dict(base or {}); broken.update(spec["break_env"])
+    rc2, out2, _ = run(adapter, ["describe"], broken)
+    try:
+        d2 = json.loads(out2)
+        good = d2.get("capabilities") == {} and d2.get("transport", {}).get("reachable") is False
+        rep.add(adapter, "C8 unreachable transport claims nothing", good,
+                "" if good else f"advertised {len(d2.get('capabilities', {}))} capabilities while unreachable")
+    except json.JSONDecodeError:
+        rep.add(adapter, "C8 unreachable transport claims nothing", False, "describe not JSON")
 
     # C7 determinism
     fn, kw = next(iter(spec["capability_fn"].values()))

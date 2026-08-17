@@ -249,6 +249,11 @@ def get_decision_history(kw):
     return ok(ROLE, "get_decision_history", {"history": hist}, [_ref(node, "stateReason")])
 
 
+def _probe():
+    import shutil
+    return bool(FIXTURE and Path(FIXTURE).exists()) or (not FIXTURE and shutil.which("gh") is not None)
+
+
 FUNCTIONS = {
     "get_work": get_work,
     "get_status": get_status,
@@ -283,4 +288,4 @@ if __name__ == "__main__":
                   {"name": "github-projects",
                    "permissions": {"read": True, "write": False},
                    "mode": "fixture" if FIXTURE else "live"},
-                  properties=PROPERTIES))
+                  properties=PROPERTIES, probe=_probe))

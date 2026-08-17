@@ -94,6 +94,10 @@ def get_entry_points(kw):
     )
 
 
+def _probe():
+    return _available()
+
+
 FUNCTIONS = {
     "get_state": get_state,
     "get_files": get_files,
@@ -117,4 +121,4 @@ CAPABILITIES = {
 if __name__ == "__main__":
     sys.exit(main(ROLE, CAPABILITIES, FUNCTIONS,
                   {"name": "git", "permissions": {"read": True, "write": False}},
-                  properties=PROPERTIES))
+                  properties=PROPERTIES, probe=_probe))

@@ -109,25 +109,35 @@ def parse_args(argv):
     return role, function, kw
 
 
-def main(role, capabilities, functions, describe_extra=None, properties=None):
+def main(role, capabilities, functions, describe_extra=None, properties=None, probe=None):
     """Standard entry point. `functions` maps name -> callable(kw) -> response.
 
     `capabilities` are claims that MUST be exercisable by a conformance probe
     (ADR-008 C2). `properties` are declarative traits that cannot be probed —
     persistence, provenance quality. Keeping them apart is what makes an
     honest-advertisement check meaningful rather than vacuous.
+
+    `probe` is a zero-arg callable returning whether the transport is usable.
+    When it returns false, `describe` advertises NO capabilities. This follows
+    LSP's rule that a missing property means absence of the capability: an
+    adapter that cannot reach its backend can serve nothing, so it must claim
+    nothing. Without this an unconfigured adapter advertises capabilities it
+    will fail every query for (issue #17).
     """
     argv = sys.argv[1:]
     if not argv:
         emit(fail(role, "-", "BAD_REQUEST", "usage: describe | query <role> <function> [k=v]"))
         return 0
     if argv[0] == "describe":
+        reachable = True if probe is None else bool(probe())
         d = {
             "contract_version": CONTRACT_VERSION,
             "role": role,
-            "capabilities": capabilities,
+            # LSP rule: missing means absent. Unreachable transport => no claims.
+            "capabilities": capabilities if reachable else {},
             "properties": properties or {},
             "functions": sorted(functions),
+            "transport": {"reachable": reachable},
         }
         if describe_extra:
             d.update(describe_extra)

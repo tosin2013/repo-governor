@@ -160,6 +160,10 @@ def get_specs(kw):
               [cite("adr", str(ADR_DIR))])
 
 
+def _probe():
+    return ADR_DIR.exists() and ADR_DIR.is_dir()
+
+
 FUNCTIONS = {
     "get_active_decisions": get_active_decisions,
     "get_superseded_decisions": get_superseded_decisions,
@@ -184,4 +188,4 @@ CAPABILITIES = {
 if __name__ == "__main__":
     sys.exit(main(ROLE, CAPABILITIES, FUNCTIONS,
                   {"name": "adr", "permissions": {"read": True, "write": False}},
-                  properties=PROPERTIES))
+                  properties=PROPERTIES, probe=_probe))
