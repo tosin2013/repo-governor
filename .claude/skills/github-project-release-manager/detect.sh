@@ -13,8 +13,20 @@ command -v gh >/dev/null || { echo "FATAL: gh not installed" >&2; exit 2; }
 gh auth status >/dev/null 2>&1 || { echo "FATAL: gh not authenticated. Run: gh auth login" >&2; exit 2; }
 git rev-parse --git-dir >/dev/null 2>&1 || { echo "FATAL: not a git repository" >&2; exit 2; }
 
-NWO=$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null)
-[ -n "$NWO" ] || { echo "FATAL: no GitHub remote resolved" >&2; exit 2; }
+# Resolve the repo LOCALLY first. `gh repo view` needs the API, and during an
+# incident it returns empty -- which read as "no remote configured" and made
+# the driver exit 2 with a wrong reason. Local git always answers.
+ORIGIN=$(git remote get-url origin 2>/dev/null)
+if [ -z "$ORIGIN" ]; then
+  echo "FATAL: no git remote 'origin' configured" >&2
+  echo "  git remote add origin https://github.com/<owner>/<repo>.git" >&2
+  exit 2
+fi
+case "$ORIGIN" in
+  *github.com[:/]*) NWO=$(printf '%s' "$ORIGIN" | sed -E 's#.*github\.com[:/]##; s#\.git$##') ;;
+  *) echo "FATAL: origin is not a GitHub remote: $ORIGIN" >&2; exit 2 ;;
+esac
+[ -n "$NWO" ] || { echo "FATAL: could not parse owner/repo from $ORIGIN" >&2; exit 2; }
 
 # API health gate. Without this a 5xx makes `gh issue list` print nothing,
 # which `grep -c .` reports as 0 -- a degraded API becomes "quiet repo" and
