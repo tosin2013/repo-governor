@@ -1,0 +1,16 @@
+{
+  "$comment": "Marker for the github-project-release-manager skill. Presence => Operational mode; do not re-run setup analysis.",
+  "version": 1,
+  "evaluated_at": "2026-08-17",
+  "repo": "tosin2013/repo-governor",
+  "board": {
+    "decision": "none",
+    "reason": "Solo maintainer, 0 open issues/PRs, 1 commit in 90d, no releases. Complexity score 0/8. A Project would add ceremony with no coordination benefit.",
+    "revisit_when": "contributors > 2, or open issues+PRs > 5, or first release cut"
+  },
+  "release": {
+    "decision": "none",
+    "reason": "Pre-implementation; specification only. No code to version yet.",
+    "revisit_when": "first implementation milestone (RG-SIM-ONBOARDING-v0.1) passes"
+  }
+}
