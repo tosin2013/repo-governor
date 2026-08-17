@@ -96,6 +96,12 @@
       "3_detection_overpromise": "onboard.py substring-counts statuses (20) where the adapter parses (2). Issue 27.",
       "4_identity_default": "REPO_GOVERNOR_GH_REPO defaults to tosin2013/repo-governor in two shipped adapters. Issue 26. RELEASE-BLOCKING."
     },
-    "structural_conclusion": "A test cannot detect a convention it shares with the implementation. Layer 1 measures contract conformance and says nothing about input coverage; the suite currently carries only one of those properties. Recorded on issue 1."
+    "structural_conclusion": "A test cannot detect a convention it shares with the implementation. Layer 1 measures contract conformance and says nothing about input coverage; the suite currently carries only one of those properties. Recorded on issue 1.",
+    "mechanism_correction": {
+      "$comment": "Maintainer observation 2026-08-17, verified. Refines issue 24 and reorders 27.",
+      "finding": "Every file-backed adapter defaults to a RELATIVE path and resolves it against the working directory, which is correct. engine/bindings.py:98 pins cwd=ROOT to the engine's own install directory, which overrides all seven repo-local providers at once.",
+      "demonstration": "adapters/adr run from the target repo reports 21 documents; the same adapter through the engine reports 24 -- this repository's. Both report path='docs/adrs', so the provenance cannot distinguish them.",
+      "fix_reordering": "Minimal correct fix is cwd, not per-adapter plumbing. Issue 27's path threading remains needed for location variance but must follow 24, not precede it."
+    }
   }
 }
