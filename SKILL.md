@@ -101,6 +101,23 @@ Detection **proposes**. It never binds. Promoting the proposal to `.repo-governo
 python3 "$RG/engine/manifest.py" --validate       # do bound adapters satisfy their declared contracts?
 ```
 
+## When the situation matches a lane, read its page first
+
+`docs/workflows/` carries per-situation recipes. They are written for the human, but **their do-not clauses bind you** — and a request rarely arrives labelled, so match the situation, not the wording:
+
+| The human says something like | Read |
+|---|---|
+| "work on issue N", "can you just add…" | `docs/workflows/starting-work.md` |
+| — or you noticed something worth doing mid-task | `docs/workflows/discovering-work.md` |
+| "upgrade X", "there's a new version / CVE" | `docs/workflows/dependency-updates.md` |
+| "fix this bug" | `docs/workflows/bugs.md` |
+| "this conflicts with ADR-N", "change the design" | `docs/workflows/architecture-changes.md` |
+| "delete this", "this looks unused" | `docs/workflows/retirement.md` |
+| the work seems done | `docs/workflows/finishing-work.md` |
+| "clean up the backlog", "reconcile the roadmap" | `docs/workflows/roadmap-maintenance.md` |
+
+Each page names the forbidden shortcut its lane tempts. If the human's request *is* that shortcut — "just delete it", "just upgrade", "while you're in there" — the page's constraint still applies: say what the lane requires instead of silently complying or silently refusing.
+
 ## Load these only when you need them
 
 | File | Read it when |
@@ -109,7 +126,6 @@ python3 "$RG/engine/manifest.py" --validate       # do bound adapters satisfy th
 | `references/dispositions.md` | full disposition and unknown-reason semantics |
 | `references/providers.md` | writing an adapter, or a provider is behaving oddly |
 | `references/lifecycles.md` | admission, maintenance or retirement state machines |
-| `docs/workflows/` | prompt recipes per situation — what the human should ask, with the do-not clauses |
 | `docs/reference/` | any `§NN` citation; start at its section map |
 
 ## What this never does
