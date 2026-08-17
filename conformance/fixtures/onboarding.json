@@ -13,8 +13,15 @@
         "condition": "L0",
         "profile": "GOVERNOR_GREENFIELD",
         "state": "AUTHORITY_SOURCE_MISSING",
-        "roles_detected": ["repository"],
-        "must_not_detect": ["roadmap_authority", "execution", "architecture", "change_signals"],
+        "roles_detected": [
+          "repository"
+        ],
+        "must_not_detect": [
+          "roadmap_authority",
+          "execution",
+          "architecture",
+          "change_signals"
+        ],
         "pass_requirement": "must not force unnecessary infrastructure"
       }
     },
@@ -33,8 +40,15 @@
       "expect": {
         "condition": "L2",
         "state": "PROPOSAL_READY",
-        "roles_detected": ["architecture", "change_signals", "repository", "roadmap_authority"],
-        "must_not_detect": ["execution"],
+        "roles_detected": [
+          "architecture",
+          "change_signals",
+          "repository",
+          "roadmap_authority"
+        ],
+        "must_not_detect": [
+          "execution"
+        ],
         "dispositions": {
           "architecture": "PROVIDER_DETECTED",
           "change_signals": "PROVIDER_DETECTED",
@@ -60,9 +74,43 @@
       "expect": {
         "state": "PROVIDER_CONFLICT",
         "conflict_role": "roadmap_authority",
-        "conflict_candidates": ["linear", "github-projects"],
-        "roles_detected": ["architecture", "change_signals", "execution", "repository", "roadmap_authority"],
+        "conflict_candidates": [
+          "linear",
+          "github-projects"
+        ],
+        "roles_detected": [
+          "architecture",
+          "change_signals",
+          "execution",
+          "repository",
+          "roadmap_authority"
+        ],
         "pass_requirement": "must halt onboarding until one roadmap authority is explicitly selected"
+      }
+    },
+    "D-adr-naming": {
+      "spec": "59",
+      "description": "ADRs named adr-NNN-title.md rather than NNNN-title.md. Regression fixture: the original detector matched only a leading-digit prefix and silently reported zero decisions on a real repository with 21 ADRs.",
+      "remote": "https://github.com/example/d.git",
+      "files": {
+        "package.json": "{\"name\":\"d\"}\n",
+        "docs/adrs/README.md": "# ADRs\n",
+        "docs/adrs/adr-001-first.md": "# 1. First\n\n**Status**: Accepted\n",
+        "docs/adrs/adr-002-second.md": "# 2. Second\n\n**Status**: Accepted\n",
+        "docs/adrs/adr-0003-third.md": "# 3. Third\n\n**Status**: Proposed\n",
+        ".github/workflows/ci.yml": "name: ci\non: push\n"
+      },
+      "expect": {
+        "state": "PROPOSAL_READY",
+        "roles_detected": [
+          "architecture",
+          "repository",
+          "roadmap_authority"
+        ],
+        "dispositions": {
+          "architecture": "PROVIDER_DETECTED"
+        },
+        "pass_requirement": "adr-NNN- naming must be detected, not silently counted as zero"
       }
     }
   }

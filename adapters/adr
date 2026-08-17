@@ -22,7 +22,10 @@ ADR_DIR = Path(os.environ.get("REPO_GOVERNOR_ADR_DIR", "docs/adrs"))
 STATUS_RE = re.compile(r"^\*\*Status\*\*:\s*(.+?)\s*$", re.M)
 TITLE_RE = re.compile(r"^#\s*(?:\d+\.\s*)?(.+?)\s*$", re.M)
 SUPERSEDED_RE = re.compile(r"[Ss]uperseded by\s+(ADR-\d+)")
-NUM_RE = re.compile(r"^(\d{3,4})-")
+# Naming conventions in the wild. Found by running against a real repository
+# with 21 ADRs named `adr-NNN-title.md`, which the original `^\d{3,4}-` pattern
+# reported as zero decisions -- a silent wrong answer, not an error.
+NUM_RE = re.compile(r"^(?:adr[-_])?(\d{3,4})[-_.]", re.I)
 
 # Statuses that constrain current work vs. those that are provenance only.
 ACTIVE = {"accepted", "proposed"}

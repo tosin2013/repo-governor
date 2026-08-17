@@ -116,7 +116,10 @@ def detect(repo: Path):
         p = repo / d
         if p.is_dir():
             md = sorted(p.glob("*.md"))
-            numbered = [f for f in md if f.name[:4].isdigit()]
+            # Accept `NNNN-title.md` and `adr-NNN-title.md`; both are common.
+            import re as _re
+            _num = _re.compile(r"^(?:adr[-_])?\d{3,4}[-_.]", _re.I)
+            numbered = [f for f in md if _num.match(f.name)]
             with_status = [f for f in numbered if "## Status" in f.read_text(errors="ignore")
                            or "**Status**" in f.read_text(errors="ignore")]
             strong = len(numbered) >= 2 and len(with_status) >= max(1, len(numbered) // 2)
