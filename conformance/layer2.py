@@ -31,6 +31,16 @@ PROVIDERS = {
         "env": {"REPO_GOVERNOR_GH_FIXTURE": "conformance/fixtures/github-projects-scenarios.json",
                 "REPO_GOVERNOR_GH_ADMISSION": "project_status"},
     },
+    "dolt-decisions": {
+        "adapter": "adapters/decision-history-dolt",
+        "env": {"REPO_GOVERNOR_DECISIONS_DB": ".repo-governor/decisions-db"},
+        "role": "decision_history",
+    },
+    "github-decisions": {
+        "adapter": "adapters/decision-history-github",
+        "env": {"REPO_GOVERNOR_GH_DECISIONS_FIXTURE": "conformance/fixtures/decision-history-github.json"},
+        "role": "decision_history",
+    },
     "linear": {
         "adapter": "adapters/linear",
         "env": {"REPO_GOVERNOR_LINEAR_FIXTURE": "conformance/fixtures/linear.json"},
@@ -40,7 +50,7 @@ PROVIDERS = {
 # Equivalence is asserted over DISPOSITION-RELEVANT facts only. A provider's
 # `reason` code is diagnostic and SHOULD differ — a more specific reason is a
 # better reason. Comparing whole payloads would punish that.
-EQUIVALENCE_KEYS = ("authority", "admitted", "__unknown__", "blocking", "__error__")
+EQUIVALENCE_KEYS = ("authority", "admitted", "disposition", "__unknown__", "blocking", "__error__")
 
 # Each scenario: what it means, what the engine must be able to conclude,
 # and how to express it in each provider. `needs` names the capability the
@@ -113,15 +123,33 @@ SCENARIOS = [
         "expect": {"__unknown__": True, "blocking": True},
         "in": {"github-projects": "103", "linear": "ENG-100"},
     },
+    {
+        "id": "work_declined",
+        "meaning": ("Work was considered and declined. INV-005: a recorded decision must survive "
+                    "rediscovery. Two stores of genuinely different shape, one contract."),
+        "function": "get_disposition",
+        "role": "decision_history",
+        "expect": {"disposition": "REJECTED"},
+        "in": {"dolt-decisions": "DECLINED-1", "github-decisions": "901"},
+    },
+    {
+        "id": "no_decision_recorded",
+        "meaning": "Nothing was ever decided. Absence is not permission, and does not block.",
+        "function": "get_disposition",
+        "role": "decision_history",
+        "expect": {"__unknown__": True, "blocking": False},
+        "in": {"dolt-decisions": "NEVER-DECIDED", "github-decisions": "904"},
+    },
 ]
 
 
-def query(pname, function, wid):
+def query(pname, function, wid, role="roadmap_authority"):
     p = PROVIDERS[pname]
+    role = p.get("role", role)
     env = dict(os.environ)
     env.update(p["env"])
     r = subprocess.run(
-        [sys.executable, str(ROOT / p["adapter"]), "query", "roadmap_authority", function, f"id={wid}"],
+        [sys.executable, str(ROOT / p["adapter"]), "query", role, function, f"id={wid}"],
         capture_output=True, text=True, cwd=ROOT, env=env, timeout=30,
     )
     try:
@@ -178,7 +206,8 @@ def main():
             continue
 
         covered += 1
-        obs = {p: observe(query(p, sc["function"], w)) for p, w in present.items()}
+        obs = {p: observe(query(p, sc["function"], w, sc.get("role", "roadmap_authority")))
+               for p, w in present.items()}
 
         # An advertised capability gap is not a normalization failure (ADR-003).
         need = sc.get("needs")

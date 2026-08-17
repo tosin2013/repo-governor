@@ -18,3 +18,8 @@ venv/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
+# Dolt decision store (ADR-019). Binary storage; git is the wrong distribution
+# mechanism for it and Dolt has its own remotes. This is a real change from
+# ADR-009, which wanted the log committed for review — recorded in ADR-019.
+.repo-governor/decisions-db/

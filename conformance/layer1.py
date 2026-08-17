@@ -140,6 +140,32 @@ SUITE = {
         "break_env": {"REPO_GOVERNOR_REPO": "/nonexistent-path-xyz"},
         "unknown_fn": ("dynamic_references", {"asset": "adapters/git"}),
     },
+    "adapters/decision-history-dolt": {
+        "role": "decision_history",
+        "probe": {"id": "RBAC-1"},
+        "capability_fn": {
+            "decisions": ("get_decisions", {"id": "RBAC-1"}),
+            "disposition": ("get_disposition", {"id": "RBAC-1"}),
+            "reversal_condition": ("get_reversal_condition", {"id": "RBAC-1"}),
+            "provenance": ("get_provenance", {}),
+            "revision_history": ("get_history", {"id": "RBAC-1"}),
+        },
+        "break_env": {"REPO_GOVERNOR_DECISIONS_DB": "/nonexistent-path-xyz"},
+        "unknown_fn": ("get_disposition", {"id": "NEVER-DECIDED"}),
+    },
+    "adapters/decision-history-github": {
+        "role": "decision_history",
+        "probe": {"id": "901"},
+        "capability_fn": {
+            "decisions": ("get_decisions", {"id": "901"}),
+            "disposition": ("get_disposition", {"id": "901"}),
+            "provenance": ("get_provenance", {}),
+        },
+        "env": {"REPO_GOVERNOR_GH_DECISIONS_FIXTURE": "conformance/fixtures/decision-history-github.json"},
+        "break_env": {"REPO_GOVERNOR_GH_DECISIONS_FIXTURE": "/nonexistent-xyz.json"},
+        "unknown_fn": ("get_disposition", {"id": "904"}),
+        "absence_fn": ("get_decisions", {"id": "999999"}),
+    },
     "adapters/linear": {
         "role": "roadmap_authority",
         "probe": {"id": "ENG-101"},

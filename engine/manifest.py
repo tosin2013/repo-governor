@@ -57,8 +57,13 @@ def _looks_secret(key, value):
     if isinstance(value, str):
         if any(value.startswith(p) for p in SECRET_PREFIXES):
             return f"value at {key} starts with a known credential prefix"
-        # High-entropy long opaque string in a config file is a smell.
-        if len(value) >= 32 and re.fullmatch(r"[A-Za-z0-9+/=_-]{32,}", value):
+        # High-entropy long opaque string in a config file is a smell -- but a
+        # PATH is not opaque. `adapters/decision-history-github` is 32 chars and
+        # matched the original pattern, which is the kind of false positive that
+        # gets a security check switched off. Credentials do not contain path
+        # separators or dots; require their absence before flagging.
+        if (len(value) >= 32 and "/" not in value and "." not in value
+                and re.fullmatch(r"[A-Za-z0-9+/=_-]{32,}", value)):
             return f"value at {key} looks like an opaque credential ({len(value)} chars)"
     if SECRET_KEYS.search(str(key)):
         return f"key {key!r} names a credential; credentials come from the environment"

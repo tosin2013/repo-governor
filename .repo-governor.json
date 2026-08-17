@@ -55,6 +55,28 @@
         "adapter": "adapters/retirement-analysis",
         "contract_version": 1
       }
+    ],
+    "decision_history": [
+      {
+        "type": "decision-history-dolt",
+        "adapter": "adapters/decision-history-dolt",
+        "contract_version": 1,
+        "transport": {
+          "kind": "cli",
+          "command": "dolt"
+        },
+        "$comment": "ADR-019. Dolt supplies the evidence chain natively (dolt_log, dolt_history_decisions), so ADR-009's hand-specified hash chaining is superseded rather than reimplemented."
+      },
+      {
+        "type": "decision-history-github",
+        "adapter": "adapters/decision-history-github",
+        "contract_version": 1,
+        "transport": {
+          "kind": "cli",
+          "command": "gh"
+        },
+        "$comment": "Second backend. GitHub already records decisions in stateReason and nothing was reading them. Bound alongside Dolt because decision_history is multi-valued (ADR-013); disagreement is CONFLICT, not precedence."
+      }
     ]
   },
   "permissions": {
@@ -84,6 +106,10 @@
       "write": false
     },
     "retirement": {
+      "read": true,
+      "write": false
+    },
+    "decision_history": {
       "read": true,
       "write": false
     }

@@ -1,0 +1,232 @@
+#!/usr/bin/env python3
+"""DecisionHistoryProvider backed by GitHub issue closure reasons (§17, ADR-019).
+
+The second backend for this role, and the reason the Layer 2 equivalence test
+says anything real: two stores with genuinely different shapes, one contract.
+
+GitHub already records decisions and nothing was reading them. Closing an issue
+as `NOT_PLANNED` is a decision that work was considered and declined — exactly
+what INV-005 and §39 need. The repository observed while designing this had
+**54 of 60** closed issues marked `NOT_PLANNED`.
+
+Mapping, and its limits:
+
+    NOT_PLANNED  -> REJECTED    unambiguous in GitHub's own vocabulary
+    DUPLICATE    -> REJECTED    with the duplicate target as provenance
+    COMPLETED    -> ACCEPTED    the work was done
+    (open)       -> no decision recorded
+
+GitHub carries no reversal condition. That is a real capability gap, advertised
+as one rather than papered over: `reversal_condition: false`. A deferral read
+from GitHub can say *that* work was declined, never *what would change it*.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from _protocol import cite, fail, main, ok, unknown  # noqa: E402
+
+ROLE = "decision_history"
+NWO = os.environ.get("REPO_GOVERNOR_GH_REPO", "tosin2013/repo-governor")
+FIXTURE = os.environ.get("REPO_GOVERNOR_GH_DECISIONS_FIXTURE")
+
+SAFE_ID = re.compile(r"^#?\d{1,9}$")
+
+# Closed mapping. A stateReason outside this is MALFORMED_SOURCE, never guessed.
+REASON_MAP = {
+    "NOT_PLANNED": "REJECTED",
+    "DUPLICATE": "REJECTED",
+    "COMPLETED": "ACCEPTED",
+    "REOPENED": None,       # reopened issues are open again; no live decision
+}
+
+QUERY = """
+query($owner:String!, $repo:String!, $number:Int!) {
+  repository(owner:$owner, name:$repo) {
+    issue(number:$number) {
+      number title state stateReason closedAt
+      labels(first:20){ nodes{ name } }
+    }
+  }
+}
+"""
+
+
+def _probe():
+    if FIXTURE:
+        return Path(FIXTURE).exists()
+    return shutil.which("gh") is not None
+
+
+def _issue(fn, number):
+    if FIXTURE:
+        p = Path(FIXTURE)
+        if not p.exists():
+            return None, fail(ROLE, fn, "PROVIDER_UNAVAILABLE", f"fixture {FIXTURE!r} does not exist")
+        try:
+            data = json.loads(p.read_text())
+        except json.JSONDecodeError as e:
+            return None, fail(ROLE, fn, "MALFORMED_SOURCE", f"fixture is not valid JSON: {e}")
+        for n in data.get("issues", []):
+            if n.get("number") == number:
+                return n, None
+        return None, fail(ROLE, fn, "NOT_FOUND", f"no issue #{number} in fixture")
+
+    owner, _, repo = NWO.partition("/")
+    if not repo:
+        return None, fail(ROLE, fn, "BAD_REQUEST", f"REPO_GOVERNOR_GH_REPO={NWO!r} is not owner/repo")
+    try:
+        p = subprocess.run(
+            ["gh", "api", "graphql", "-f", f"query={QUERY}", "-f", f"owner={owner}",
+             "-f", f"repo={repo}", "-F", f"number={number}"],
+            capture_output=True, text=True, timeout=60)
+    except FileNotFoundError:
+        return None, fail(ROLE, fn, "PROVIDER_UNAVAILABLE", "gh CLI is not installed")
+    except subprocess.TimeoutExpired:
+        return None, fail(ROLE, fn, "PROVIDER_UNAVAILABLE", "gh api timed out")
+    if p.returncode != 0:
+        return None, fail(ROLE, fn, "PROVIDER_UNAVAILABLE", f"gh api failed: {p.stderr.strip()[:160]}")
+    try:
+        data = json.loads(p.stdout)
+    except json.JSONDecodeError as e:
+        return None, fail(ROLE, fn, "MALFORMED_SOURCE", f"gh returned non-JSON: {e}")
+    node = ((data.get("data") or {}).get("repository") or {}).get("issue")
+    if node is None:
+        return None, fail(ROLE, fn, "NOT_FOUND", f"no issue #{number} in {NWO}")
+    return node, None
+
+
+def _guard(fn, kw):
+    wid = kw.get("id")
+    if not wid:
+        return None, fail(ROLE, fn, "BAD_REQUEST", "missing required argument: id=<issue-number>")
+    if not SAFE_ID.match(wid):
+        return None, fail(ROLE, fn, "BAD_REQUEST", f"id must be an issue number, got {wid!r}")
+    return int(wid.lstrip("#")), None
+
+
+def _decision(node):
+    """Return (disposition, reason_text) or (None, why-there-is-none)."""
+    if node.get("state") != "CLOSED":
+        return None, "issue is open; no decision has been recorded"
+    sr = node.get("stateReason")
+    if sr not in REASON_MAP:
+        return None, f"unrecognised stateReason {sr!r}"
+    mapped = REASON_MAP[sr]
+    if mapped is None:
+        return None, f"stateReason {sr!r} records no live decision"
+    return mapped, f"issue closed as {sr}"
+
+
+def get_decisions(kw):
+    num, err = _guard("get_decisions", kw)
+    if err:
+        return err
+    node, err = _issue("get_decisions", num)
+    if err:
+        return err
+    disp, why = _decision(node)
+    if disp is None:
+        return unknown(ROLE, "get_decisions",
+                       reason="NO_DECISION_RECORDED",
+                       detail=f"Issue #{num}: {why}. Absence of a decision is not permission (INV-005).",
+                       resolution="Close the issue with a state reason, or record the decision elsewhere.",
+                       blocking=False)
+    rec = {"decision_id": f"gh-{num}", "authority_id": f"#{num}",
+           "disposition": disp, "reason": why,
+           "reversal_condition": None, "closed_at": node.get("closedAt")}
+    return ok(ROLE, "get_decisions",
+              {"authority_id": f"#{num}", "decisions": [rec], "count": 1},
+              [cite("github", f"{NWO}#issues.{num}", "stateReason")])
+
+
+def get_disposition(kw):
+    num, err = _guard("get_disposition", kw)
+    if err:
+        return err
+    node, err = _issue("get_disposition", num)
+    if err:
+        return err
+    disp, why = _decision(node)
+    if disp is None:
+        return unknown(ROLE, "get_disposition",
+                       reason="NO_DECISION_RECORDED",
+                       detail=f"Issue #{num}: {why}.",
+                       resolution="Close with a state reason to record a decision.",
+                       blocking=False)
+    return ok(ROLE, "get_disposition",
+              {"authority_id": f"#{num}", "disposition": disp, "reason": why,
+               "superseded_count": 0},
+              [cite("github", f"{NWO}#issues.{num}", "stateReason")])
+
+
+def get_reversal_condition(kw):
+    """GitHub cannot express one. Advertised false; always a typed unknown."""
+    num, err = _guard("get_reversal_condition", kw)
+    if err:
+        return err
+    node, err = _issue("get_reversal_condition", num)
+    if err:
+        return err
+    disp, why = _decision(node)
+    if disp != "REJECTED":
+        return unknown(ROLE, "get_reversal_condition",
+                       reason="NO_DECISION_RECORDED",
+                       detail=f"Issue #{num} carries no REJECTED decision, so no reversal condition applies.",
+                       resolution="None needed.",
+                       blocking=False)
+    return unknown(ROLE, "get_reversal_condition",
+                   reason="NO_DECISION_RECORDED",
+                   detail=(f"Issue #{num} was closed as declined, but GitHub has no field for a "
+                           "reversal condition. What would justify revisiting it is not recorded, "
+                           "so nothing can establish that it may be."),
+                   resolution="Record the reversal condition in a store that can hold one.",
+                   blocking=True)
+
+
+def get_provenance(kw):
+    return ok(ROLE, "get_provenance",
+              {"source": "github", "repository": NWO,
+               "mode": "fixture" if FIXTURE else "live",
+               "chain": "GitHub's own issue timeline; not hand-rolled",
+               "mapping": {k: v for k, v in REASON_MAP.items() if v}},
+              [cite("github", f"{NWO}#issues", "stateReason")])
+
+
+FUNCTIONS = {
+    "get_decisions": get_decisions,
+    "get_disposition": get_disposition,
+    "get_reversal_condition": get_reversal_condition,
+    "get_provenance": get_provenance,
+}
+
+PROPERTIES = {
+    "persistence": True,
+    # Weaker than Dolt: a disposition is INFERRED from a closure reason rather
+    # than read from a field that means "decision".
+    "provenance_quality": "inferred",
+    "chain_supplied_by_store": True,
+}
+
+CAPABILITIES = {
+    "decisions": True,
+    "disposition": True,
+    "provenance": True,
+    "reversal_condition": False,   # honest: GitHub has no such field
+    "revision_history": False,     # timeline exists but is not exposed here
+}
+
+if __name__ == "__main__":
+    sys.exit(main(ROLE, CAPABILITIES, FUNCTIONS,
+                  {"name": "decision-history-github",
+                   "permissions": {"read": True, "write": False},
+                   "mode": "fixture" if FIXTURE else "live"},
+                  properties=PROPERTIES, probe=_probe))

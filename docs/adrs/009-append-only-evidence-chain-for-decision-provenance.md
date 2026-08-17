@@ -1,8 +1,17 @@
 # 9. Append-Only Evidence Chain for Decision Provenance
 
-**Status**: Proposed
+**Status**: Proposed · **Amended by [ADR-019](019-database-backed-decision-history.md), 2026-08-17**
 **Date**: 2026-08-17
 **Domain**: Observability & provenance
+
+> **Amended by ADR-019.** This ADR specified JSON files under `.repo-governor/decisions/`, hash-chained by hand. It was never implemented that way. `decision_history` is now backed by a database — Dolt by default — because the role is append-only, unbounded, and queried by relationship, and because Dolt supplies the evidence chain natively via `dolt_log` and `dolt_history_decisions`. **The hand-specified hash chaining below is superseded, not reimplemented.**
+>
+> Two claims in this ADR no longer hold and are corrected rather than quietly contradicted:
+>
+> * *"enforceable with zero external dependencies"* — binding this role now requires installing a database. Defensible, because §54 prohibits requiring a specific third-party **tracker** for a role and `decision_history` is optional per profile, so `GOVERNOR_GREENFIELD` and `GOVERNOR_LITE` install nothing. But it is a real change to a stated rationale.
+> * *"committed by default, gitignorable by choice"* — Dolt stores binary data and has its own remotes, so the store is gitignored. The distribution and pull-request-review benefits this ADR wanted from committing the log are given up.
+>
+> The redaction question this ADR left open is settled in ADR-019: hash plus typed facts plus explicit redaction markers, closing #4.
 
 ## Context
 

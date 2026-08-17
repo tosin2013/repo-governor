@@ -75,6 +75,10 @@ REASONS = {
     "STATUS_UNSTATED":               ("architecture", False,
                                       "Decision files carry no Status line."),
 
+    # decision history — absence is not permission, but it does not block either
+    "NO_DECISION_RECORDED":          ("decision_history", False,
+                                      "No prior decision recorded; the question was never asked. "
+                                      "Absence of a decision is not permission (INV-005)."),
     # execution — non-blocking: execution state never authorizes (INV-002)
     "NO_HANDOFF_RECORDED":           ("execution", False,
                                       "No handoff state; agent continuity is not recoverable."),
@@ -103,7 +107,7 @@ REASONS = {
 }
 
 DIMENSIONS = ("authority", "acceptance", "scope", "architecture", "execution",
-              "evidence", "retirement", "change_signals", "provider")
+              "evidence", "retirement", "change_signals", "provider", "decision_history")
 
 # Profiles may only make a non-blocking reason blocking, never the reverse.
 # Loosening a blocking reason would let a profile permit EXECUTE on evidence
