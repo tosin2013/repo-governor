@@ -73,7 +73,14 @@ REASONS = {
     "NO_ACCEPTED_DECISIONS":         ("architecture", False,
                                       "Decisions exist but none is Accepted; state is INFERRED, not DEFINED."),
     "STATUS_UNSTATED":               ("architecture", False,
-                                      "Decision files carry no Status line."),
+                                      "Decision files carry no Status line. A repository that has "
+                                      "not declared statuses is not blocked from working; it is "
+                                      "simply not constrained by decisions it never accepted."),
+    "ARCHITECTURE_PARTIALLY_READ":   ("architecture", True,
+                                      "More decision files could not be read than constraints were "
+                                      "established from, so the constraint set is dominated by what "
+                                      "was not read. Governing on the readable minority would state "
+                                      "an architecture that is mostly unexamined."),
 
     # decision history — absence is not permission, but it does not block either
     "NO_DECISION_RECORDED":          ("decision_history", False,

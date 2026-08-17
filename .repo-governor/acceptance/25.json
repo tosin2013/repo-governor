@@ -1,0 +1,22 @@
+{
+  "$comment": "Acceptance criteria for GitHub issue #25 -- get_constraints must stop reporting DEFINED while dropping decisions it could not read (ADR-003 rule 6). The command checks assert the behaviour at both ends of the dominance rule, not just that the code changed.",
+  "authority_id": "25",
+  "criteria": [
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/vocabulary.py"
+    },
+    {
+      "check": "command_exit",
+      "target": "REPO_GOVERNOR_ADR_DIR=conformance/fixtures/adrs-dominated ./adapters/adr query architecture get_constraints id=x | jq -e '.value.state == \"UNKNOWN\" and .unknown.reason == \"ARCHITECTURE_PARTIALLY_READ\" and .unknown.blocking == true'"
+    },
+    {
+      "check": "command_exit",
+      "target": "REPO_GOVERNOR_ADR_DIR=conformance/fixtures/adrs-minority ./adapters/adr query architecture get_constraints id=x | jq -e '.value.state == \"DEFINED\" and .unknown.reason == \"STATUS_UNSTATED\" and .unknown.blocking == false'"
+    },
+    {
+      "check": "command_exit",
+      "target": "./adapters/adr query architecture get_constraints id=x | jq -e '.unknown == null'"
+    }
+  ]
+}

@@ -71,23 +71,46 @@ def _guard(fn):
     return recs, None
 
 
+def _completeness(recs, established):
+    """The unknown describing how much of the decision record was actually read.
+
+    Two distinct facts share one shape here, and this adapter **cannot yet tell
+    them apart**: a file with no Status line at all, and a file whose Status is
+    written in a dialect this parser does not support. Both leave `status` None.
+    Until the dialect work lands (issue #28) the reason is necessarily imprecise,
+    and saying so is better than picking one and sounding certain.
+
+    Blocking is decided by dominance rather than a threshold pulled from the air:
+    when more files could not be read than constraints were established, the
+    answer is dominated by what was not read, and governing on the readable
+    minority would state an architecture that is mostly unexamined. One
+    unreadable file among twenty constraints is a footnote; nineteen among two
+    is not the same fact at a different size.
+    """
+    unstated = [r for r in recs if r["status"] is None]
+    if not unstated:
+        return None
+    detail = (f"{len(unstated)} of {len(recs)} decision file(s) have no Status this adapter can "
+              f"read; {established} constraint(s) were established. "
+              + ", ".join(r["id"] for r in unstated[:5])
+              + (" ..." if len(unstated) > 5 else ""))
+    resolution = ("Add a Status line each parser can read, or check whether these use a status "
+                  "dialect this adapter does not support yet (issue #28).")
+    if len(unstated) > established:
+        return {"reason": "ARCHITECTURE_PARTIALLY_READ", "detail": detail,
+                "resolution": resolution, "blocking": True}
+    return {"reason": "STATUS_UNSTATED", "detail": detail,
+            "resolution": resolution, "blocking": False}
+
+
 def get_active_decisions(kw):
     recs, err = _guard("get_active_decisions")
     if err:
         return err
-    unstated = [r for r in recs if r["status"] is None]
     active = [r for r in recs
               if r["status"] and r["status"].split()[0].lower() in ACTIVE
               and not r["superseded_by"]]
-    u = None
-    if unstated:
-        u = {
-            "reason": "STATUS_UNSTATED",
-            "detail": f"{len(unstated)} decision file(s) have no **Status** line: "
-                      + ", ".join(r["id"] for r in unstated[:5]),
-            "resolution": "Add a '**Status**: Accepted|Proposed|Superseded' line to each.",
-            "blocking": False,
-        }
+    u = _completeness(recs, len(active))
     return ok(ROLE, "get_active_decisions",
               {"decisions": active, "count": len(active)},
               [cite("adr", r["path"], "**Status**") for r in active] or [cite("adr", str(ADR_DIR))],
@@ -128,8 +151,20 @@ def get_constraints(kw):
         state, constraints = "INFERRED", proposed
     else:
         state, constraints = "UNKNOWN", []
-    u = None
-    if state == "INFERRED":
+    # The defect this fixes (#25): `state` was returned as DEFINED with no unknown
+    # attached while every file the parser could not read was silently dropped.
+    # A partial read reported as DEFINED asserts an architecture that was never
+    # examined -- ADR-003 rule 6, absence conflated with unknown, inside our own
+    # adapter. Completeness takes precedence over the proposed-only note, because
+    # not having read the decisions outranks having read only unaccepted ones.
+    u = _completeness(recs, len(constraints))
+    if u and u["blocking"]:
+        # `state` must not contradict the unknown beside it. A consumer reading
+        # only `state` would see DEFINED and proceed, which is the same confident
+        # wrong answer one field over. Where the read is dominated by what could
+        # not be parsed, the architecture state IS unknown (§37's third value).
+        state = "UNKNOWN"
+    if u is None and state == "INFERRED":
         u = {
             "reason": "NO_ACCEPTED_DECISIONS",
             "detail": f"{len(proposed)} decision(s) are Proposed; none Accepted. "
