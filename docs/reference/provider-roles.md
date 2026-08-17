@@ -7,7 +7,7 @@
 
 ## §10 — Provider Model
 
-Repo Governor treats all external systems as pluggable providers. Seven categories:
+Repo Governor treats all external systems as pluggable providers. Eight categories (seven original, plus one added by ADR-017):
 
 1. `RoadmapAuthorityProvider`
 2. `ArchitectureEvidenceProvider`
