@@ -83,7 +83,8 @@ SUITE = {
             "decision_history": ("get_decision_history", {"id": "3"}),
         },
         # Fixture mode by default so C7 determinism is assertable (ADR-008 rule 1).
-        "env": {"REPO_GOVERNOR_GH_FIXTURE": "conformance/fixtures/github-projects.json"},
+        "env": {"REPO_GOVERNOR_GH_FIXTURE": "conformance/fixtures/github-projects.json",
+                "REPO_GOVERNOR_GH_ADMISSION": "project_status"},
         "break_env": {"REPO_GOVERNOR_GH_FIXTURE": "/nonexistent-fixture-xyz.json"},
         "unknown_fn": ("get_non_goals", {"id": "1"}),
         "absence_fn": ("get_work", {"id": "9999"}),

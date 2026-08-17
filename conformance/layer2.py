@@ -28,7 +28,8 @@ PROVIDERS = {
     },
     "github-projects": {
         "adapter": "adapters/github-projects",
-        "env": {"REPO_GOVERNOR_GH_FIXTURE": "conformance/fixtures/github-projects-scenarios.json"},
+        "env": {"REPO_GOVERNOR_GH_FIXTURE": "conformance/fixtures/github-projects-scenarios.json",
+                "REPO_GOVERNOR_GH_ADMISSION": "project_status"},
     },
     "linear": {
         "adapter": "adapters/linear",
