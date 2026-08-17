@@ -32,7 +32,8 @@
         "signal": "milestone"
       },
       "env": {
-        "REPO_GOVERNOR_GH_ADMISSION": "milestone"
+        "REPO_GOVERNOR_GH_ADMISSION": "milestone",
+        "REPO_GOVERNOR_GH_REPO": "tosin2013/repo-governor"
       }
     },
     "acceptance_criteria": {
@@ -75,7 +76,10 @@
           "kind": "cli",
           "command": "gh"
         },
-        "$comment": "Second backend. GitHub already records decisions in stateReason and nothing was reading them. Bound alongside Dolt because decision_history is multi-valued (ADR-013); disagreement is CONFLICT, not precedence."
+        "$comment": "Second backend. GitHub already records decisions in stateReason and nothing was reading them. Bound alongside Dolt because decision_history is multi-valued (ADR-013); disagreement is CONFLICT, not precedence. Repository identity is declared here because the adapter no longer defaults it (ADR-028, issue 26).",
+        "env": {
+          "REPO_GOVERNOR_GH_REPO": "tosin2013/repo-governor"
+        }
       }
     ],
     "$comment": "Six roles bound. `execution` and `change_signals` are deliberately UNBOUND: this repository has no execution tracker and no dependency-signal source, and the file providers previously bound to them read synthetic fixtures under .repo-governor/. Binding a role to a fixture makes the fixture the repository's state -- which is how the roadmap became a shadow roadmap (ADR-022). An unbound role yields a typed disposition, which is the honest answer; a fixture-backed one yields a confident wrong answer."

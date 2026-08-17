@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -41,11 +42,32 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import manifest as MF  # noqa: E402
 
+# ROOT is where the ENGINE lives -- it resolves adapter paths and nothing else.
+# TARGET is the repository being GOVERNED. Conflating the two meant every
+# repo-local provider read the engine's own repository whatever it was pointed
+# at, and said so with provenance that looked correct (#24, ADR-027).
 ROOT = Path(__file__).resolve().parent.parent
 
 # A subprocess verb maps to the permission verb it needs. `query` is a read;
 # `write` is a write. Nothing infers a verb from the function name.
 VERB_PERMISSION = {"query": "read", "write": "write", "describe": "read"}
+
+
+# Target resolution lives in manifest.py, so the manifest and the adapters
+# cannot disagree about which repository is being governed.
+target = MF.target
+
+
+def _subject(t):
+    """A stable name for the governed repository, for provenance qualification."""
+    p = subprocess.run(["git", "-C", str(t), "remote", "get-url", "origin"],
+                       capture_output=True, text=True, timeout=20)
+    url = p.stdout.strip()
+    if p.returncode == 0 and url:
+        slug = re.sub(r"^.*[:/]([^/:]+/[^/]+?)(?:\.git)?$", r"\1", url)
+        if slug and slug != url:
+            return slug
+    return t.name
 
 _DESCRIBE_CACHE: dict[str, dict] = {}
 
@@ -89,13 +111,19 @@ def _env_for(binding):
     for k, v in (binding.get("env") or {}).items():
         env[str(k)] = str(v)
     env["REPO_GOVERNOR_BINDING"] = json.dumps(binding, sort_keys=True)
+    t = target()
+    env["REPO_GOVERNOR_TARGET"] = str(t)
+    env["REPO_GOVERNOR_SUBJECT"] = _subject(t)
     return env
 
 
 def _spawn(binding, role, fn, kw, verb):
+    # cwd is the GOVERNED repository, not the engine's install directory. Every
+    # repo-local adapter resolves its default path relative to cwd, which is
+    # correct; pinning cwd to ROOT overrode all seven of them at once (#24).
     args = [sys.executable, str(ROOT / binding["adapter"]), verb, role, fn]
     args += [f"{k}={v}" for k, v in kw.items()]
-    p = subprocess.run(args, capture_output=True, text=True, cwd=ROOT,
+    p = subprocess.run(args, capture_output=True, text=True, cwd=str(target()),
                        env=_env_for(binding), timeout=310)
     try:
         return json.loads(p.stdout)
@@ -140,7 +168,7 @@ def describe(binding, use_cache=True):
     if use_cache and key in _DESCRIBE_CACHE:
         return _DESCRIBE_CACHE[key]
     p = subprocess.run([sys.executable, str(ROOT / key), "describe"],
-                       capture_output=True, text=True, cwd=ROOT,
+                       capture_output=True, text=True, cwd=str(target()),
                        env=_env_for(binding), timeout=60)
     try:
         d = json.loads(p.stdout)

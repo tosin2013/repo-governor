@@ -22,6 +22,7 @@ Usage:  python3 engine/manifest.py [path]        validate and summarise
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -29,9 +30,38 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from jsonschema_mini import validate  # noqa: E402
 
+# ROOT is where the ENGINE lives. It resolves the schema and adapter paths, and
+# nothing else. The repository being GOVERNED is a separate question (ADR-027) --
+# conflating them made every repo-local provider read the engine's own
+# repository whatever it was pointed at, with provenance that looked correct.
 ROOT = Path(__file__).resolve().parent.parent
 SCHEMA = ROOT / "schemas" / "manifest-v1.json"
-DEFAULT = ROOT / ".repo-governor.json"
+
+
+def _git_toplevel(start):
+    import subprocess  # noqa: PLC0415 -- only needed on this path
+    try:
+        p = subprocess.run(["git", "-C", str(start), "rev-parse", "--show-toplevel"],
+                           capture_output=True, text=True, timeout=20)
+    except (FileNotFoundError, OSError):
+        return None
+    return Path(p.stdout.strip()) if p.returncode == 0 and p.stdout.strip() else None
+
+
+def target():
+    """The repository under governance.
+
+    Declared by `REPO_GOVERNOR_TARGET`; otherwise the git repository enclosing
+    the working directory; otherwise the working directory itself. Never the
+    engine's install directory, unless that is genuinely where you are standing.
+
+    A governance manifest describes the repository it sits in (ADR-004), so the
+    manifest is read from here too. Reading the engine's manifest while
+    governing somewhere else binds providers nobody declared for that place.
+    """
+    declared = os.environ.get("REPO_GOVERNOR_TARGET")
+    start = Path(declared).resolve() if declared else Path.cwd()
+    return (_git_toplevel(start) or start).resolve()
 
 SUPPORTED_VERSIONS = (1,)
 
@@ -86,7 +116,7 @@ def _scan_secrets(node, path="$"):
 
 def load(path=None):
     """Return (manifest, errors). A non-empty error list means DO NOT evaluate."""
-    p = Path(path) if path else DEFAULT
+    p = Path(path) if path else (target() / ".repo-governor.json")
     if not p.exists():
         # Absent manifest is not an error; the repository is un-onboarded.
         return None, [f"AUTHORITY_SOURCE_MISSING: no manifest at {p}"]

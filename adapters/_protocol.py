@@ -28,6 +28,7 @@ byte-identical replay that ADR-009 depends on.
 from __future__ import annotations
 
 import json
+import os
 import sys
 
 CONTRACT_VERSION = 1
@@ -95,8 +96,24 @@ def fail(role, function, etype, message):
     }
 
 
+# The repository this invocation is governing. Set by engine/bindings.py from the
+# resolved target (ADR-027). Absent when an adapter is driven directly, which is
+# how the conformance suites run.
+SUBJECT = os.environ.get("REPO_GOVERNOR_SUBJECT", "")
+
+
 def cite(source, ref, field=None):
-    """One provenance entry. No timestamp — see module docstring."""
+    """One provenance entry. No timestamp — see module docstring.
+
+    Refs from repo-local providers are repository-relative (`docs/adrs`,
+    `filesystem:package.json`), which identifies nothing on its own. The same
+    check run against two repositories produced opposite answers and
+    byte-identical provenance (#24), so a decision record could not say which
+    repository it was about. Qualify the ref with the governed repository
+    whenever the engine has told us what that is.
+    """
+    if SUBJECT and not ref.startswith(SUBJECT + "//"):
+        ref = f"{SUBJECT}//{ref}"
     c = {"source": source, "ref": ref}
     if field:
         c["field"] = field

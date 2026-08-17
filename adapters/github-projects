@@ -31,15 +31,23 @@ from _protocol import cite, fail, main, ok, unknown  # noqa: E402
 
 ROLE = "roadmap_authority"
 FIXTURE = os.environ.get("REPO_GOVERNOR_GH_FIXTURE")
-NWO = os.environ.get("REPO_GOVERNOR_GH_REPO", "tosin2013/repo-governor")
+# Repository identity is NEVER defaulted (ADR-028). This read
+# the author's own repository slug until 2026-08-17, so any other repository that
+# did not set it got confident, well-provenanced answers about that project
+# (#26). An adapter that cannot determine WHICH system it is reading must fail,
+# not guess -- the same rule ADR-003 rule 6 states for absence versus unknown.
+NWO = os.environ.get("REPO_GOVERNOR_GH_REPO", "")
 
 # ADR-018: the admission signal is DECLARED, never assumed. No fallback chain --
 # trying Projects then milestones then labels would be the adapter deciding what
 # admission means in someone else's repository.
 ADMISSION = os.environ.get("REPO_GOVERNOR_GH_ADMISSION", "")
 ADMISSION_SIGNALS = ("project_status", "milestone", "label", "none")
-ADMISSION_LABEL = os.environ.get("REPO_GOVERNOR_GH_ADMISSION_LABEL", "admitted")
-AUTHORIZE_LABEL = os.environ.get("REPO_GOVERNOR_GH_AUTHORIZE_LABEL", "ready")
+# Same rule one level down. ADR-018 made the admission SIGNAL declared; its
+# parameters were still guessed. Defaulting to `admitted` / `ready` picks label
+# names in someone else's repository, which is what ADR-018 refused (#26).
+ADMISSION_LABEL = os.environ.get("REPO_GOVERNOR_GH_ADMISSION_LABEL", "")
+AUTHORIZE_LABEL = os.environ.get("REPO_GOVERNOR_GH_AUTHORIZE_LABEL", "")
 
 # Fetch ONE issue by number. The previous query paged `issues(first:50)` and
 # searched the result, which silently returned NOT_FOUND for any issue outside
@@ -88,8 +96,25 @@ CLOSED_REASON = {
 }
 
 
+
+def _require_repo(fn):
+    """Identity is declared or the provider is unavailable. Never guessed (ADR-028)."""
+    owner, _, repo = NWO.partition("/")
+    if not NWO:
+        return fail(ROLE, fn, "PROVIDER_UNAVAILABLE",
+                    "no repository declared. Set providers.<role>.env.REPO_GOVERNOR_GH_REPO "
+                    "in the manifest to 'owner/repo'. An adapter that cannot tell which "
+                    "repository it is reading must not answer.")
+    if not repo:
+        return fail(ROLE, fn, "BAD_REQUEST", f"REPO_GOVERNOR_GH_REPO={NWO!r} is not owner/repo")
+    return None
+
+
 def _fetch_one(fn, number):
     """Fetch a single issue by number. Live mode only; fixtures use _fetch."""
+    err = _require_repo(fn)
+    if err:
+        return None, err
     owner, _, repo = NWO.partition("/")
     try:
         p = subprocess.run(
@@ -122,9 +147,10 @@ def _fetch(fn):
             return json.loads(p.read_text()), None
         except json.JSONDecodeError as e:
             return None, fail(ROLE, fn, "MALFORMED_SOURCE", f"fixture is not valid JSON: {e}")
+    err = _require_repo(fn)
+    if err:
+        return None, err
     owner, _, repo = NWO.partition("/")
-    if not repo:
-        return None, fail(ROLE, fn, "BAD_REQUEST", f"REPO_GOVERNOR_GH_REPO={NWO!r} is not owner/repo")
     try:
         p = subprocess.run(
             ["gh", "api", "graphql", "-f", f"query={QUERY}", "-f", f"owner={owner}", "-f", f"repo={repo}"],
@@ -323,6 +349,15 @@ def get_authority(kw):
                   [_ref(node, "milestone.title"), _ref(node, "assignees")])
 
     if ADMISSION == "label":
+        if not ADMISSION_LABEL:
+            return unknown(ROLE, "get_authority",
+                           reason="ADMISSION_SIGNAL_UNDECLARED",
+                           detail=("Signal 'label' is declared but no label name is. Picking "
+                                   "'admitted' would be the adapter choosing what admission means "
+                                   "in your repository, which ADR-018 refuses one level up (#26)."),
+                           resolution="Declare admission.admission_label, and admission.authorize_label "
+                                      "if authorization is also label-driven.",
+                           blocking=True)
         names = _labels(node)
         if AUTHORIZE_LABEL in names:
             return ok(ROLE, "get_authority", {"authority": "AUTHORIZED", "admitted": True},

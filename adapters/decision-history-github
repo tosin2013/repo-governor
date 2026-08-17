@@ -35,7 +35,12 @@ sys.path.insert(0, str(Path(__file__).parent))
 from _protocol import cite, fail, main, ok, unknown  # noqa: E402
 
 ROLE = "decision_history"
-NWO = os.environ.get("REPO_GOVERNOR_GH_REPO", "tosin2013/repo-governor")
+# Repository identity is NEVER defaulted (ADR-028). This read
+# the author's own repository slug until 2026-08-17, so any other repository that
+# did not set it got confident, well-provenanced answers about that project
+# (#26). An adapter that cannot determine WHICH system it is reading must fail,
+# not guess -- the same rule ADR-003 rule 6 states for absence versus unknown.
+NWO = os.environ.get("REPO_GOVERNOR_GH_REPO", "")
 FIXTURE = os.environ.get("REPO_GOVERNOR_GH_DECISIONS_FIXTURE")
 
 SAFE_ID = re.compile(r"^#?\d{1,9}$")
@@ -104,6 +109,20 @@ def _issue_from_raw(fn, number, raw):
     return node, None
 
 
+
+def _require_repo(fn):
+    """Identity is declared or the provider is unavailable. Never guessed (ADR-028)."""
+    owner, _, repo = NWO.partition("/")
+    if not NWO:
+        return fail(ROLE, fn, "PROVIDER_UNAVAILABLE",
+                    "no repository declared. Set providers.<role>.env.REPO_GOVERNOR_GH_REPO "
+                    "in the manifest to 'owner/repo'. An adapter that cannot tell which "
+                    "repository it is reading must not answer.")
+    if not repo:
+        return fail(ROLE, fn, "BAD_REQUEST", f"REPO_GOVERNOR_GH_REPO={NWO!r} is not owner/repo")
+    return None
+
+
 def _issue(fn, number):
     raw = _raw_from_stdin()
     if raw is not None:
@@ -121,9 +140,10 @@ def _issue(fn, number):
                 return n, None
         return None, fail(ROLE, fn, "NOT_FOUND", f"no issue #{number} in fixture")
 
+    err = _require_repo(fn)
+    if err:
+        return None, err
     owner, _, repo = NWO.partition("/")
-    if not repo:
-        return None, fail(ROLE, fn, "BAD_REQUEST", f"REPO_GOVERNOR_GH_REPO={NWO!r} is not owner/repo")
     try:
         p = subprocess.run(
             ["gh", "api", "graphql", "-f", f"query={QUERY}", "-f", f"owner={owner}",

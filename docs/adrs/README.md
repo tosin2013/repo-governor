@@ -2,7 +2,7 @@
 
 Generated 2026-08-17 from PRD v0.2 (provider-oriented draft) using the MCP ADR Analysis Server's PRD-to-ADR protocol, informed by the external landscape research in [`../research/2026-08-17-external-landscape.md`](../research/2026-08-17-external-landscape.md).
 
-**21 of 24 ADRs are Accepted** as of 2026-08-17, ratified under [RATIFICATION-v0.1.0.md](RATIFICATION-v0.1.0.md). ADR-020 and ADR-024 are held `Proposed`; ADR-014 is `Superseded` by the 023/024 split. Per §61, the project cannot reach `IMPLEMENTATION_READY` until the `RG-SIM-ONBOARDING-v0.1` simulation passes.
+**21 of 26 ADRs are Accepted** as of 2026-08-17, ratified under [RATIFICATION-v0.1.0.md](RATIFICATION-v0.1.0.md). ADR-020 and ADR-024 are held `Proposed`, and ADR-027 / ADR-028 are newly `Proposed`; ADR-014 is `Superseded` by the 023/024 split. Per §61, the project cannot reach `IMPLEMENTATION_READY` until the `RG-SIM-ONBOARDING-v0.1` simulation passes.
 
 > **`PRD.md` no longer exists.** Its normative content was extracted into [`../reference/`](../reference/) on 2026-08-17, with original § numbering preserved so every citation below still resolves. Start at the [section map](../reference/README.md#section-map).
 
@@ -34,6 +34,8 @@ Generated 2026-08-17 from PRD v0.2 (provider-oriented draft) using the MCP ADR A
 | [022](022-repo-governor-does-not-own-roadmap-state.md) | Repo Governor does not own roadmap state | Product boundary | **Section 54 reproduced inside the tool**; roadmap rebound to GitHub |
 | [023](023-completion-firewall.md) | The completion firewall | Policy engine | Split from 014 — the half that shipped |
 | [024](024-scope-envelope-compiler.md) | ScopeEnvelope is compiled, not authored | Policy engine | Split from 014 — **the half that did not**; held Proposed |
+| [027](027-the-governed-repository-is-not-the-install-directory.md) | The governed repository is not the install directory | Portability | The engine governed **itself** whatever it was pointed at |
+| [028](028-provider-identity-is-never-defaulted.md) | Provider identity is never defaulted | Safety | Adapters named the author's repository as a fallback |
 
 ## Dependency order
 

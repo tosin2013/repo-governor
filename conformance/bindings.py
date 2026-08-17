@@ -148,6 +148,55 @@ def main():
     fails += check("secret-shaped value in binding.env fails the load",
                    any("SECRET" in e for e in errs_secret), str(errs_secret)[:120])
 
+    print("\nThe governed repository is where you point it\n")
+
+    # 13. TARGET is not ROOT. `bindings.target()` must follow the declaration,
+    #     not the engine's install path -- the defect that made every repo-local
+    #     provider read this repository whatever it was pointed at (#24).
+    import os as _os, subprocess as _sp, tempfile as _tf
+    with _tf.TemporaryDirectory() as td:
+        other = Path(td) / "other"
+        (other / "docs" / "adrs").mkdir(parents=True)
+        (other / "docs" / "adrs" / "001-only-one.md").write_text(
+            "# 1. Only One\n\n**Status**: Accepted\n")
+        _sp.run(["git", "init", "-q", str(other)], check=False, capture_output=True)
+        _sp.run(["git", "-C", str(other), "remote", "add", "origin",
+                 "https://github.com/elsewhere/other.git"], check=False, capture_output=True)
+        (other / ".repo-governor.json").write_text(json.dumps({
+            "repo_governor": {"version": 1},
+            "repository": {"id": "elsewhere/other"},
+            "condition": {"assessed": "L1", "profile": "GOVERNOR_LITE"},
+            "providers": {
+                "repository": {"type": "git", "adapter": "adapters/git", "contract_version": 1},
+                "architecture": [{"type": "adr", "adapter": "adapters/adr", "contract_version": 1}]},
+            "permissions": {"repository": {"read": True}, "architecture": {"read": True}}}))
+        env0 = _os.environ.get("REPO_GOVERNOR_TARGET")
+        _os.environ["REPO_GOVERNOR_TARGET"] = str(other)
+        try:
+            fails += check("target() follows the declaration, not the install path",
+                           B.target() == other.resolve(), f"got {B.target()}")
+            r = B.call("architecture", "get_provenance", {})
+            n = (r.get("value") or {}).get("documents")
+            fails += check("a foreign repository's own decisions are read", n == 1, f"read {n}")
+            ref = (r.get("provenance") or [{}])[0].get("ref", "")
+            fails += check("provenance names the governed repository",
+                           ref.startswith("elsewhere/other//"), f"ref={ref!r}")
+            # The decisive one: governing A must never cite B.
+            fails += check("governing one repository never cites another",
+                           "repo-governor" not in ref, f"ref={ref!r}")
+        finally:
+            if env0 is None:
+                _os.environ.pop("REPO_GOVERNOR_TARGET", None)
+            else:
+                _os.environ["REPO_GOVERNOR_TARGET"] = env0
+
+    # 14. No adapter names the author's repository. A default identity means a
+    #     foreign repository gets confident answers about someone else's project
+    #     (#26). A blunt grep on purpose -- a clever check is easier to defeat.
+    named = [p.name for p in sorted((ROOT / "adapters").iterdir())
+             if p.is_file() and "tosin2013" in p.read_text(errors="ignore")]
+    fails += check("no adapter contains the author's repository slug", not named, str(named))
+
     print(f"\n{'BINDINGS: CONFORMANT' if not fails else f'BINDINGS: NON-CONFORMANT ({fails})'}")
     return 0 if not fails else 1
 

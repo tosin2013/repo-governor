@@ -32,7 +32,7 @@ python3 engine/completion.py <work-id>     # govern
 | | |
 | --- | --- |
 | Roadmap authority | GitHub issues, admission by milestone ([ADR-018](docs/adrs/018-admission-signal-is-declared-not-assumed.md), [ADR-022](docs/adrs/022-repo-governor-does-not-own-roadmap-state.md)) |
-| Decisions | 24 ADRs — **21 Accepted** (2026-08-17), 2 held `Proposed` ([020](docs/adrs/020-agent-supplied-transport-with-adapter-as-normalizer.md), [024](docs/adrs/024-scope-envelope-compiler.md)), 1 `Superseded` ([014](docs/adrs/014-scope-envelope-as-bounded-execution-contract.md), split) |
+| Decisions | 26 ADRs — **21 Accepted** (2026-08-17), 4 `Proposed` ([020](docs/adrs/020-agent-supplied-transport-with-adapter-as-normalizer.md), [024](docs/adrs/024-scope-envelope-compiler.md), [027](docs/adrs/027-the-governed-repository-is-not-the-install-directory.md), [028](docs/adrs/028-provider-identity-is-never-defaulted.md)), 1 `Superseded` ([014](docs/adrs/014-scope-envelope-as-bounded-execution-contract.md), split) |
 | Open thesis risks | [#1](https://github.com/tosin2013/repo-governor/issues/1) normalization (fixtures only), [#2](https://github.com/tosin2013/repo-governor/issues/2) envelope thinness (measured: *always* thin on real trackers), [#5](https://github.com/tosin2013/repo-governor/issues/5) skill activation (unmeasured) |
 
 ---
@@ -84,7 +84,7 @@ engine/        deterministic policy engine, Python stdlib only
 conformance/   7 suites — the evidence behind every gate claim
 schemas/       manifest v1 JSON Schema
 docs/
-  adrs/        24 architectural decisions (21 Accepted) + index + ratification review
+  adrs/        26 architectural decisions (21 Accepted) + index + ratification review
   reference/   normative specification, §1–§70, INV-001…INV-014
   research/    external landscape sweep + transport/capability research
 ```
