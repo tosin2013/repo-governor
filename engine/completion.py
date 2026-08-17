@@ -17,6 +17,7 @@ Usage:  python3 engine/completion.py <authority-id> [--roadmap <adapter>]
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -25,14 +26,20 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import vocabulary as V  # noqa: E402
+import manifest as MF  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
+ENGINE_VERSION = "0.1.0"
+try:
+    MF_HASH = hashlib.sha256((ROOT / ".repo-governor.json").read_bytes()).hexdigest()[:16]
+except OSError:
+    MF_HASH = None
 
 
-def call(adapter, role, fn, kw, env_extra=None):
+def call(adapter, role, fn, kw, env_extra=None, verb="query"):
     env = dict(os.environ)
     env.update(env_extra or {})
-    args = [sys.executable, str(ROOT / adapter), "query", role, fn]
+    args = [sys.executable, str(ROOT / adapter), verb, role, fn]
     args += [f"{k}={v}" for k, v in kw.items()]
     p = subprocess.run(args, capture_output=True, text=True, cwd=ROOT, env=env, timeout=310)
     try:
@@ -133,6 +140,82 @@ def evaluate(authority_id, roadmap_adapter, roadmap_env):
             "unknowns": unknowns, "provenance": provenance}
 
 
+def _repo_is_public():
+    """Drives the redaction default. Unknown visibility is treated as public --
+    failing conservatively, per §51."""
+    try:
+        p = subprocess.run(["gh", "repo", "view", "--json", "visibility", "-q", ".visibility"],
+                           capture_output=True, text=True, cwd=ROOT, timeout=20)
+        if p.returncode == 0:
+            return p.stdout.strip().upper() != "PRIVATE"
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+    return True
+
+
+def _redact(decision, provenance, public):
+    """Hash plus typed facts plus explicit markers (ADR-019).
+
+    Never a silent omission: an omitted snapshot is indistinguishable from
+    there having been no snapshot, which is the absence-versus-unknown
+    confusion ADR-003 rule 6 forbids in adapters.
+    """
+    snapshot = json.dumps(provenance, sort_keys=True)
+    sha = hashlib.sha256(snapshot.encode()).hexdigest()
+    facts = {k: decision.get(k) for k in ("decision", "authority") if decision.get(k) is not None}
+    if not public:
+        return sha, facts, False, None
+    return sha, facts, True, ["provider_snapshots"]
+
+
+def record(decision, roadmap_adapter):
+    """Append the decision to the bound decision-history store, if permitted.
+
+    Returns a dict describing what happened. Recording NEVER changes the
+    disposition -- it is a side effect after the fact, so ADR-002's pure
+    evaluation is untouched.
+
+    The decision id is a content hash, not a timestamp. ADR-002 forbids clock
+    reads in the evaluation path, and a content-derived id also makes recording
+    idempotent: re-evaluating an unchanged state rewrites the same row.
+    """
+    m, errs = MF.load()
+    if errs:
+        return {"recorded": False, "why": "manifest invalid; refusing to record"}
+    allowed, why = MF.permitted(m, "decision_history", "write")
+    if not allowed:
+        # ADR-005 rule 5: a permission failure is a disposition, not an exception.
+        return {"recorded": False, "why": f"not permitted: {why}"}
+
+    bindings = (m.get("providers") or {}).get("decision_history") or []
+    writable = [b for b in bindings if b.get("type", "").startswith("decision-history-dolt")]
+    if not writable:
+        return {"recorded": False, "why": "no writable decision-history backend is bound"}
+
+    public = _repo_is_public()
+    sha, facts, redacted, fields = _redact(decision, decision.get("provenance", []), public)
+    body = json.dumps(decision, sort_keys=True)
+    did = "d-" + hashlib.sha256(body.encode()).hexdigest()[:24]
+
+    disp = {"STOP_COMPLETE": "ACCEPTED", "CONTINUE": "ACCEPTED",
+            "AUTHORITY_WITHDRAWN": "CANCELLED", "NO_EXECUTION_AUTHORITY": "DEFERRED",
+            "UNKNOWN": "DEFERRED"}.get(decision["decision"])
+    if disp is None:
+        return {"recorded": False, "why": f"no decision-history mapping for {decision['decision']}"}
+
+    kw = {"decision_id": did, "authority_id": decision["authority_id"],
+          "disposition": disp, "reason": f"engine decision {decision['decision']}",
+          "engine_version": ENGINE_VERSION, "manifest_hash": MF_HASH or "",
+          "snapshot_sha256": sha, "typed_facts": json.dumps(facts, sort_keys=True),
+          "redacted": str(redacted).lower(),
+          "fields_redacted": json.dumps(fields) if fields else ""}
+    r = call(writable[0]["adapter"], "decision_history", "record_decision", kw, verb="write")
+    if not r.get("ok"):
+        return {"recorded": False, "why": r.get("error", {}).get("message", "write failed")}
+    return {"recorded": True, "decision_id": did, "redacted": redacted,
+            "fields_redacted": fields, "committed": False}
+
+
 def main(argv):
     if not argv:
         print(__doc__.strip().splitlines()[-1], file=sys.stderr)
@@ -146,7 +229,10 @@ def main(argv):
         env = {"REPO_GOVERNOR_LINEAR_FIXTURE": "conformance/fixtures/linear.json"}
     elif adapter == "adapters/github-projects":
         env = {"REPO_GOVERNOR_GH_FIXTURE": "conformance/fixtures/github-projects-scenarios.json"}
-    print(json.dumps(evaluate(authority_id, adapter, env), indent=2, sort_keys=True))
+    result = evaluate(authority_id, adapter, env)
+    if "--record" in argv:
+        result["record"] = record(result, adapter)
+    print(json.dumps(result, indent=2, sort_keys=True))
     return 0
 
 

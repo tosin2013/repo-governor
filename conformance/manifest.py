@@ -65,7 +65,8 @@ PERM_CASES = [
     ("repository", "create", False),         # absent verb => deny
     ("roadmap_authority", "transition", False),
     ("decision_history", "read", True),      # bound as of ADR-019 (two backends)
-    ("decision_history", "write", False),    # bound, but write not granted
+    ("decision_history", "write", True),     # the ONE write granted anywhere (ADR-019)
+    ("architecture", "write", False),        # every other role stays read-only
     ("nonexistent", "read", False),          # unbound role => deny; all 8 real roles are now bound
 ]
 

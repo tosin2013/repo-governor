@@ -6,7 +6,14 @@ stdout, not this module. It exists only to keep the Python adapters short.
 Wire protocol
 -------------
     $ADAPTER describe                       -> capability manifest
-    $ADAPTER query <role> <function> [k=v]  -> typed response
+    $ADAPTER query <role> <function> [k=v]  -> typed response (read)
+    $ADAPTER write <role> <function> [k=v]  -> typed response (mutate)
+
+`query` and `write` are separate verbs so the read/write split ADR-005 cares
+about is visible at the protocol level rather than buried in a function name.
+An adapter that declares no writers rejects `write` outright. The ENGINE still
+checks the manifest before calling either -- an adapter offering a writer is
+capability, not permission (INV-014).
 
 Every response is a single JSON object on stdout. Exit code 0 means "the
 adapter ran"; it does NOT mean the query succeeded — check `ok`. This split
@@ -109,7 +116,8 @@ def parse_args(argv):
     return role, function, kw
 
 
-def main(role, capabilities, functions, describe_extra=None, properties=None, probe=None):
+def main(role, capabilities, functions, describe_extra=None, properties=None, probe=None,
+         writers=None):
     """Standard entry point. `functions` maps name -> callable(kw) -> response.
 
     `capabilities` are claims that MUST be exercisable by a conformance probe
@@ -137,22 +145,29 @@ def main(role, capabilities, functions, describe_extra=None, properties=None, pr
             "capabilities": capabilities if reachable else {},
             "properties": properties or {},
             "functions": sorted(functions),
+            "writers": sorted(writers or {}),
             "transport": {"reachable": reachable},
         }
         if describe_extra:
             d.update(describe_extra)
         emit(d)
         return 0
-    if argv[0] != "query":
+    if argv[0] not in ("query", "write"):
         emit(fail(role, "-", "BAD_REQUEST", f"unknown verb {argv[0]!r}"))
         return 0
+    verb = argv[0]
     req_role, function, kw = parse_args(argv[1:])
     if req_role != role:
         emit(fail(role, function or "-", "BAD_REQUEST", f"this adapter serves role {role!r}, not {req_role!r}"))
         return 0
-    fn = functions.get(function)
+    table = (writers or {}) if verb == "write" else functions
+    fn = table.get(function)
     if fn is None:
-        emit(fail(role, function or "-", "UNSUPPORTED_FUNCTION", f"{function!r} not advertised"))
+        if verb == "write" and not writers:
+            emit(fail(role, function or "-", "UNSUPPORTED_FUNCTION",
+                      "this adapter declares no writers; it is read-only"))
+        else:
+            emit(fail(role, function or "-", "UNSUPPORTED_FUNCTION", f"{function!r} not advertised"))
         return 0
     emit(fn(kw))
     return 0

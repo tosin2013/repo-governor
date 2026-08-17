@@ -149,6 +149,8 @@ def load(path=None):
             errs.append(f"PERMISSION_MALFORMED: {role!r} block is not an object; resolves to deny.")
             continue
         for verb in block:
+            if verb.startswith("$"):
+                continue  # annotation, not a verb
             if verb in RESERVED_VERBS:
                 errs.append(f"PERMISSION_RESERVED: {verb!r} is reserved and unimplemented at v1 "
                             "(ADR-005 rule 6).")

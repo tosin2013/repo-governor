@@ -111,7 +111,8 @@
     },
     "decision_history": {
       "read": true,
-      "write": false
+      "write": true,
+      "$comment": "The only write granted anywhere in this manifest. ADR-005 rule 4 treats write as exceptional and read as presumed; this is the exception, because the engine recording its own decisions is what makes INV-005 enforceable. Every other role stays read-only."
     }
   }
 }

@@ -241,6 +241,9 @@
         },
         "transition": {
           "type": "boolean"
+        },
+        "$comment": {
+          "type": "string"
         }
       }
     },

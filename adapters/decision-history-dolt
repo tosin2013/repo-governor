@@ -234,6 +234,53 @@ def get_history(kw):
               [cite("dolt", f"{DB_DIR}#dolt_history_decisions", "commit_hash")])
 
 
+def _esc(v):
+    """Single-quote a value for a SQL literal, or NULL."""
+    if v is None or v == "":
+        return "NULL"
+    return "'" + str(v).replace("\\", "\\\\").replace("'", "''") + "'"
+
+
+def record_decision(kw):
+    """Append one decision record. The only write this adapter offers.
+
+    Writing does not commit. `dolt add`/`dolt commit` is a separate, human or
+    CI action, so a decision is staged and reviewable before it becomes part
+    of the chain -- the same shape as ADR-010's detection-proposes rule.
+    """
+    for req in ("decision_id", "authority_id", "disposition"):
+        if not kw.get(req):
+            return fail(ROLE, "record_decision", "BAD_REQUEST", f"missing required argument: {req}")
+    if kw["disposition"] not in DISPOSITIONS:
+        return fail(ROLE, "record_decision", "MALFORMED_SOURCE",
+                    f"disposition {kw['disposition']!r} is not in {list(DISPOSITIONS)}")
+    for field in ("decision_id", "authority_id"):
+        if not SAFE_ID.match(kw[field]):
+            return fail(ROLE, "record_decision", "BAD_REQUEST",
+                        f"{field}={kw[field]!r} contains characters that cannot appear in a query")
+
+    cols = ("decision_id", "authority_id", "disposition", "reason", "reversal_condition",
+            "engine_version", "manifest_hash", "snapshot_sha256", "typed_facts",
+            "redacted", "fields_redacted")
+    vals = [_esc(kw.get(c)) for c in cols[:8]]
+    vals.append(_esc(kw.get("typed_facts")))
+    vals.append("true" if str(kw.get("redacted", "")).lower() == "true" else "false")
+    vals.append(_esc(kw.get("fields_redacted")))
+    q = (f"INSERT INTO decisions ({', '.join(cols)}) VALUES ({', '.join(vals)}) "
+         "ON DUPLICATE KEY UPDATE disposition=VALUES(disposition), reason=VALUES(reason)")
+    rows, err = _sql(q)
+    if err:
+        return fail(ROLE, "record_decision", "PROVIDER_UNAVAILABLE", err)
+    return ok(ROLE, "record_decision",
+              {"decision_id": kw["decision_id"], "authority_id": kw["authority_id"],
+               "recorded": True, "committed": False,
+               "note": "Staged, not committed. `dolt commit` is a separate action so a "
+                       "decision is reviewable before it joins the chain."},
+              [cite("dolt", f"{DB_DIR}#decisions.{kw['decision_id']}", "disposition")])
+
+
+WRITERS = {"record_decision": record_decision}
+
 FUNCTIONS = {
     "get_decisions": get_decisions,
     "get_disposition": get_disposition,
@@ -260,5 +307,5 @@ CAPABILITIES = {
 if __name__ == "__main__":
     sys.exit(main(ROLE, CAPABILITIES, FUNCTIONS,
                   {"name": "decision-history-dolt",
-                   "permissions": {"read": True, "write": False}},
-                  properties=PROPERTIES, probe=_probe))
+                   "permissions": {"read": True, "write": True}},
+                  properties=PROPERTIES, probe=_probe, writers=WRITERS))
