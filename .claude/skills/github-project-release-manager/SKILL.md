@@ -302,7 +302,9 @@ These were all hit while building this skill.
   exit=1
   error: your authentication token is missing required scopes [project]
   ```
-  So "can I read the board?" and "can I change the board?" are different questions. Test the actual write before promising it.
+  So "can I read the board?" and "can I change the board?" are different questions. Test the actual write before promising it — `gh project list` succeeding proves nothing about `item-edit`.
+
+  After `gh auth refresh -s project -h github.com`, note the scope list shows `'project'` and **no longer shows `'read:project'`** — the refresh replaces the narrower scope rather than adding to it. Detect write capability by looking for `'project'`, not by counting scopes.
 - **`read:project` is not enough to write.** The failure is a GraphQL error, not a non-zero CLI exit in every path:
   ```text
   INSUFFICIENT_SCOPES ... The 'updateProjectV2' field requires one of the
