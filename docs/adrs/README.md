@@ -2,7 +2,7 @@
 
 Generated 2026-08-17 from PRD v0.2 (provider-oriented draft) using the MCP ADR Analysis Server's PRD-to-ADR protocol, informed by the external landscape research in [`../research/2026-08-17-external-landscape.md`](../research/2026-08-17-external-landscape.md).
 
-All ADRs are **Proposed**. None is accepted. Per §61, the project cannot reach `IMPLEMENTATION_READY` until the `RG-SIM-ONBOARDING-v0.1` simulation passes.
+**21 of 24 ADRs are Accepted** as of 2026-08-17, ratified under [RATIFICATION-v0.1.0.md](RATIFICATION-v0.1.0.md). ADR-020 and ADR-024 are held `Proposed`; ADR-014 is `Superseded` by the 023/024 split. Per §61, the project cannot reach `IMPLEMENTATION_READY` until the `RG-SIM-ONBOARDING-v0.1` simulation passes.
 
 > **`PRD.md` no longer exists.** Its normative content was extracted into [`../reference/`](../reference/) on 2026-08-17, with original § numbering preserved so every citation below still resolves. Start at the [section map](../reference/README.md#section-map).
 
@@ -23,7 +23,7 @@ All ADRs are **Proposed**. None is accepted. Per §61, the project cannot reach 
 | [011](011-python-stdlib-only-engine-with-language-agnostic-adapters.md) | Python stdlib-only engine, any-language adapters | Runtime | Language and dependency policy |
 | [012](012-provider-content-treated-as-untrusted-input.md) | Provider content treated as untrusted input | Security | **Gap in §51** — prompt injection |
 | [013](013-single-canonical-authority-per-role.md) | Single canonical authority per role, halt on conflict | Conflict resolution | Role cardinality; no tie-breaking |
-| [014](014-scope-envelope-as-bounded-execution-contract.md) | ScopeEnvelope as bounded contract + completion firewall | Domain model | How scope boundaries are drawn |
+| ~~014~~ | ~~ScopeEnvelope + completion firewall~~ — **superseded**, split into [023](023-completion-firewall.md) and [024](024-scope-envelope-compiler.md) | Domain model | Bundled two decisions; only one shipped |
 | [015](015-json-as-canonical-manifest-format.md) | JSON as the canonical manifest format | Configuration | Closes ADR-011's deferred choice; unblocks gate 5 |
 | [016](016-mcp-as-adapter-transport-not-adapter-replacement.md) | MCP as adapter transport, not replacement | Integration | Whether providers route via MCP servers |
 | [017](017-completion-evidence-from-repo-local-acceptance-artifact.md) | Completion evidence from a repo-local acceptance artifact | Domain model | Makes `STOP_COMPLETE` derivable; unblocks gate 7 |
@@ -32,6 +32,8 @@ All ADRs are **Proposed**. None is accepted. Per §61, the project cannot reach 
 | [020](020-agent-supplied-transport-with-adapter-as-normalizer.md) | Agent-supplied transport, adapter as normalizer | Transport | Moves credentials out of remote adapters; amends ADR-003 and ADR-016 |
 | [021](021-every-provider-resolved-through-the-manifest.md) | Every provider resolved through the manifest | Engine architecture | Builds ADR-005 rule 2, specified and never implemented |
 | [022](022-repo-governor-does-not-own-roadmap-state.md) | Repo Governor does not own roadmap state | Product boundary | **Section 54 reproduced inside the tool**; roadmap rebound to GitHub |
+| [023](023-completion-firewall.md) | The completion firewall | Policy engine | Split from 014 — the half that shipped |
+| [024](024-scope-envelope-compiler.md) | ScopeEnvelope is compiled, not authored | Policy engine | Split from 014 — **the half that did not**; held Proposed |
 
 ## Dependency order
 
@@ -109,7 +111,7 @@ The gate ids are GitHub issue numbers, not `GATE-N`. They were file-roadmap ids 
 
 The gate asks whether the architecture is stable enough to build on. It does not ask whether the product is worth building, and four things remain open:
 
-* **All 22 ADRs are still `Proposed`.** None has been accepted. The gate was met against decisions nobody has ratified. See [`RATIFICATION-v0.1.0.md`](RATIFICATION-v0.1.0.md) — the release condition is not 22/22 Accepted, it is *no Proposed ADR silently normative in the shipped release*.
+* ~~**All 22 ADRs are still `Proposed`.**~~ **Resolved 2026-08-17.** 21 of 24 Accepted; ADR-020 and ADR-024 deliberately held. See [`RATIFICATION-v0.1.0.md`](RATIFICATION-v0.1.0.md).
 * **#1 (cross-provider normalization) has weak evidence.** 9/9 scenarios agree, but all three adapters were written by the same author against the same map — that measures shared intent as much as portability. A third-party adapter is the real test.
 * **#2 (envelope thinness) is not merely unmeasured — it is unanswerable as written.** ADR-014's envelope compiler was never built, so nothing compiles an envelope whose thinness could be measured. Found by the ratification sweep.
 * **The criteria-drift weakness is unresolved.** Acceptance criteria were amended twice during implementation. Both amendments were justified and recorded, and nothing but that record distinguishes a legitimate correction from a convenient one.

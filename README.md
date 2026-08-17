@@ -32,7 +32,7 @@ python3 engine/completion.py <work-id>     # govern
 | | |
 | --- | --- |
 | Roadmap authority | GitHub issues, admission by milestone ([ADR-018](docs/adrs/018-admission-signal-is-declared-not-assumed.md), [ADR-022](docs/adrs/022-repo-governor-does-not-own-roadmap-state.md)) |
-| Decisions | 22 ADRs, all still **Proposed**, none accepted |
+| Decisions | 24 ADRs — **21 Accepted** (2026-08-17), 2 held `Proposed` ([020](docs/adrs/020-agent-supplied-transport-with-adapter-as-normalizer.md), [024](docs/adrs/024-scope-envelope-compiler.md)), 1 `Superseded` ([014](docs/adrs/014-scope-envelope-as-bounded-execution-contract.md), split) |
 | Open thesis risks | [#1](https://github.com/tosin2013/repo-governor/issues/1) normalization (fixtures only), [#2](https://github.com/tosin2013/repo-governor/issues/2) envelope thinness (measured: *always* thin on real trackers), [#5](https://github.com/tosin2013/repo-governor/issues/5) skill activation (unmeasured) |
 
 ---
@@ -72,7 +72,7 @@ Keeping these separate is the point — it's what stops *"the task says READY"* 
 
 A deterministic engine reconciles their state and returns one bounded disposition from a closed vocabulary of twelve. It returns a verdict; it never performs the action.
 
-**What v0.1.0 actually emits is five of those twelve:** `STOP_COMPLETE`, `CONTINUE`, `UNKNOWN`, `AUTHORITY_WITHDRAWN`, `NO_EXECUTION_AUTHORITY`. The engine answers *is this finished?* and *is authority absent or withdrawn?* — it does not yet issue the affirmative `EXECUTE`, and the discovery path that produces `CAPTURE_ONLY` is specified ([ADR-014](docs/adrs/014-scope-envelope-as-bounded-execution-contract.md)) and unbuilt. The completion firewall is the half that shipped, and it is the harder half. See the [ratification review](docs/adrs/RATIFICATION-v0.1.0.md).
+**What v0.1.0 actually emits is five of those twelve:** `STOP_COMPLETE`, `CONTINUE`, `UNKNOWN`, `AUTHORITY_WITHDRAWN`, `NO_EXECUTION_AUTHORITY`. The engine answers *is this finished?* and *is authority absent or withdrawn?* — it does not yet issue the affirmative `EXECUTE`, and the discovery path that produces `CAPTURE_ONLY` is specified ([ADR-024](docs/adrs/024-scope-envelope-compiler.md), held `Proposed`) and unbuilt. The completion firewall is the half that shipped, and it is the harder half. See the [ratification review](docs/adrs/RATIFICATION-v0.1.0.md).
 
 Governance depth scales with repository condition (L0 greenfield → L4 mature/high-assurance), so a two-file repository needs Git, a ten-line manifest, and four invariants — nothing more.
 
@@ -84,7 +84,7 @@ engine/        deterministic policy engine, Python stdlib only
 conformance/   7 suites — the evidence behind every gate claim
 schemas/       manifest v1 JSON Schema
 docs/
-  adrs/        22 architectural decisions (all Proposed) + index + ratification review
+  adrs/        24 architectural decisions (21 Accepted) + index + ratification review
   reference/   normative specification, §1–§70, INV-001…INV-014
   research/    external landscape sweep + transport/capability research
 ```

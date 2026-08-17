@@ -1,6 +1,7 @@
 # 3. Seven Provider Roles with Normalized Contracts
 
-**Status**: Proposed
+**Status**: Accepted
+**Ratified**: 2026-08-17 by Tosin Akinosho (§68), under the [v0.1.0 architecture ratification review](RATIFICATION-v0.1.0.md).
 **Amended by**: [ADR-020](020-agent-supplied-transport-with-adapter-as-normalizer.md) — the adapter protocol gains an optional raw-input source (`--input -`). Role contracts and the typed-fact vocabulary are unchanged.
 **Date**: 2026-08-17
 **Domain**: Provider abstraction

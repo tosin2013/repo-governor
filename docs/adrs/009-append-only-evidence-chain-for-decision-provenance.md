@@ -1,6 +1,7 @@
 # 9. Append-Only Evidence Chain for Decision Provenance
 
-**Status**: Proposed · **Amended by [ADR-019](019-database-backed-decision-history.md), 2026-08-17**
+**Status**: Accepted
+**Ratified**: 2026-08-17 by Tosin Akinosho (§68), under the [v0.1.0 architecture ratification review](RATIFICATION-v0.1.0.md). · **Amended by [ADR-019](019-database-backed-decision-history.md), 2026-08-17**
 **Date**: 2026-08-17
 **Domain**: Observability & provenance
 

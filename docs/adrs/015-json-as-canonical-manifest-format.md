@@ -1,6 +1,7 @@
 # 15. JSON as the Canonical Manifest Format
 
-**Status**: Proposed
+**Status**: Accepted
+**Ratified**: 2026-08-17 by Tosin Akinosho (§68), under the [v0.1.0 architecture ratification review](RATIFICATION-v0.1.0.md).
 **Date**: 2026-08-17
 **Domain**: Configuration & runtime
 **Resolves**: [#3](https://github.com/tosin2013/repo-governor/issues/3) · **Unblocks**: [#11](https://github.com/tosin2013/repo-governor/issues/11) (gate 5)

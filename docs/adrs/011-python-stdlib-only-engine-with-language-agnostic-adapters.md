@@ -1,6 +1,7 @@
 # 11. Python Stdlib-Only Engine with Language-Agnostic Adapters
 
-**Status**: Proposed
+**Status**: Accepted
+**Ratified**: 2026-08-17 by Tosin Akinosho (§68), under the [v0.1.0 architecture ratification review](RATIFICATION-v0.1.0.md).
 **Date**: 2026-08-17
 **Domain**: Runtime & packaging
 

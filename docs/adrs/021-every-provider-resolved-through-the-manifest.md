@@ -1,6 +1,7 @@
 # 21. Every Provider Is Resolved Through the Manifest
 
-**Status**: Proposed
+**Status**: Accepted
+**Ratified**: 2026-08-17 by Tosin Akinosho (§68), under the [v0.1.0 architecture ratification review](RATIFICATION-v0.1.0.md).
 **Date**: 2026-08-17
 **Domain**: Engine architecture / authorization
 **Implements**: [ADR-005](005-deny-by-default-permission-model.md) rule 2

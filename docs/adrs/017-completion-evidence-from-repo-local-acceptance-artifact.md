@@ -1,6 +1,7 @@
 # 17. Completion Evidence from a Repo-Local Acceptance Artifact
 
-**Status**: Proposed
+**Status**: Accepted
+**Ratified**: 2026-08-17 by Tosin Akinosho (§68), under the [v0.1.0 architecture ratification review](RATIFICATION-v0.1.0.md).
 **Date**: 2026-08-17
 **Domain**: Domain model / completion
 **Resolves**: [#15](https://github.com/tosin2013/repo-governor/issues/15) · **Unblocks**: [#13](https://github.com/tosin2013/repo-governor/issues/13) (gate 7)
