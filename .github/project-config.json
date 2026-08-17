@@ -25,8 +25,8 @@
         "Done"
       ],
       "auto_add_workflow": true,
-      "items": 21,
-      "status_snapshot": "15 Done, 6 Backlog (2026-08-17). Reconciled against issue state: 0 drift across 21 items.",
+      "items": 23,
+      "status_snapshot": "15 Done, 8 Backlog (2026-08-17). Reconciled against issue state: 0 drift across 23 items.",
       "write_scope_acquired": "2026-08-17 \u2014 token now carries 'project'; manual field edits work. Note the refresh REPLACED read:project rather than adding to it."
     },
     "reason": "Linked by the maintainer on 2026-08-17, overriding the computed recommendation of 'none'. The override is correct and the score is not wrong: it measures COORDINATION need \u2014 contributors, open items, activity \u2014 and coordination need genuinely is low for a solo repository. What it does not measure is TRACKING need. This repository carries 19 tracked items across three distinct categories (gate conditions, thesis risks, architecture questions) with real dependencies between them, and that is what the board is for. Two different needs; the score only sees one.",
@@ -45,21 +45,23 @@
     "shippable_artifact": "Now exists: 12 adapters, 7 engine modules, 6 conformance suites, SKILL.md. Release decision stays 'milestone' \u2014 no version cut yet, and commits are not conventional, so any version recommendation is judgment-based rather than derivable.",
     "milestone_state": "Both milestones CLOSED 2026-08-17.",
     "version_recommendation": "v0.1.0, judgment-based. 0 feat / 0 fix / 0 breaking across 42 commits because this repository does not use conventional commits, so the count is not evidence of a patch release \u2014 it is evidence the heuristic does not apply here.",
-    "release_blocker": "All 22 ADRs are still Proposed. Tagging would publish an architecture nothing has accepted. Licensing is no longer a blocker: Apache-2.0 applied 2026-08-17 and detected by GitHub.",
+    "release_blocker": "Architecture ratification (issue 22). All 22 ADRs are still Proposed. The release condition is NOT 22/22 Accepted -- it is that every decision the runtime depends on is Accepted and no Proposed ADR is silently normative. Review recommends 20 accept / 2 hold (014 half-shipped, 020 unexercised by the engine). See docs/adrs/RATIFICATION-v0.1.0.md. Licensing resolved.",
     "license": "Apache-2.0, applied 2026-08-17. Chosen for the patent grant and contribution terms because ADR-003's adapter protocol invites third-party adapters. Ownership (section 68, Tosin Open Source) was decided separately and is recorded in NOTICE."
   },
   "open_work": {
     "$comment": "Post-milestone. None of these block anything; all are open questions or backlog.",
     "issues": {
+      "23": "ScopeEnvelope compiler + discovery path specified but unbuilt; blocks 2",
+      "22": "architecture ratification gate for v0.1.0 -- the release blocker",
       "20": "manifest does not bound what the host could supply; five-layer authority taxonomy recorded",
-      "14": "Jira adapter \u2014 backlogged",
-      "6": "monorepo governance \u2014 deferred past v1",
-      "5": "skill activation reliability across hosts \u2014 governance logic is not governance enforcement",
-      "2": "ScopeEnvelope thinness \u2014 measured: ALWAYS thin on real trackers, not merely often",
-      "1": "cross-provider normalization \u2014 the thesis question; Layer 2 has never run on two LIVE providers"
+      "14": "Jira adapter -- backlogged (relabelled gate -> enhancement; it never was a gate condition)",
+      "6": "monorepo governance -- deferred past v1",
+      "5": "skill activation reliability across hosts -- governance logic is not governance enforcement",
+      "2": "ScopeEnvelope thinness -- UNANSWERABLE as written; nothing compiles an envelope. Blocked on 23",
+      "1": "cross-provider normalization -- the thesis question; Layer 2 has never run on two LIVE providers"
     },
     "milestoned": 0,
-    "note": "All six deliberately unmilestoned, and therefore NOT_ADMITTED under the declared admission signal. That is the honest reading: open questions are not admitted work. There is no v0.3 milestone and creating one would invent a scope nobody has decided."
+    "note": "All eight deliberately unmilestoned, therefore NOT_ADMITTED under the declared admission signal. Admitting 22 is the next decision and it is the maintainer's, not the agent's: section 68 makes acceptance a human authority."
   },
   "governance_self_binding": {
     "$comment": "This repository is now governed by its own engine off GitHub issues, not off a local file. Recorded because the previous arrangement was a section 54 failure condition that went unnoticed for 40 commits (ADR-022).",
