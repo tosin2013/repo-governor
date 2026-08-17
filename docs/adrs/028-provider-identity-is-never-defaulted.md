@@ -1,6 +1,7 @@
 # 28. Provider Identity Is Never Defaulted
 
-**Status**: Proposed
+**Status**: Accepted
+**Ratified**: 2026-08-17 by Tosin Akinosho (§68), under the [v0.1.0 architecture ratification review](RATIFICATION-v0.1.0.md).
 **Date**: 2026-08-17
 **Domain**: Provider abstraction / safety
 **Extends**: [ADR-018](018-admission-signal-is-declared-not-assumed.md)

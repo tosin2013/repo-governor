@@ -120,6 +120,15 @@ def main():
                     r"(Proposed|experimental|held)[^\n]{0,80}ADR-" + num, text, re.I)
                 fails += check(f"{doc} marks proposed ADR-{num} as unaccepted", bool(marked),
                                "cited without saying it is Proposed")
+            elif st == "Accepted":
+                # The mirror, and the one ratification itself creates: a document
+                # that called a decision `Proposed` becomes wrong the moment the
+                # decision is accepted. Staleness runs in both directions and
+                # only one of them is obvious.
+                stale = re.search(r"ADR-" + num + r"[^\n]{0,60}`?Proposed`?", text) or re.search(
+                    r"`?Proposed`?[^\n]{0,60}ADR-" + num, text)
+                fails += check(f"{doc} does not still call accepted ADR-{num} proposed", not stale,
+                               "ratification made this line stale")
 
     print(f"\n{'AGENT SURFACE: CONFORMANT' if not fails else f'AGENT SURFACE: NON-CONFORMANT ({fails})'}")
     return 0 if not fails else 1

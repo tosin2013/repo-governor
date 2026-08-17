@@ -44,8 +44,8 @@ python3 engine/retirement.py <path>
 ## House rules that have cost us
 
 - **Never put a closing verb next to a `#` reference in a commit message**, even quoted. GitHub parses it anyway. This closed the same issue twice, the second time in the commit documenting the trap.
-- **Adapters resolve paths relative to the working directory**, never relative to their own location. The engine pinning `cwd` to its own install directory made every repo-local provider read this repository whatever it was pointed at ([ADR-027](docs/adrs/027-the-governed-repository-is-not-the-install-directory.md), `Proposed` — shipped but not ratified).
-- **Provider identity is never defaulted** ([ADR-028](docs/adrs/028-provider-identity-is-never-defaulted.md), `Proposed`). An adapter that cannot tell which system it is reading must fail, not guess.
+- **Adapters resolve paths relative to the working directory**, never relative to their own location. The engine pinning `cwd` to its own install directory made every repo-local provider read this repository whatever it was pointed at ([ADR-027](docs/adrs/027-the-governed-repository-is-not-the-install-directory.md)).
+- **Provider identity is never defaulted** ([ADR-028](docs/adrs/028-provider-identity-is-never-defaulted.md)). An adapter that cannot tell which system it is reading must fail, not guess.
 - **Fixtures live under `conformance/`, never under `.repo-governor/`**, and fixture ids name the state they demonstrate, never a real work item. Binding a fixture as a provider of record is how this project reproduced §54's oldest failure condition inside itself ([ADR-022](docs/adrs/022-repo-governor-does-not-own-roadmap-state.md)).
 
 ## Before you commit

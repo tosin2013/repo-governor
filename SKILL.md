@@ -17,7 +17,7 @@ A TODO, a `READY` task, a new dependency release, an unused-looking module, a gr
 
 **Stand in the repository you are governing. Invoke the engine by its full path.**
 
-The engine governs the repository you are standing in, not the directory it lives in — so `cd`-ing into this skill to make a relative path work would govern the skill instead of your repository. That is a real defect this project shipped and fixed (ADR-027, `Proposed` — the behaviour ships, the decision is not yet ratified); do not recreate it.
+The engine governs the repository you are standing in, not the directory it lives in — so `cd`-ing into this skill to make a relative path work would govern the skill instead of your repository. That is a real defect this project shipped and fixed (ADR-027); do not recreate it.
 
 You need the skill's own location. Take it, in this order:
 
@@ -42,7 +42,7 @@ python3 "$RG/engine/manifest.py"            # is this repository governed?
 - **`AUTHORITY_SOURCE_MISSING`** → not onboarded. It names the path it looked in — check that it is the repository you meant. Run `python3 "$RG/engine/onboard.py" .` and stop; binding requires a human.
 - **`MANIFEST INVALID`** → refuse to evaluate. Report the errors. Do not guess.
 
-A GitHub-backed role must declare its repository in the manifest binding — `env.REPO_GOVERNOR_GH_REPO` — because identity is never defaulted (ADR-028, `Proposed`). An adapter that cannot tell which repository it is reading refuses rather than guessing.
+A GitHub-backed role must declare its repository in the manifest binding — `env.REPO_GOVERNOR_GH_REPO` — because identity is never defaulted (ADR-028). An adapter that cannot tell which repository it is reading refuses rather than guessing.
 
 ## Ask the engine
 

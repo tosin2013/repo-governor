@@ -1,9 +1,16 @@
 # Architecture Ratification Review — v0.1.0
 
-**Prepared** 2026-08-17 · **Status: review only. Nothing here is ratified.**
-**Acceptance authority:** Tosin Akinosho (§68). This document does not change any ADR's status and must not be read as doing so.
+**Prepared** 2026-08-17 · **Ratified 2026-08-17 by Tosin Akinosho (§68).**
 
-## Why this is not "accept all 22"
+> **Outcome.** 23 of 26 Accepted. ADR-014 `Superseded`, split into ADR-023 (Accepted) and ADR-024 (held). ADR-020 and ADR-024 remain `Proposed` and **neither is referenced by the v0.1.0 runtime**, which is what makes holding them consistent with the release condition below.
+>
+> Two decisions were added *after* the first ratification and ratified in a second pass: **ADR-027** and **ADR-028**, both produced by fixing issues 24 and 26. The runtime depends on both — 027 in `engine/bindings.py`, `engine/manifest.py` and `adapters/_protocol.py`; 028 in the two GitHub-backed adapters — so under the condition stated here they could not be held. That is the condition working: it identified the gate rather than being satisfied by a count.
+>
+> The three documentation defects F1–F3 were fixed before the tag, and a fourth class was found afterwards and fixed under issue 29 — the shipped skill taught an invocation the engine had stopped supporting. `conformance/skill.py` now checks the agent surface on every run, in both directions of staleness.
+
+**Acceptance authority:** Tosin Akinosho (§68). The review below is the evidence; the ratification recorded above is the decision. They are deliberately separate documents in one file — an agent produced the first and a human made the second.
+
+## Why this was not "accept all 22"
 
 Ratifying the architecture because the implementation works reverses the governance relationship:
 

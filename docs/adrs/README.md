@@ -2,7 +2,7 @@
 
 Generated 2026-08-17 from PRD v0.2 (provider-oriented draft) using the MCP ADR Analysis Server's PRD-to-ADR protocol, informed by the external landscape research in [`../research/2026-08-17-external-landscape.md`](../research/2026-08-17-external-landscape.md).
 
-**21 of 26 ADRs are Accepted** as of 2026-08-17, ratified under [RATIFICATION-v0.1.0.md](RATIFICATION-v0.1.0.md). ADR-020 and ADR-024 are held `Proposed`, and ADR-027 / ADR-028 are newly `Proposed`; ADR-014 is `Superseded` by the 023/024 split. Per §61, the project cannot reach `IMPLEMENTATION_READY` until the `RG-SIM-ONBOARDING-v0.1` simulation passes.
+**23 of 26 ADRs are Accepted** as of 2026-08-17, ratified under [RATIFICATION-v0.1.0.md](RATIFICATION-v0.1.0.md). ADR-020 and ADR-024 are held `Proposed` — neither is referenced by the runtime; ADR-014 is `Superseded` by the 023/024 split. Per §61, the project cannot reach `IMPLEMENTATION_READY` until the `RG-SIM-ONBOARDING-v0.1` simulation passes.
 
 > **`PRD.md` no longer exists.** Its normative content was extracted into [`../reference/`](../reference/) on 2026-08-17, with original § numbering preserved so every citation below still resolves. Start at the [section map](../reference/README.md#section-map).
 
