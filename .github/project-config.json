@@ -25,8 +25,8 @@
         "Done"
       ],
       "auto_add_workflow": true,
-      "items": 18,
-      "status_snapshot": "10 Done, 9 Backlog (2026-08-17). Board and issues reconciled, 0 drift across 19 items.",
+      "items": 20,
+      "status_snapshot": "13 Done, 7 Backlog (2026-08-17). Reconciled against issue state: 0 drift across 20 items, no closed issue left un-Done and no open issue marked Done.",
       "write_scope_acquired": "2026-08-17 \u2014 token now carries 'project'; manual field edits work. Note the refresh REPLACED read:project rather than adding to it."
     },
     "reason": "Linked by the maintainer on 2026-08-17, overriding the computed recommendation of 'none'. The override is correct and the score is not wrong: it measures COORDINATION need \u2014 contributors, open items, activity \u2014 and coordination need genuinely is low for a solo repository. What it does not measure is TRACKING need. This repository carries 19 tracked items across three distinct categories (gate conditions, thesis risks, architecture questions) with real dependencies between them, and that is what the board is for. Two different needs; the score only sees one.",
@@ -36,12 +36,29 @@
   "release": {
     "decision": "milestone",
     "reason": "Gate work is now tracked under milestone RG-SIM-ONBOARDING-v0.1 (0/7). Still no shippable artifact, so no tags, CHANGELOG, or release automation yet.",
-    "revisit_when": "RG-SIM-ONBOARDING-v0.1 reaches 7/7 and implementation produces a versionable artifact",
+    "revisit_when": "TRIGGERED 2026-08-17 \u2014 the milestone completed and a versionable artifact exists. The open question is now whether to cut v0.1.0, which is a maintainer decision and has not been made.",
     "milestone": "RG-SIM-ONBOARDING-v0.1",
     "milestone_scope": "Expanded 2026-08-17 from 7 gate conditions to 10. Rule: an issue belongs in RG-SIM-ONBOARDING-v0.1 if it blocks IMPLEMENTATION_READY. #15/#17/#18 block gate conditions and were added; #1/#2/#16 are product-viability and positioning questions and were kept out.",
     "milestone_items": 10,
-    "milestone_progress": "9/11 \u2014 all seven section-61 gate conditions closed and engine-verified, plus #15 (STOP_COMPLETE derivability) and #4 (redaction default). Remaining: #17 and #18, both partly done.",
+    "milestone_progress": "10/10. All seven section-61 gate conditions closed and engine-verified, plus #15 (STOP_COMPLETE derivability), #17 (capabilities per transport) and #18 (agent-supplied transport, ADR-020).",
     "implementation_gate": "MET 2026-08-17. RG-SIM-ONBOARDING-v0.1 passes. Note: met against 17 ADRs that are all still Proposed.",
-    "shippable_artifact": "Now exists: 12 adapters, 7 engine modules, 6 conformance suites, SKILL.md. Release decision stays 'milestone' \u2014 no version cut yet, and commits are not conventional, so any version recommendation is judgment-based rather than derivable."
+    "shippable_artifact": "Now exists: 12 adapters, 7 engine modules, 6 conformance suites, SKILL.md. Release decision stays 'milestone' \u2014 no version cut yet, and commits are not conventional, so any version recommendation is judgment-based rather than derivable.",
+    "milestone_state": "CLOSED 2026-08-17 at 10/10.",
+    "version_recommendation": "v0.1.0, judgment-based. 0 feat / 0 fix / 0 breaking across 42 commits because this repository does not use conventional commits, so the count is not evidence of a patch release \u2014 it is evidence the heuristic does not apply here.",
+    "release_blocker": "All 20 ADRs are still Proposed. Tagging v0.1.0 would publish an architecture nothing has accepted. Decide ADR status before or with the first tag."
+  },
+  "open_work": {
+    "$comment": "Post-milestone. None of these block anything; all are open questions or backlog.",
+    "issues": {
+      "20": "manifest no longer bounds what the host could supply (created by ADR-020)",
+      "19": "parallel roadmap \u2014 carries a LIVE section-54 failure condition",
+      "14": "Jira adapter \u2014 backlogged",
+      "6": "monorepo governance \u2014 deferred past v1",
+      "5": "skill activation reliability across hosts",
+      "2": "ScopeEnvelope thinness \u2014 unresolved and worse than assumed",
+      "1": "cross-provider normalization \u2014 the thesis question"
+    },
+    "milestoned": 0,
+    "note": "All seven are deliberately unmilestoned. There is no v0.2 milestone and creating one now would invent a scope nobody has decided."
   }
 }
