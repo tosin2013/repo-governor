@@ -4,9 +4,17 @@
   "evaluated_at": "2026-08-17",
   "repo": "tosin2013/repo-governor",
   "board": {
-    "decision": "none",
-    "reason": "Solo maintainer, 0 open issues/PRs, 1 commit in 90d, no releases. Complexity score 0/8. A Project would add ceremony with no coordination benefit.",
-    "revisit_when": "contributors > 2, or open issues+PRs > 5, or first release cut"
+    "decision": "full",
+    "source": "human override",
+    "project": {
+      "number": 5,
+      "title": "repo-governor",
+      "url": "https://github.com/users/tosin2013/projects/5",
+      "fields": ["Status", "Priority", "Size", "Estimate", "Iteration"],
+      "status_options": ["Backlog", "Ready", "In progress", "In review", "Done"]
+    },
+    "reason": "Linked by the maintainer on 2026-08-17, overriding the complexity-score recommendation of 'none' (score 0/8). Human decision takes precedence; do not re-evaluate.",
+    "revisit_when": "board sits empty with no open issues for an extended period, or the maintainer asks to reconsider"
   },
   "release": {
     "decision": "none",
