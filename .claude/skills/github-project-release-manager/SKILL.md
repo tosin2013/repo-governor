@@ -215,9 +215,11 @@ gh project item-add <number> --owner <login> --url https://github.com/<owner>/<r
 List items and their current status:
 
 ```bash
-gh project item-list <number> --owner <login> --format json \
+gh project item-list <number> --owner <login> --limit 100 --format json \
   | jq -r '.items[] | "\(.content.number // "-")\t\(.status // "no status")\t\(.content.title)"'
 ```
+
+**`--limit` is not optional.** Without it the command returns 30 items and says nothing about the rest — see Gotchas.
 
 Flag mismatches — a closed issue still in `In Progress`, a merged PR not marked `Done` — and fix them, or report them when write scope is missing.
 
@@ -328,6 +330,11 @@ These were all hit while building this skill.
 - **During a GitHub incident, writes report success and silently do not take.** Verified 2026-08-17 during a partial outage: `gh issue reopen 17` printed `✓ Reopened issue` and exited 0, and three subsequent reads showed the issue still `CLOSED`. Never trust a write's success message during degraded service — read the state back before reporting.
 - **A degraded API makes `gh issue list` return nothing, which is indistinguishable from an empty repo.** Same outage: consecutive runs returned 16, then 0, then 16 open issues, with `HTTP 503` on the GraphQL endpoint while REST still answered. `detect.sh` now gates on **both** endpoints and exits 3 rather than reporting a wrong count. Without that gate a degraded API reads as a quiet repo, and the complexity score is confidently wrong.
 - **Closing keywords in commit messages fire anywhere in the message, and quoting does not escape them.** Verified twice on the same issue. First a message beginning `Clos` + `e #NN defect` — meaning "close the NN defect" — closed it. Then the commit *documenting that gotcha* closed it again, because the explanation quoted the offending string. Backticks, single quotes and surrounding prose all still parse. **Never put a closing verb adjacent to a `#` reference in a commit message, even inside a quotation.** Write the number without the hash, or separate them: `the closing-keyword trap on issue NN`.
+- **`gh project item-list` silently caps at 30 items.** No warning, no pagination hint, exit 0 — a truncated board reads exactly like a complete one. This produced three false "0 drift across 30 items" reconciliation reports on a 33-item board, each of which looked like a clean bill of health. It is the same failure family as the degraded-API case below: **a partial answer presented as a total one.** Always pass `--limit`, and cross-check the count against `gh issue list --state all --limit 100` rather than trusting either number alone:
+  ```bash
+  gh project item-list <n> --owner <login> --limit 100 --format json | jq '.items | length'   # 33
+  gh project item-list <n> --owner <login> --format json | jq '.items | length'               # 30
+  ```
 - **`gh` cannot configure Project built-in workflows.** Auto-add and auto-archive must be enabled in the web UI. Say this rather than silently skipping it.
 
 ## Troubleshooting

@@ -1,0 +1,26 @@
+{
+  "$comment": "Acceptance criteria for issue 32. The command checks assert BEHAVIOUR at both ends -- agreement where the transports can agree, and declared absence where one genuinely cannot answer.",
+  "authority_id": "32",
+  "criteria": [
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/transport.py"
+    },
+    {
+      "check": "file_exists",
+      "target": "conformance/fixtures/linear-mcp.json"
+    },
+    {
+      "check": "command_exit",
+      "target": "echo '{\"issues\":[{\"id\":\"ENG-101\",\"title\":\"x\",\"status\":\"Backlog\",\"statusType\":\"backlog\"}]}' | ./adapters/linear query roadmap_authority get_authority id=ENG-101 --input - | jq -e '.value.authority == \"ADMITTED\"'"
+    },
+    {
+      "check": "command_exit",
+      "target": "echo '{\"issues\":[{\"id\":\"ENG-101\",\"title\":\"x\",\"status\":\"Backlog\"}]}' | ./adapters/linear query roadmap_authority get_authority id=ENG-101 --input - | jq -e '.error.type == \"MALFORMED_SOURCE\"'"
+    },
+    {
+      "check": "command_exit",
+      "target": "echo '{\"issues\":[{\"id\":\"ENG-200\",\"title\":\"c\",\"status\":\"Backlog\",\"statusType\":\"backlog\",\"parentId\":\"uuid-x\"}]}' | ./adapters/linear query roadmap_authority get_parent_or_goal id=ENG-200 --input - | jq -e '.unknown.reason == \"PARENT_NOT_RESOLVABLE_ON_TRANSPORT\"'"
+    }
+  ]
+}

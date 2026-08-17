@@ -25,9 +25,10 @@
         "Done"
       ],
       "auto_add_workflow": true,
-      "items": 31,
-      "status_snapshot": "20 Done, 11 Backlog (2026-08-17). 0 drift across 31 items.",
-      "write_scope_acquired": "2026-08-17 \u2014 token now carries 'project'; manual field edits work. Note the refresh REPLACED read:project rather than adding to it."
+      "items": 33,
+      "status_snapshot": "21 Done, 12 Backlog (2026-08-17). 0 drift across 33 items, verified with --limit 100. Earlier snapshots in this file said '0 drift across 30 items' and were capped by gh project item-list's silent default of 30 -- true of the first 30 only.",
+      "write_scope_acquired": "2026-08-17 \u2014 token now carries 'project'; manual field edits work. Note the refresh REPLACED read:project rather than adding to it.",
+      "reconciliation_method": "gh project item-list REQUIRES --limit; without it the command returns 30 and exit 0, so a truncated board is indistinguishable from a complete one. Cross-check against gh issue list --state all --limit 100."
     },
     "reason": "Linked by the maintainer on 2026-08-17, overriding the computed recommendation of 'none'. The override is correct and the score is not wrong: it measures COORDINATION need \u2014 contributors, open items, activity \u2014 and coordination need genuinely is low for a solo repository. What it does not measure is TRACKING need. This repository carries 19 tracked items across three distinct categories (gate conditions, thesis risks, architecture questions) with real dependencies between them, and that is what the board is for. Two different needs; the score only sees one.",
     "revisit_when": "board sits empty with no open issues for an extended period, or the maintainer asks to reconsider",
@@ -128,5 +129,12 @@
     "push": "AGENTS.md -- loaded automatically for every agent in the repository. CLAUDE.md is a one-line pointer, not a copy: content in the vendor file would be the bet section 54 warns against.",
     "checked_by": "conformance/skill.py -- executes what the surface documents rather than grepping it. Caught four unmarked citations of Proposed ADRs on its first run.",
     "not_done": "engine/onboard.py does not propose an AGENTS.md stanza, so only hand-edited repositories get the push half. Issue 27's territory, and the thing that would make governance reach agents in arbitrary repositories."
+  },
+  "program": {
+    "$comment": "RG-REAL-REPO-v0.2 tracking structure, decided 2026-08-17.",
+    "umbrella": "issue 31, with the stage table as the source of truth for stage completion",
+    "hierarchy": "Native GitHub sub-issues: 27, 28, 23, 1, 5, 32, 33 linked under 31. The board already exposed 'Parent issue' and 'Sub-issues progress' fields, so no labels were invented -- the relation is real rather than described in prose.",
+    "milestone_caveat": "Milestone progress counts issues, not stages. Stage A completed with no issue at all (recorded in 31), and stages E/F had none until 33 was filed. A milestone reading 7/7 would have reported a program complete with two stages unattempted.",
+    "beads_discipline": "Issue 33 defines the Stage E experiment and delivers a go/no-go on the Beads adapter. no-go is a successful outcome. The adapter build is NOT admitted and must not be until necessity is argued."
   }
 }
