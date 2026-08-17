@@ -310,6 +310,9 @@ These were all hit while building this skill.
 - **`$?` after a pipe is the last command's status.** `gh ... | head` always reports `head`'s exit code. Capture first: `out=$(gh ... 2>&1); rc=$?`.
 - **`git describe --tags` exits non-zero on a repo with no tags.** Always `2>/dev/null` with a fallback, or the whole script dies under `set -e`.
 - **`date -d` is GNU-only.** macOS needs `date -v-30d`. Use `date -v-30d +%Y-%m-%d 2>/dev/null || date -d '30 days ago' +%Y-%m-%d`.
+- **During a GitHub incident, writes report success and silently do not take.** Verified 2026-08-17 during a partial outage: `gh issue reopen 17` printed `✓ Reopened issue` and exited 0, and three subsequent reads showed the issue still `CLOSED`. Never trust a write's success message during degraded service — read the state back before reporting.
+- **A degraded API makes `gh issue list` return nothing, which is indistinguishable from an empty repo.** Same outage: consecutive runs returned 16, then 0, then 16 open issues, with `HTTP 503` on the GraphQL endpoint while REST still answered. `detect.sh` now gates on **both** endpoints and exits 3 rather than reporting a wrong count. Without that gate a degraded API reads as a quiet repo, and the complexity score is confidently wrong.
+- **Closing keywords in commit messages fire on any leading verb.** A message beginning `Close #17 defect` — meaning "close the #17 defect" — closed issue 17. Put the issue reference where it cannot be parsed as a keyword, or phrase it as `Closes the defect in #17`.
 - **`gh` cannot configure Project built-in workflows.** Auto-add and auto-archive must be enabled in the web UI. Say this rather than silently skipping it.
 
 ## Troubleshooting

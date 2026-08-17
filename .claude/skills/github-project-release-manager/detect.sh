@@ -15,6 +15,22 @@ git rev-parse --git-dir >/dev/null 2>&1 || { echo "FATAL: not a git repository" 
 
 NWO=$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null)
 [ -n "$NWO" ] || { echo "FATAL: no GitHub remote resolved" >&2; exit 2; }
+
+# API health gate. Without this a 5xx makes `gh issue list` print nothing,
+# which `grep -c .` reports as 0 -- a degraded API becomes "quiet repo" and
+# every downstream count and the complexity score are silently wrong.
+# Same rule ADR-008 C3 imposes on adapters: typed failure, never a plausible
+# empty result. Verified against a real GitHub partial outage 2026-08-17.
+# Check BOTH endpoints: `gh issue list` / `pr list` go through GraphQL, and
+# during the 2026-08-17 outage REST answered while GraphQL returned 503.
+API_ERR=$(gh api repos/"$NWO" --jq .name 2>&1 >/dev/null)
+[ -n "$API_ERR" ] || API_ERR=$(gh api graphql -f query='query{viewer{login}}' --jq .data.viewer.login 2>&1 >/dev/null)
+if [ -n "$API_ERR" ]; then
+  echo "FATAL: GitHub API is not answering reliably -- refusing to report state." >&2
+  echo "  $API_ERR" >&2
+  echo "  Check https://www.githubstatus.com/ and retry. Counts would be wrong, not missing." >&2
+  exit 3
+fi
 OWNER=${NWO%%/*}
 REPO=${NWO##*/}
 
