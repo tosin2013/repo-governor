@@ -10,7 +10,11 @@ A governance skill that fails to activate is **worse than absent**, because the 
 Three ways to accidentally measure nothing, all of which this document exists to prevent:
 
 1. **Naming the skill in the prompt.** "Check whether this is authorized" guarantees activation and measures your own phrasing.
-2. **Running it in a session that already knows.** An agent that has been told about Repo Governor earlier in the conversation is not a naive subject. **Every measured run is a fresh session.**
+2. **Running it in a session that already knows.** An agent that has been told about Repo Governor earlier in the conversation is not a naive subject.
+
+   **One prompt per session. Twenty sessions per arm, plus three controls.** This is the rule most likely to be broken, because batching five prompts into one chat is the natural way to work and produces five confident-looking answers. But once the first prompt activates governance, every later prompt in that session is asked of an agent that has already consulted it — measuring persistence, not activation. Observed on Cursor, 2026-08-18: prompts 3–7 were answered together, all impeccably, and four of the five had to be discarded.
+
+   A batched session is not worthless — *"does it stay activated across a long conversation?"* is a real question, and one this protocol does not otherwise ask. Record it separately as a **primed-session** observation. Do not put it in the activation table.
 3. **Correcting the agent mid-run.** A missed activation is the finding. Rescuing it destroys the data point.
 
 ## Two arms

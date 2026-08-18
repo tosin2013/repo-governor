@@ -4,6 +4,8 @@ Copy to `docs/research/activation-results-<host>.md` and fill in. Keeping the sh
 
 Read the protocol first. **Do not fill this in from memory after the fact** — grade each prompt as it happens, because a session you are reconstructing is one you are also rationalising.
 
+**One prompt per session.** Not one per arm, not one per batch. A second prompt in a session that has already consulted governance measures persistence, not activation; record those separately as primed-session observations.
+
 ---
 
 ## Host
