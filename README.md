@@ -72,7 +72,9 @@ Keeping these separate is the point — it's what stops *"the task says READY"* 
 
 A deterministic engine reconciles their state and returns one bounded disposition from a closed vocabulary of twelve. It returns a verdict; it never performs the action.
 
-**What v0.1.0 actually emits is five of those twelve:** `STOP_COMPLETE`, `CONTINUE`, `UNKNOWN`, `AUTHORITY_WITHDRAWN`, `NO_EXECUTION_AUTHORITY`. The engine answers *is this finished?* and *is authority absent or withdrawn?* — it does not yet issue the affirmative `EXECUTE`, and the discovery path that produces `CAPTURE_ONLY` is specified ([ADR-024](docs/adrs/024-scope-envelope-compiler.md), held `Proposed`) and unbuilt. The completion firewall is the half that shipped, and it is the harder half. See the [ratification review](docs/adrs/RATIFICATION-v0.1.0.md).
+**Since v0.1.0 the engine emits eleven of the twelve.** `engine/completion.py` answers *is this finished?* and *is authority absent or withdrawn?*; `engine/envelope.py` compiles the ScopeEnvelope and rules on discoveries, adding `CAPTURE_ONLY`, the four review lanes, and `EXECUTE` for work substantiated as necessary to the authorized outcome. Only `CONFLICT` remains unreachable — it needs two peer providers actually disagreeing.
+
+The v0.1.0 tag itself emits five; that limitation is recorded in the [ratification review](docs/adrs/RATIFICATION-v0.1.0.md). [ADR-024](docs/adrs/024-scope-envelope-compiler.md) is still `Proposed`: three of its four acceptance conditions are met, and the fourth — measuring envelope thinness on repositories this project does not own — is [#2](https://github.com/tosin2013/repo-governor/issues/2).
 
 Governance depth scales with repository condition (L0 greenfield → L4 mature/high-assurance), so a two-file repository needs Git, a ten-line manifest, and four invariants — nothing more.
 
@@ -81,7 +83,7 @@ Governance depth scales with repository condition (L0 greenfield → L4 mature/h
 ```text
 adapters/      12 provider adapters, subprocess protocol, any language
 engine/        deterministic policy engine, Python stdlib only
-conformance/   8 suites — the evidence behind every gate claim
+conformance/   9 suites — the evidence behind every gate claim
 schemas/       manifest v1 JSON Schema
 docs/
   adrs/        26 architectural decisions (23 Accepted) + index + ratification review
@@ -96,6 +98,7 @@ docs/
 | `transport.py` | agent-as-transport produces byte-identical results (70 comparisons) |
 | `bindings.py` | the engine holds no adapter knowledge, and the permission gate is a gate |
 | `skill.py` | the agent surface teaches an invocation that works, and cites no moved decision |
+| `envelope.py` | §40 verbatim — the completion firewall admits no exception |
 | `manifest.py` | 28 checks — 20 refusal cases; the loader's value is what it rejects |
 | `onboarding.py` | `RG-SIM-ONBOARDING-v0.1`, fixtures A–C |
 | `vocabulary.py` | closed sets cannot drift from the code |

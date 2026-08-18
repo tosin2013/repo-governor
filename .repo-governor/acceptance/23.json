@@ -1,0 +1,26 @@
+{
+  "$comment": "Acceptance criteria for issue 23, taken from ADR-024's own acceptance conditions. The fourth (measuring thinness on repositories this project does not own) is issue 2 and deliberately NOT claimed here -- 23 unblocks it, it does not answer it.",
+  "authority_id": "23",
+  "criteria": [
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/envelope.py"
+    },
+    {
+      "check": "file_exists",
+      "target": "engine/envelope.py"
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 engine/envelope.py 23 | jq -e '.thinness.verdict != null and (.architecture_constraints|length) > 0'"
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 engine/envelope.py 23 --discovery 'POSSIBLE_FEATURE:Admin UI' --completed --record | jq -e '.disposition == \"CAPTURE_ONLY\" and .record.recorded == true'"
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 engine/envelope.py 23 --discovery 'BUG:x' --necessary --completed | jq -e '.disposition == \"CAPTURE_ONLY\"'"
+    }
+  ]
+}

@@ -20,7 +20,7 @@ For a genuine open question rather than a buildable thing:
 
 ## What the engine will say
 
-`CAPTURE_ONLY` is the *correct, complete* outcome for a discovery — not a deferral, not a consolation prize. **Know the limit:** the engine cannot yet emit it. The discovery path is specified in ADR-024 and held `Proposed`, so INV-001 — *discovery confers no authority* — is currently a rule the assistant follows because you told it to, which is exactly why the first recipe above sets it up front. A clean `completion.py` run on issue N says nothing about the thing discovered along the way.
+`CAPTURE_ONLY` is the *correct, complete* outcome for a discovery — not a deferral, not a consolation prize. The engine now rules on discoveries directly (`engine/envelope.py --discovery`), so ask it rather than deciding yourself. ADR-024 remains `Proposed` — its last acceptance condition is a measurement on repositories this project does not own — but INV-001 is now enforced rather than merely followed: an unsubstantiated necessity claim fails closed, and once acceptance conditions are satisfied nothing converts to execution at all. A clean `completion.py` run on issue N still says nothing about the thing discovered along the way; that is a separate question with a separate answer.
 
 ## The forbidden shortcut
 

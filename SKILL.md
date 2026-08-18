@@ -78,7 +78,15 @@ Anything you notice that is not the authorized work — a possible feature, a bu
 
 `CAPTURE_ONLY` is the default and is a complete, correct outcome. Promoting a discovery requires separate admission through the roadmap provider.
 
-**This one is on you, not on the engine.** The discovery path is specified (ADR-024, held `Proposed`) and not implemented: no engine module emits `CAPTURE_ONLY`, and `completion.py` governs the completion axis only. Until it is built, INV-001 is a rule you follow rather than a rule the engine enforces — so do not read a clean `completion.py` run as clearance to act on something you discovered.
+Ask the engine rather than deciding yourself:
+
+```bash
+python3 "$RG/engine/envelope.py" <work-id> --discovery <TYPE>[:target] [--record]
+```
+
+It compiles the ScopeEnvelope from provider state and rules on the discovery. `--record` persists the capture through the decision-history provider, idempotently.
+
+**Two limits worth knowing.** Necessity is a claim you make (`--necessary`) and the engine *substantiates against declared scope* — an unsupported claim fails closed to `CAPTURE_ONLY`, so it is not a password that unlocks work. And once acceptance conditions are satisfied, **nothing** converts to execution: not a bug, not a necessary change, not a three-line fix (§40). ADR-024 remains `Proposed` — its last acceptance condition is a measurement on repositories this project does not own.
 
 ## Before deleting anything
 

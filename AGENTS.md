@@ -29,7 +29,13 @@ Work items are **GitHub issue numbers** — the roadmap of record is GitHub Issu
 
 ## Two things the engine cannot enforce, so they are on you
 
-**Discovery confers no authority (INV-001).** Anything you notice that is not the authorized work is a discovery: record it, do not act on it. The discovery path is specified ([ADR-024](docs/adrs/024-scope-envelope-compiler.md), held `Proposed`) and **not implemented** — no engine module emits `CAPTURE_ONLY`. A clean `completion.py` run is not clearance to act on something you found along the way.
+**Discovery confers no authority (INV-001).** Anything you notice that is not the authorized work is a discovery. Do not decide its fate yourself:
+
+```bash
+python3 engine/envelope.py <issue-number> --discovery <TYPE>[:target] [--record]
+```
+
+A clean `completion.py` run is still not clearance to act on something you found along the way — `completion.py` governs the completion axis only, and the discovery is a separate question with a separate answer.
 
 **Admission is a human act.** Filing an issue is not admitting it. Putting it in a milestone is. Do not milestone your own findings to unblock yourself.
 
@@ -55,7 +61,7 @@ python3 engine/retirement.py <path>
 ## Before you commit
 
 ```bash
-for s in layer1 layer2 transport manifest onboarding vocabulary bindings skill; do python3 conformance/$s.py; done
+for s in layer1 layer2 transport manifest onboarding vocabulary bindings skill envelope; do python3 conformance/$s.py; done
 python3 engine/manifest.py --validate
 ```
 
