@@ -13,11 +13,16 @@ Read the protocol first. **Do not fill this in from memory after the fact** — 
 | | |
 |---|---|
 | Host and version | |
+| **Model** | exact name and version — see below |
 | OS | |
 | Date | |
 | Repo-governor commit | |
 | Install path used | e.g. `.agents/skills/repo-governor` |
 | Installed via `tools/install-skill.sh`? | yes / no — if no, say what differed |
+
+**Record the model, not just the host.** Skill activation depends on whether the agent judges a description relevant to a request, which is a model behaviour as much as a host one. A host running a different model measures both at once, and a rate without a model attached cannot be compared to anything or reproduced later.
+
+This is a variable worth *using* rather than merely controlling: [the Cursor run](activation-results-cursor.md) ceilinged at 20/20 on Arm A, which left `AGENTS.md` nothing to rescue and the protocol's central question unanswerable. A model that produces misses is the condition under which the push surface can finally be shown to help or not.
 
 ## Preconditions
 
