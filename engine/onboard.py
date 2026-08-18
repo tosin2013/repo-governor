@@ -115,9 +115,12 @@ def _adr_status(path):
     if _ADR_MOD is False:
         return None
     try:
-        m = _ADR_MOD.STATUS_RE.search(path.read_text(errors="ignore"))
-        return m.group(1).strip() if m else None
-    except OSError:
+        # _status_of, not a named regex: the adapter's regexes are private detail
+        # and renaming one silently broke this import once already. The function
+        # is the contract.
+        status, _why = _ADR_MOD._status_of(path.read_text(errors="ignore"))
+        return status
+    except (OSError, AttributeError):
         return None
 
 

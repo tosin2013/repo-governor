@@ -21,7 +21,20 @@ ROLE = "architecture"
 # (#27). `docs/adrs` remains the fallback only when nobody said otherwise.
 ADR_DIR = Path(configured("REPO_GOVERNOR_ADR_DIR", "path", "docs/adrs"))
 
-STATUS_RE = re.compile(r"^\*\*Status\*\*:\s*(.+?)\s*$", re.M)
+# Four dialects, measured across 439 real ADRs in 34 collections rather than
+# guessed. The inline form this adapter originally supported is the LEAST common
+# of the three that matter:
+#     heading  57%   ## Status \n\n Accepted        MADR / Nygard
+#     bullet   19%   - **Status:** Accepted          colon inside the bold
+#     inline   16%   **Status**: Accepted            the only form once supported
+#     yaml      2%   --- \n status: accepted         MADR 3.0 front matter
+STATUS_INLINE = re.compile(r"^\s*[-*]?\s*\*\*Status:?\*\*:?\s*(.+?)\s*$", re.M)
+STATUS_HEADING = re.compile(r"^#{1,4}\s*Status\s*$\n+\s*(.+?)\s*$", re.M)
+STATUS_YAML = re.compile(r"^status\s*:\s*(.+?)\s*$", re.M | re.I)
+# A template nobody filled in. `[Proposed | Accepted | ...]` used to survive as a
+# status whose first word matched nothing -- neither active, nor historical, nor
+# unstated. It fell out of every bucket without a word.
+PLACEHOLDER = re.compile(r"[\[\|]")
 TITLE_RE = re.compile(r"^#\s*(?:\d+\.\s*)?(.+?)\s*$", re.M)
 SUPERSEDED_RE = re.compile(r"[Ss]uperseded by\s+(ADR-\d+)")
 # Naming conventions in the wild. Found by running against a real repository
@@ -32,6 +45,71 @@ NUM_RE = re.compile(r"^(?:adr[-_])?(\d{3,4})[-_.]", re.I)
 # Statuses that constrain current work vs. those that are provenance only.
 ACTIVE = {"accepted", "proposed"}
 HISTORICAL = {"superseded", "deprecated", "rejected"}
+
+
+
+def _header(text):
+    """The region a status may legitimately live in: front matter, or title to
+    the first body section.
+
+    Bounding this is the prerequisite, not a refinement. `STATUS_RE.search(text)`
+    scanned whole documents and took the first hit -- in one real ADR the status
+    sits at line 3 and the only inline match is at line 618, inside an
+    "Implementation Status Update" appendix. It produced the right answer by
+    luck. Ten files across the corpus are read from the body that way, and
+    ADDING dialects to an unbounded search makes it strictly worse, because
+    `## Status` is a common heading deep in long documents.
+    """
+    lines = text.splitlines()
+    if lines and lines[0].strip() == "---":                      # YAML front matter
+        for i, ln in enumerate(lines[1:], 1):
+            if ln.strip() == "---":
+                return "\n".join(lines[:i + 1]), True
+    out = []
+    seen_meta = False
+    for ln in lines:
+        s = ln.strip()
+        # Stop at the first body section -- a heading that is not the title and
+        # not a metadata heading like `## Status` / `## Date`.
+        if s.startswith("#") and out:
+            word = s.lstrip("#").strip().split()[0].lower() if s.lstrip("#").strip() else ""
+            if word in ("status", "date", "deciders", "related", "tags"):
+                seen_meta = True
+            elif seen_meta or word in ("context", "decision", "consequences", "background"):
+                break
+        out.append(ln)
+        if len(out) > 60:            # a header this long is a body; stop guessing
+            break
+    return "\n".join(out), False
+
+
+def _status_of(text):
+    """(status, reason) for one decision file. Reason is None when a status was read.
+
+    Several dialects agreeing is fine. Several DISAGREEING is MALFORMED_SOURCE,
+    never first-wins: precedence would silently pick a winner where the document
+    genuinely says two things.
+    """
+    header, is_yaml = _header(text)
+    found = {}
+    if is_yaml:
+        m = STATUS_YAML.search(header)
+        if m:
+            found["yaml"] = m.group(1).strip().strip('"\'')
+    else:
+        for name, rx in (("heading", STATUS_HEADING), ("inline", STATUS_INLINE)):
+            m = rx.search(header)
+            if m:
+                found[name] = m.group(1).strip()
+    if not found:
+        return None, "STATUS_UNSTATED"
+    firsts = {v.split()[0].lower() for v in found.values() if v.split()}
+    if len(firsts) > 1:
+        return None, "STATUS_DIALECTS_DISAGREE"
+    value = next(iter(found.values()))
+    if PLACEHOLDER.search(value):
+        return None, "STATUS_TEMPLATE_UNFILLED"
+    return value, None
 
 
 def _scan():
@@ -53,14 +131,15 @@ def _scan():
             text = p.read_text(encoding="utf-8")
         except OSError as e:
             return None, ("PROVIDER_UNAVAILABLE", f"cannot read {p}: {e}")
-        st = STATUS_RE.search(text)
+        status, why = _status_of(text)
         ti = TITLE_RE.search(text)
         sup = SUPERSEDED_RE.search(text)
         records.append({
             "id": f"ADR-{NUM_RE.match(p.name).group(1)}",
             "path": str(p),
             "title": ti.group(1) if ti else None,
-            "status": st.group(1).strip() if st else None,
+            "status": status,
+            "unreadable_reason": why,
             "superseded_by": sup.group(1) if sup else None,
         })
     return records, None
@@ -92,6 +171,29 @@ def _completeness(recs, established):
     unstated = [r for r in recs if r["status"] is None]
     if not unstated:
         return None
+    # A file the parser could not read is not the same fact as a file that
+    # declares nothing. Report the specific reason when the unreadable files
+    # agree on one, so "you left a template unfilled" never arrives disguised as
+    # "you have no statuses".
+    # A specific fault wins over a generic absence even when both are present.
+    # Requiring unanimity would let one file with no status at all mask a
+    # placeholder in another -- the definite problem diluted by the vague one.
+    reasons = [r.get("unreadable_reason") for r in unstated]
+    specific = next((x for x in ("STATUS_DIALECTS_DISAGREE", "STATUS_TEMPLATE_UNFILLED")
+                     if x in reasons), None)
+    if specific:
+        detail = (f"{len(unstated)} of {len(recs)} decision file(s): "
+                  + ", ".join(r["id"] for r in unstated[:5])
+                  + (" ..." if len(unstated) > 5 else ""))
+        resolution = ("Fill in the template placeholder, or reconcile the disagreeing status "
+                      "lines so the file says one thing.")
+        # Written as literals, not a variable: conformance/vocabulary.py scans
+        # statically for emitted reasons and a computed one is invisible to it.
+        if specific == "STATUS_DIALECTS_DISAGREE":
+            return {"reason": "STATUS_DIALECTS_DISAGREE", "detail": detail,
+                    "resolution": resolution, "blocking": True}
+        return {"reason": "STATUS_TEMPLATE_UNFILLED", "detail": detail,
+                "resolution": resolution, "blocking": True}
     detail = (f"{len(unstated)} of {len(recs)} decision file(s) have no Status this adapter can "
               f"read; {established} constraint(s) were established. "
               + ", ".join(r["id"] for r in unstated[:5])

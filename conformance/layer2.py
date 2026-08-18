@@ -50,11 +50,20 @@ PROVIDERS = {
 # Equivalence is asserted over DISPOSITION-RELEVANT facts only. A provider's
 # `reason` code is diagnostic and SHOULD differ — a more specific reason is a
 # better reason. Comparing whole payloads would punish that.
-EQUIVALENCE_KEYS = ("authority", "admitted", "disposition", "__unknown__", "blocking", "__error__")
+EQUIVALENCE_KEYS = ("authority", "admitted", "disposition", "state",
+                    "__unknown__", "blocking", "__error__")
 
 # Each scenario: what it means, what the engine must be able to conclude,
 # and how to express it in each provider. `needs` names the capability the
 # scenario requires, so an honestly-advertised gap is not scored as divergence.
+# The four ADR dialects are separate "providers" for equivalence purposes: the
+# same decision written four genuinely different ways must yield the same typed
+# facts. This is a real portability test rather than a self-consistency one,
+# because the four documents share no syntax -- only meaning.
+for _d in ("heading", "inline", "bullet", "yaml"):
+    PROVIDERS[f"adr-{_d}"] = {"adapter": "adapters/adr", "role": "architecture",
+                              "env": {"REPO_GOVERNOR_ADR_DIR": f"conformance/fixtures/adrs/{_d}"}}
+
 SCENARIOS = [
     {
         "id": "authority_withdrawn",
@@ -124,6 +133,16 @@ SCENARIOS = [
         "in": {"github-projects": "103", "linear": "ENG-100"},
     },
     {
+        "id": "adr_dialect_equivalence",
+        "meaning": ("The same decision, written in four status dialects that share no syntax. "
+                    "16% of 439 real ADRs were readable before this; a dialect the parser misses "
+                    "is a decision the engine cannot see (#28)."),
+        "function": "get_constraints",
+        "role": "architecture",
+        "expect": {},
+        "in": {"adr-heading": "x", "adr-inline": "x", "adr-bullet": "x", "adr-yaml": "x"},
+    },
+    {
         "id": "work_declined",
         "meaning": ("Work was considered and declined. INV-005: a recorded decision must survive "
                     "rediscovery. Two stores of genuinely different shape, one contract."),
@@ -171,8 +190,18 @@ def advertises(pname, capability):
 
 
 def projection(obs):
-    """Disposition-relevant facts only."""
-    return {k: obs[k] for k in EQUIVALENCE_KEYS if k in obs}
+    """Disposition-relevant facts only.
+
+    `constraints` is compared by COUNT, not by value: each provider cites its own
+    file paths, so raw comparison would always differ for reasons that carry no
+    meaning. Comparing only `state` proved too coarse -- one decision flipping to
+    Superseded left another Accepted, so the state stayed DEFINED and a genuine
+    divergence passed.
+    """
+    out = {k: obs[k] for k in EQUIVALENCE_KEYS if k in obs}
+    if isinstance(obs.get("constraints"), list):
+        out["n_constraints"] = len(obs["constraints"])
+    return out
 
 
 def observe(resp):

@@ -80,6 +80,13 @@ REASONS = {
                                       "Decision files carry no Status line. A repository that has "
                                       "not declared statuses is not blocked from working; it is "
                                       "simply not constrained by decisions it never accepted."),
+    "STATUS_TEMPLATE_UNFILLED":      ("architecture", True,
+                                      "A decision file carries an unfilled template placeholder "
+                                      "instead of a status. It used to fall out of every bucket "
+                                      "silently -- neither active, nor historical, nor unstated."),
+    "STATUS_DIALECTS_DISAGREE":      ("architecture", True,
+                                      "Two status dialects in one file disagree. Precedence would "
+                                      "pick a winner where the document genuinely says two things."),
     "ARCHITECTURE_PARTIALLY_READ":   ("architecture", True,
                                       "More decision files could not be read than constraints were "
                                       "established from, so the constraint set is dominated by what "

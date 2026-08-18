@@ -1,0 +1,30 @@
+{
+  "$comment": "Acceptance criteria for issue 28. The corpus check is the one that matters: it measures repositories this project did not write, which is the only kind of evidence a fixture cannot fake.",
+  "authority_id": "28",
+  "criteria": [
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/layer2.py"
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/vocabulary.py"
+    },
+    {
+      "check": "file_exists",
+      "target": "tools/adr-census.py"
+    },
+    {
+      "check": "command_exit",
+      "target": "test $(REPO_GOVERNOR_ADR_DIR=/Users/tosinakinosho/workspaces/mcp-adr-analysis-server/docs/adrs ./adapters/adr query architecture get_constraints id=x | jq '.value.constraints|length') -ge 19"
+    },
+    {
+      "check": "command_exit",
+      "target": "REPO_GOVERNOR_ADR_DIR=conformance/fixtures/adrs/traps ./adapters/adr query architecture get_active_decisions id=x | jq -e '.unknown.reason == \"STATUS_TEMPLATE_UNFILLED\"'"
+    },
+    {
+      "check": "command_exit",
+      "target": "for d in heading inline bullet yaml; do REPO_GOVERNOR_ADR_DIR=conformance/fixtures/adrs/$d ./adapters/adr query architecture get_constraints id=x | jq -e '.value.state == \"DEFINED\" and (.value.constraints|length) == 2' >/dev/null || exit 1; done"
+    }
+  ]
+}
