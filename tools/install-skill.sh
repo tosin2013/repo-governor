@@ -51,6 +51,8 @@ git clone -q "$SRC" "$DEST"
 rm -f  "$DEST/AGENTS.md"       # "This repository is governed by Repo Governor"
 rm -f  "$DEST/CLAUDE.md"       # loader shim for the above
 rm -rf "$DEST/.claude"         # the maintainer's own board-management skill
+rm -f  "$DEST/.repo-governor.json"   # binds tosin2013/repo-governor -- not the host repo
+rm -rf "$DEST/.repo-governor"        # its acceptance criteria and decision store
 
 # Leave a note, because a pruned clone is otherwise a mystery to whoever finds
 # it, and because `git status` inside it will now show deletions.
@@ -65,6 +67,7 @@ with three paths removed by `tools/install-skill.sh`:
 | `AGENTS.md` | says *"this repository is governed by Repo Governor"* — true of Repo Governor, not of the repository you installed it into. Cursor injects nested `AGENTS.md` files as always-on workspace rules. |
 | `CLAUDE.md` | loader shim for the above |
 | `.claude/` | carries an unrelated skill that recursive skill discovery would offer |
+| `.repo-governor.json`, `.repo-governor/` | bind and configure governance for *Repo Governor's own repository*. Left in place, an agent standing in this directory resolves the install as the repository under governance and answers questions about the wrong project. |
 
 `git status` here shows them as deletions. That is expected. To update:
 
@@ -78,10 +81,10 @@ NOTE
 
 echo "installed: $DEST"
 [ -f "$DEST/SKILL.md" ] && echo "  SKILL.md present" || { echo "  SKILL.md MISSING" >&2; exit 1; }
-for f in AGENTS.md CLAUDE.md .claude; do
+for f in AGENTS.md CLAUDE.md .claude .repo-governor.json .repo-governor; do
   [ -e "$DEST/$f" ] && { echo "  PRUNE FAILED: $f still present" >&2; exit 1; }
 done
-echo "  pruned: AGENTS.md, CLAUDE.md, .claude/"
+echo "  pruned: AGENTS.md, CLAUDE.md, .claude/, .repo-governor.json, .repo-governor/"
 echo
 echo "Next: start a NEW session in the host, and confirm it lists 'repo-governor'."
 echo "Skills are discovered at session start; one added mid-session is invisible."

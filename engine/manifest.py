@@ -60,8 +60,43 @@ def target():
     governing somewhere else binds providers nobody declared for that place.
     """
     declared = os.environ.get("REPO_GOVERNOR_TARGET")
-    start = Path(declared).resolve() if declared else Path.cwd()
-    return (_git_toplevel(start) or start).resolve()
+    if declared:
+        start = Path(declared).resolve()
+        return (_git_toplevel(start) or start).resolve()
+    start = Path.cwd()
+    resolved = (_git_toplevel(start) or start).resolve()
+    return _escape_install(resolved)
+
+
+# Skills directories, by host. `docs/installation.md` carries the full table.
+SKILL_ROOTS = (".agents", ".claude", ".cursor", ".codex")
+
+
+def _escape_install(repo):
+    """An installed copy of this engine is not the repository under governance.
+
+    Installing the skill clones this repository into `<target>/.agents/skills/
+    repo-governor`. That clone is a git repository, and it ships a manifest
+    binding `tosin2013/repo-governor` -- so an agent whose working directory
+    lands inside it resolves the INSTALL as the target and answers questions
+    about Repo Governor while standing in somebody else's project.
+
+    Observed live: asked about issue 8 in an unrelated repository, the engine
+    reported that repository's issue 8 as complete, citing acceptance criteria
+    that belong to this one. It is not a hypothetical off-by-one; it produced a
+    confident, fully-cited answer to a question nobody asked.
+
+    So: when the resolved repository sits under a `<host>/skills/` path, keep
+    walking outward to the repository that CONTAINS the install. ADR-027 said
+    the governed repository is not the install directory; this is the case
+    where detection could not tell them apart on its own.
+    """
+    parts = repo.parts
+    for i in range(len(parts) - 1, 0, -1):
+        if parts[i] == "skills" and parts[i - 1] in SKILL_ROOTS:
+            outer = Path(*parts[:i - 1])
+            return (_git_toplevel(outer) or outer).resolve()
+    return repo
 
 SUPPORTED_VERSIONS = (1,)
 

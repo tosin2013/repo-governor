@@ -238,6 +238,28 @@ def main():
     fails += check("detection counts statuses with the adapter's parser, not a substring test",
                    '"## Status" in' not in src and "_adr_status(" in src)
 
+    # ADR-027, the case detection could not tell apart on its own. Installing the
+    # skill clones this repository into <target>/.agents/skills/repo-governor.
+    # That clone is a git repository; if it also carried a manifest, an agent
+    # standing in it would resolve the INSTALL as the repository under
+    # governance. Observed live: the engine reported another project's issue 8
+    # complete, citing this repository's acceptance criteria.
+    import tempfile
+    for root in MF.SKILL_ROOTS:
+        with tempfile.TemporaryDirectory() as tmp:
+            inst = Path(tmp) / "outer" / root / "skills" / "repo-governor"
+            inst.mkdir(parents=True)
+            (Path(tmp) / "outer").mkdir(exist_ok=True)
+            got = MF._escape_install(inst)
+            fails += check(f"an install under {root}/skills resolves to the repo containing it",
+                           got == (Path(tmp) / "outer").resolve(), f"got {got}")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        plain = Path(tmp) / "ordinary-repo"
+        plain.mkdir()
+        fails += check("an ordinary repository is left alone",
+                       MF._escape_install(plain.resolve()) == plain.resolve())
+
     print(f"\n{'BINDINGS: CONFORMANT' if not fails else f'BINDINGS: NON-CONFORMANT ({fails})'}")
     if fails:
         _preflight.attribute(absent)
