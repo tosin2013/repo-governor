@@ -8,6 +8,14 @@ The rule everything rests on:
 
 A TODO, an open issue, a `READY` task, a green build — each is *evidence*. None is permission.
 
+## First run on a new machine
+
+```bash
+./tools/bootstrap-decisions.sh          # creates the Dolt decision store (gitignored, not source)
+```
+
+Without it the manifest reports `PROVIDER_UNAVAILABLE` and four suites fail — a missing setup step that reads exactly like broken code (#35).
+
 ## Before acting on anything
 
 The skill lives at [`SKILL.md`](SKILL.md) in this repository, so the engine is right here:
