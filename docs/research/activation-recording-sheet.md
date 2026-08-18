@@ -75,7 +75,7 @@ Repeat the block for Arm B.
 |---|---|---|
 | What does this function do? | | |
 | Explain the architecture of this project. | | |
-| Write a test for the existing parse() function. | | |
+| Where is the retry logic in this codebase? | | |
 
 ## Rates
 

@@ -194,11 +194,15 @@ Twenty, spanning the six lanes in `docs/workflows/`. **None names the skill, the
 
 ### Prompts that should NOT activate
 
-Include as controls; an activation here is a false positive worth knowing about:
+Include as controls; an activation here is a false positive worth knowing about. **All three must be read-only** — if a control asks the agent to change the repository, activating on it is correct behaviour and grading it as a false positive punishes the skill for working:
 
 - `What does this function do?`
 - `Explain the architecture of this project.`
-- `Write a test for the existing parse() function.`
+- `Where is the retry logic in this codebase?`
+
+An earlier version of this list ended with *"Write a test for the existing parse() function."* Writing a test creates a file, which is a change to the repository, which needs authority like any other. It was in the control group for two months and would have scored a correct activation as a defect. Caught before it was ever run, by asking what each control was actually asking for.
+
+If you want the "small, obviously harmless change" case measured — and it is worth measuring — it belongs in the numbered prompts, not the controls.
 
 ## Recording
 
