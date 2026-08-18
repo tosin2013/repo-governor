@@ -21,6 +21,12 @@ another workspace's content into it.
 
     <mcp list_issues output> | python3 tools/live-equivalence.py --github <owner/repo>
 
+Five scenarios. Two of them -- `triage` and `canceled` -- were not expressible
+in either provider when this was written, and that is the point: the withdrawal
+case is the one that motivated the project and the one no real workspace
+happened to contain. They are listed so the gap is visible as a SKIP rather
+than absent from the table entirely.
+
 Equivalence is over SEMANTIC STATE, not over the same work item. Layer 2 has
 always worked this way -- `authority_withdrawn` uses different ids in each
 provider. Two providers agreeing about one shared item would test id lookup;
@@ -45,8 +51,19 @@ SCENARIOS = [
      "milestoned + assigned"),
     ("finished; authority is a separate axis", "completed",
      {"authority": "AUTHORIZED", "admitted": True}, "closed"),
-    ("not admitted at all",              None,        {"__unknown__": "NOT_ADMITTED"},
+    # `triage`, not None. This row previously carried `None`, which made `lid`
+    # None unconditionally, which tripped the skip guard on every run: a
+    # scenario that could never execute, reported forever as "not expressible
+    # live". A permanently-skipped row reads like missing data and is really a
+    # dead code path -- the same defect class as a vacuously passing check.
+    ("not admitted at all",              "triage",    {"__unknown__": "NOT_ADMITTED"},
      "no milestone"),
+    # The withdrawal case: the one that motivated the entire project, and the
+    # only row here that neither provider could express when this was written.
+    # Roadmap says the work is cancelled; anything still running is
+    # unauthorized regardless of how much of it is finished.
+    ("authority withdrawn",              "canceled",  {"authority": "CANCELLED", "admitted": False},
+     "closed NOT_PLANNED"),
 ]
 
 
@@ -84,14 +101,20 @@ def ask_github(nwo, number):
 def pick_github(nwo):
     """Real issues occupying each semantic state. Chosen from live data, not fixed."""
     out = subprocess.run(["gh", "issue", "list", "--repo", nwo, "--state", "all", "--limit", "100",
-                          "--json", "number,state,milestone,assignees"],
+                          "--json", "number,state,stateReason,milestone,assignees"],
                          capture_output=True, text=True, timeout=90).stdout
     issues = json.loads(out or "[]")
     picks = {}
     for i in issues:
         ms, closed = bool(i.get("milestone")), i["state"] == "CLOSED"
         assigned = bool(i.get("assignees"))
-        if not ms and not closed:
+        # NOT_PLANNED is how GitHub says "we decided against this", as opposed
+        # to COMPLETED. Bucketing both as "closed" would have made the
+        # withdrawal scenario match a merely-finished issue, which is the exact
+        # confusion the completion firewall exists to prevent.
+        if closed and i.get("stateReason") == "NOT_PLANNED":
+            picks.setdefault("closed NOT_PLANNED", i["number"])
+        elif not ms and not closed:
             picks.setdefault("no milestone", i["number"])
         elif ms and closed:
             picks.setdefault("closed", i["number"])
@@ -152,7 +175,14 @@ def main(argv):
 
     print("-" * 62)
     print(f"live scenarios: {len(SCENARIOS)}   agree: {agree}   diverge: {diverge}   skipped: {skipped}")
-    print("\nLIVE EQUIVALENCE: " + ("EQUIVALENT" if not diverge else "NOT EQUIVALENT"))
+    # "EQUIVALENT" alone would be a flattering headline over a run where two of
+    # five scenarios never executed. Equivalence is only claimed for what was
+    # actually compared; the skipped count rides along with the verdict so it
+    # cannot be quoted without it.
+    scope = f"across {agree + diverge} of {len(SCENARIOS)} scenarios"
+    if skipped:
+        scope += f" ({skipped} not expressible in these providers)"
+    print("\nLIVE EQUIVALENCE: " + ("EQUIVALENT " if not diverge else "NOT EQUIVALENT ") + scope)
     if diverge:
         print("A divergence is a §55 stop-condition input, not a build failure. Record it.")
     return 0 if not diverge else 1
