@@ -1,0 +1,26 @@
+{
+  "$comment": "Acceptance criteria for issue 37 (Codex activation run). The deliverable is a MEASUREMENT, so the criteria check that a committed results file exists and states rates for both arms -- not that anyone believes the run happened. The contamination check is the honest weak link: criterion 4 verifies the operator DECLARED it, which is a declaration, not a verification. It is listed anyway because forcing the operator to write the sentence is worth more than omitting it, and mislabelling it as verified would be worse than either.",
+  "authority_id": "37",
+  "criteria": [
+    {
+      "check": "file_exists",
+      "target": "docs/research/activation-results-codex.md"
+    },
+    {
+      "check": "command_exit",
+      "target": "grep -q 'Arm A' docs/research/activation-results-codex.md && grep -q 'Arm B' docs/research/activation-results-codex.md"
+    },
+    {
+      "check": "command_exit",
+      "target": "grep -qE '[0-9]+/20|N/A' docs/research/activation-results-codex.md"
+    },
+    {
+      "check": "command_exit",
+      "target": "grep -qi 'contamination' docs/research/activation-results-codex.md"
+    },
+    {
+      "check": "command_exit",
+      "target": "grep -qE 'FULL|PARTIAL|NONE' docs/research/activation-results-codex.md"
+    }
+  ]
+}

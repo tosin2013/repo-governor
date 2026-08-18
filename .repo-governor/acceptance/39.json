@@ -1,0 +1,22 @@
+{
+  "$comment": "Acceptance criteria for issue 39 (independent census). The point of this run is a corpus the author cannot see, so the criteria require BOTH tools' numbers and an explicit statement about unparsed dialects -- an empty unparsed list is a real result and must be stated, not left silent. Criterion 4 fails a file that only corroborates: it must say whether it agrees with the 92% and the 14/42/1 figures, because a result that never compares itself to the claim it was run to test is not evidence.",
+  "authority_id": "39",
+  "criteria": [
+    {
+      "check": "file_exists",
+      "target": "docs/research/census-independent.md"
+    },
+    {
+      "check": "command_exit",
+      "target": "grep -qi 'adr-census' docs/research/census-independent.md && grep -qi 'envelope-census' docs/research/census-independent.md"
+    },
+    {
+      "check": "command_exit",
+      "target": "grep -qi 'unparsed' docs/research/census-independent.md"
+    },
+    {
+      "check": "command_exit",
+      "target": "grep -qiE 'corrobor|contradict|diverg|agree' docs/research/census-independent.md"
+    }
+  ]
+}
