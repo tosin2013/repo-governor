@@ -1,5 +1,5 @@
 {
-  "$comment": "Acceptance criteria for issue 37 (Codex activation run). The deliverable is a MEASUREMENT, so the criteria check that a committed results file exists and states rates for both arms -- not that anyone believes the run happened. The contamination check is the honest weak link: criterion 4 verifies the operator DECLARED it, which is a declaration, not a verification. It is listed anyway because forcing the operator to write the sentence is worth more than omitting it, and mislabelling it as verified would be worse than either.",
+  "$comment": "Acceptance criteria for issue 37 (Codex activation run). REWRITTEN after the first version reported STOP_COMPLETE on a results file whose own second line read 'Arm B not yet run'. Every check passed: 'grep -q Arm B' matched that sentence, and the [0-9]+/20 rate came from Arm A. Naming a thing is not reporting it, so both arms are now required to carry a RATE next to their name, and the controls must be scored too. Verified by running these against the half-finished file: it fails.",
   "authority_id": "37",
   "criteria": [
     {
@@ -8,11 +8,19 @@
     },
     {
       "check": "command_exit",
-      "target": "grep -q 'Arm A' docs/research/activation-results-codex.md && grep -q 'Arm B' docs/research/activation-results-codex.md"
+      "target": "grep -qE 'Arm A: *([0-9]+/20|N/A)' docs/research/activation-results-codex.md"
     },
     {
       "check": "command_exit",
-      "target": "grep -qE '[0-9]+/20|N/A' docs/research/activation-results-codex.md"
+      "target": "grep -qE 'Arm B: *([0-9]+/20|N/A)' docs/research/activation-results-codex.md"
+    },
+    {
+      "check": "command_exit",
+      "target": "grep -qiE 'controls?[^0-9]*[0-3]/3' docs/research/activation-results-codex.md"
+    },
+    {
+      "check": "command_exit",
+      "target": "! grep -qiE 'not yet run|not run yet' docs/research/activation-results-codex.md"
     },
     {
       "check": "command_exit",
