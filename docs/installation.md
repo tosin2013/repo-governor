@@ -9,8 +9,11 @@ Repo Governor ships as an [Agent Skill](https://platform.claude.com/docs/en/agen
 `.agents/skills/` is read by more than one vendor and is the closest thing to a neutral location. This repository already uses the same pattern one level up: `AGENTS.md` holds the content and `CLAUDE.md` is a one-line pointer to it, because [ADR-001](adrs/001-agent-skill-as-primary-delivery-surface.md) makes tool-independence the thesis rather than a preference.
 
 ```bash
-git clone https://github.com/tosin2013/repo-governor .agents/skills/repo-governor
+git clone https://github.com/tosin2013/repo-governor /tmp/repo-governor
+/tmp/repo-governor/tools/install-skill.sh <target-repo>
 ```
+
+**Use the script rather than cloning straight into the skills directory.** A plain clone puts this repository's own `AGENTS.md` inside your project, and it opens *"This repository is governed by Repo Governor"* — a true statement about Repo Governor and a false one about yours. Cursor was observed injecting that file as an always-on workspace rule from inside the skill directory of an unrelated project, which hands your agent our house rules and tells it your repository is governed by something it has not agreed to. The script clones and then removes the three paths that are correct here and wrong anywhere else; see `INSTALLED.md` in the result.
 
 Then add whatever pointer your host needs beside it:
 
@@ -33,17 +36,28 @@ ln -s ../../.agents/skills/repo-governor .claude/skills/repo-governor
 
 Two real copies drift, and a drifted skill fails in the way that is hardest to notice: it works, and it is answering from the wrong version.
 
-## Two things that arrive with the clone
+## What a plain clone drags in, and why the script exists
 
-The skill is a clone of this repository, so it brings this repository's own files with it.
+Verified on Cursor, 2026-08-18. Asked which instruction files were applied to a workspace containing an unrelated project, it listed **six**, of which four came from installed skill copies:
 
-**A second skill.** `.claude/skills/github-project-release-manager/` is this project's board-management tooling. Hosts that walk the skills root recursively will list it as available — observed on Cursor. Harmless, and probably not what you wanted:
-
-```bash
-rm -rf <skills-dir>/repo-governor/.claude
+```
+<target>/.agents/skills/repo-governor/AGENTS.md      <- injected as an always-on rule
+<target>/.agents/skills/repo-governor/CLAUDE.md      <- injected as an always-on rule
 ```
 
-**An `AGENTS.md` that talks about the wrong repository.** It says *this repository is governed by Repo Governor*, meaning `repo-governor`. On a host that loads nested agent-instruction files, it reads as a statement about whatever repository you installed into. In ordinary use that is closer to true than false and does no harm. For [measuring activation](research/activation-protocol.md) it is fatal, and the protocol carries the test for it.
+So on that host, installing Repo Governor by cloning applies **Repo Governor's own house rules to the user's repository**, including a first line asserting that repository is governed by us. Nobody asked for that, and it is invisible unless you think to ask the host what it loaded.
+
+`tools/install-skill.sh` removes three paths after cloning:
+
+| Removed | Why |
+|---|---|
+| `AGENTS.md` | the assertion above |
+| `CLAUDE.md` | loader shim for it |
+| `.claude/` | carries `github-project-release-manager`, an unrelated skill that recursive discovery offers as available — also observed on Cursor |
+
+The engine still runs from the pruned copy; none of the removed files are read by it.
+
+**For [measuring activation](research/activation-protocol.md) this is not merely untidy, it is fatal** — an Arm A target that has been told it is governed is Arm B. The protocol carries the test.
 
 ## Verify the host can actually see it
 

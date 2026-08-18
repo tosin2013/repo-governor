@@ -104,7 +104,15 @@ This is not answerable from the filesystem. Ask the host, in a fresh session wit
 
 > What instructions, rules, or context files are currently applied to this workspace? List them.
 
-If governance, authorization, or Repo Governor appears in the answer, **Arm A cannot be measured on this host as installed**. Options, in order of preference: install the skill outside the target (a user-level skills directory), or record Arm A as unavailable for that host and report Arm B only. Do not proceed and hope.
+If governance, authorization, or Repo Governor appears in the answer, **Arm A cannot be measured on this host as installed**. Do not proceed and hope.
+
+**Cursor answered yes, on 2026-08-18.** It listed `<target>/.agents/skills/repo-governor/AGENTS.md` and `CLAUDE.md` among the always-on rules applied to an unrelated project. `tools/install-skill.sh` now prunes both at install time, which removes this leak for every user and not only for the experiment. Re-run the question after installing with the script; the answer is what makes Arm A admissible, not the install method.
+
+### Multi-root workspaces void Arm A outright
+
+The same session revealed a second, independent contamination: the workspace had **two roots**, `repo-governor` and the target. `repo-governor/AGENTS.md` was therefore applied — a root-level file, nothing to do with skill installation, unfixable by pruning.
+
+**Arm A requires a single-root workspace containing only the target.** A repository that is silent about governance stops being silent the moment it shares a workspace with one that is not, and no amount of care about the skill directory helps. Confirm root count before every Arm A session; it is the cheapest of these checks and the one that voids the run most completely.
 
 Record the answer either way — "the host does not load nested instruction files" is a finding worth having, and it is the difference between a measurement and a number.
 
