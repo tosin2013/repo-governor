@@ -21,6 +21,8 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _preflight  # noqa: E402
 sys.path.insert(0, str(ROOT / "engine"))
 import bindings as B  # noqa: E402
 import manifest as MF  # noqa: E402
@@ -51,6 +53,7 @@ def with_manifest(mutate):
 
 
 def main():
+    absent = _preflight.banner()
     fails = 0
     print("Engine holds no adapter knowledge\n")
 
@@ -236,6 +239,8 @@ def main():
                    '"## Status" in' not in src and "_adr_status(" in src)
 
     print(f"\n{'BINDINGS: CONFORMANT' if not fails else f'BINDINGS: NON-CONFORMANT ({fails})'}")
+    if fails:
+        _preflight.attribute(absent)
     return 0 if not fails else 1
 
 

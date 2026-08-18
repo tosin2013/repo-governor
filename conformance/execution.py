@@ -24,6 +24,8 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _preflight  # noqa: E402
 sys.path.insert(0, str(ROOT / "engine"))
 import completion as C  # noqa: E402
 import manifest as MF  # noqa: E402
@@ -59,6 +61,7 @@ def bound_manifest(with_execution=True):
 
 
 def main():
+    absent = _preflight.banner()
     fails = 0
     m = bound_manifest()
 
@@ -102,6 +105,8 @@ def main():
     fails += check("no discoveries are claimed when nothing was read", not r.get("captured"))
 
     print(f"\n{'EXECUTION SUBORDINATION: CONFORMANT' if not fails else f'EXECUTION SUBORDINATION: NON-CONFORMANT ({fails})'}")
+    if fails:
+        _preflight.attribute(absent)
     return 0 if not fails else 1
 
 
