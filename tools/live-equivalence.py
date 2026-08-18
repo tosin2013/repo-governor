@@ -118,6 +118,31 @@ def matches(obs, expect):
     return all(obs.get(k) == v for k, v in expect.items())
 
 
+def score(lp, gp, expect):
+    """Classify a compared pair of projections against the expected map.
+
+    Extracted so the self-test can call the exact function `main()` uses,
+    rather than testing helpers adjacent to the scoring line while leaving
+    the line itself unexercised. That gap is how `expect` went unused and
+    `agreement` was decided purely by `lp == gp` -- covered by construction,
+    not verified by any check.
+
+    "agree"   -- providers match AND the match is the expected value.
+    "wrong"   -- providers match each other but NOT the expected value.
+                 Agreement without correctness is not success: two adapters
+                 that both mapped withdrawal to ADMITTED would print AGREE
+                 under a same-only check.
+    "diverge" -- providers disagree. A normalization failure, §55 input.
+    """
+    same = lp == gp
+    correct = matches(lp, expect) and matches(gp, expect)
+    if same and correct:
+        return "agree"
+    if not same:
+        return "diverge"
+    return "wrong"
+
+
 def mcp_missing(issues):
     return sorted({f for n in issues for f in MCP_REQUIRED if f not in n})
 
@@ -224,10 +249,22 @@ def self_test():
     check("projection drops reason so a more specific code is not a divergence",
           projection(unk) == {"__unknown__": True, "blocking": True})
 
-    wrong = {"authority": "ADMITTED", "admitted": True}
-    expect_w = {"authority": "CANCELLED", "admitted": False}
-    check("two providers agreeing on the WRONG map is not success",
-          wrong == dict(wrong) and not matches(wrong, expect_w))
+    # These three exercise score() directly -- the function main() actually
+    # calls to decide AGREE / WRONG / DIVERGENCE. A prior version of this
+    # check compared a dict to a copy of itself (`wrong == dict(wrong)`),
+    # which cannot fail, and never called the scoring path at all: proven by
+    # mutation, forcing `correct = True` inside the old inlined logic left
+    # this suite green. Calling score() closes that gap by construction --
+    # any future rewrite of the scoring line runs through the same function.
+    correct_withdrawal = {"authority": "CANCELLED", "admitted": False}
+    wrong_but_agreeing = {"authority": "ADMITTED", "admitted": True}
+    disagreeing = {"authority": "AUTHORIZED", "admitted": True}
+    check("providers agreeing on the CORRECT value scores agree",
+          score(correct_withdrawal, dict(correct_withdrawal), correct_withdrawal) == "agree")
+    check("two providers agreeing on the WRONG map scores wrong, not agree",
+          score(wrong_but_agreeing, dict(wrong_but_agreeing), correct_withdrawal) == "wrong")
+    check("providers disagreeing with each other scores diverge",
+          score(wrong_but_agreeing, disagreeing, correct_withdrawal) == "diverge")
     check("a payload missing title is a usage error, not a divergence",
           mcp_missing([{"id": "x", "statusType": "backlog"}]) == ["status", "title"])
 
@@ -316,12 +353,11 @@ def main(argv):
         print(f"[{meaning}]")
         print(f"    linear  {ltype:<10} {_fmt(lobs)}")
         print(f"    github  {gh_state:<22} {_fmt(gobs)}")
-        same = lp == gp
-        correct = matches(lp, expect) and matches(gp, expect)
-        if same and correct:
+        result = score(lp, gp, expect)
+        if result == "agree":
             agree += 1
             print("    AGREE + CORRECT\n")
-        elif not same:
+        elif result == "diverge":
             diverge += 1
             print("    ** DIVERGENCE ** equivalent state, different typed facts\n")
         else:
