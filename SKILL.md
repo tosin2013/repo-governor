@@ -99,9 +99,16 @@ python3 "$RG/engine/retirement.py" <path>
 ## Onboarding a repository
 
 ```bash
-python3 "$RG/engine/onboard.py" <path>            # assess condition, detect candidates
-python3 "$RG/engine/onboard.py" <path> --write    # write .repo-governor.proposed.json
+python3 "$RG/engine/onboard.py" <path>            # assess condition, detect candidates — READ ONLY
 ```
+
+**Stop there and report.** `--write` creates `.repo-governor.proposed.json` in the target, and creating a file in a repository is a change to that repository — deny-by-default applies to it like anything else. Run it only when a human asks for the proposal to be written:
+
+```bash
+python3 "$RG/engine/onboard.py" <path> --write    # only on request
+```
+
+"Proposing" names what the file means, not what writing it costs. An agent asked to fix a parser that answers by leaving a governance artifact in the repository root has changed the repository it just declined to change.
 
 Detection **proposes**. It never binds. Promoting the proposal to `.repo-governor.json` is a human action, and the engine never reads the proposal file. Two candidates for a single-valued role produce `PROVIDER_CONFLICT` and onboarding halts — no ranking is applied, because any automatic tie-break would silently confer authority.
 
