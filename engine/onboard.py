@@ -187,8 +187,16 @@ def detect(repo: Path):
 
     # execution — Beads
     if (repo / ".beads").is_dir():
-        add("execution", "beads", "adapters/execution-file", "PROVIDER_DETECTED",
-            [_cite(repo, ".beads/", "beads database directory present")])
+        # UNCONFIRMED. A .beads directory is a SQLite-backed store;
+        # adapters/execution-file reads a JSON file and cannot open it. Third
+        # instance of the same over-promise as the ADR status count and the
+        # dependabot config (#27): detection may name an adapter only if that
+        # adapter can read the evidence that triggered the detection.
+        add("execution", "beads", "adapters/execution-file", "PROVIDER_UNCONFIRMED",
+            [_cite(repo, ".beads/", "beads database directory present")],
+            [_cite(repo, ".beads/", "no adapter here reads a beads database; execution-file reads "
+                                    "a JSON file, so this needs a real adapter or `bd export` "
+                                    "written into that file")])
 
     # roadmap_authority — Linear
     for f in (".linear.json", ".linear.yml", "linear.json"):

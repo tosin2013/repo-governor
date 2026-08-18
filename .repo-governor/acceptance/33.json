@@ -1,0 +1,26 @@
+{
+  "$comment": "Acceptance criteria for issue 33. The deliverable is a design and a go/no-go, not code -- so the criteria check that the argument exists, reaches a verdict, and that the finding it turned up is tracked rather than left in prose.",
+  "authority_id": "33",
+  "criteria": [
+    {
+      "check": "file_exists",
+      "target": "docs/research/2026-08-17-stage-e-execution-separation.md"
+    },
+    {
+      "check": "command_exit",
+      "target": "grep -q 'NO-GO' docs/research/2026-08-17-stage-e-execution-separation.md"
+    },
+    {
+      "check": "command_exit",
+      "target": "grep -q 'PROVIDER_UNCONFIRMED' engine/onboard.py && ! grep -q 'beads database directory present\")\\])' engine/onboard.py"
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/onboarding.py"
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/skill.py"
+    }
+  ]
+}

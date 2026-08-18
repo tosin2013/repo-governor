@@ -94,8 +94,15 @@ def main():
     # 5. And from a repository that is NOT governed, the documented failure is
     #    the one the surface promises -- naming the path it looked in.
     with tempfile.TemporaryDirectory() as td:
+        # REPO_GOVERNOR_TARGET must be cleared. It declares the governed
+        # repository (ADR-027) and outranks cwd -- so when this suite runs
+        # THROUGH the engine, which sets it, the inherited value made an
+        # ungoverned directory report MANIFEST VALID and this check fail. The
+        # check was correct; its environment was not isolated from its caller.
+        import os as _os2
+        clean = {k: v for k, v in _os2.environ.items() if k != "REPO_GOVERNOR_TARGET"}
         p = subprocess.run([sys.executable, str(ROOT / "engine" / "manifest.py")],
-                           capture_output=True, text=True, cwd=td, timeout=120)
+                           capture_output=True, text=True, cwd=td, timeout=120, env=clean)
         out = p.stdout + p.stderr
         fails += check("an ungoverned repository yields AUTHORITY_SOURCE_MISSING naming its path",
                        "AUTHORITY_SOURCE_MISSING" in out and td in out, out[:120])
