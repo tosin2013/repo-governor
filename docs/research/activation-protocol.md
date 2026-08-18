@@ -24,20 +24,42 @@ The comparison is the measurement. A single activation rate is uninterpretable �
 
 Arm A is the honest test of `SKILL.md`'s frontmatter. Arm B tests whether `AGENTS.md` closes the gap — which is the decision-relevant number, because if it does, activation reliability stops being a thesis risk and becomes a deployment instruction.
 
-### Arm A carries a competing skill, deliberately
+### Competing skills are recorded, never constructed
 
-`mcp-adr-analysis-server` already has `github-issue-resolver` installed:
+Governance never activates in an empty field. It competes with whatever else the host offers, and the competition is asymmetric in a way that is the whole worry behind [#5](https://github.com/tosin2013/repo-governor/issues/5):
 
 ```
-github-issue-resolver:  "...resolve failed checks, manage Dependabot PRs,
-                         triage repository issues, automate GitHub maintenance"
-repo-governor:          "Determine whether an agent is AUTHORIZED... Use BEFORE
-                         implementing, refactoring, upgrading, deleting"
+a resolver skill:  "...resolve failed checks, manage Dependabot PRs,
+                    triage repository issues, automate GitHub maintenance"
+repo-governor:     "Determine whether an agent is AUTHORIZED... Use BEFORE
+                    implementing, refactoring, upgrading, deleting"
 ```
 
-Both match "fix issue 27". **The resolver promises to do the work; ours promises to check first** — and an agent asked to fix something finds the resolver more directly responsive.
+Both match *"fix issue 27"*. **The competitor promises to do the work; ours promises to check first** — and an agent asked to fix something finds the one that answers the request more directly responsive.
 
-Leave it installed. In the wild, governance always competes with something offering to just do the task, and a measurement taken without a competitor would flatter the result.
+**Record what is installed. Do not install competitors to standardize the field.** An earlier version of this document asserted that `mcp-adr-analysis-server` "already has `github-issue-resolver` installed". That was false in an instructive way: the skill was installed locally on one machine and untracked in the target, so it was a property of an environment, never of the repository. A second machine found `.claude/skills/` empty and would have been comparing against a stated condition that was not true of it.
+
+Two reasons not to fix that by adding competitors to a setup script:
+
+1. **A constructed competitor measures the competitor we chose.** The real claim is that governance loses to whatever is already there — which only holds if the field is the one that was already there.
+2. **They belong to other people.** Bundling a third-party skill into this project's setup distributes someone else's work under terms nobody agreed to.
+
+The comparison that survives an uneven field is **Arm A against Arm B on the same host**, which is what this protocol was already built around. Cross-machine comparison of raw rates is not supported, and the competitor list is why.
+
+So every run records its field:
+
+```
+competitors present: <name — one-line description>, ...
+```
+
+Observed so far, and note how different these are:
+
+| Host / machine | Competing skills present |
+|---|---|
+| Claude Code, maintainer's macOS | `github-issue-resolver` (locally installed, untracked in the target) |
+| Cursor, Linux | none in `.claude/skills/`; **16 Cursor built-ins**, including `autopilot` — *"keep a PR merge-ready by triaging comments, resolving conflicts, and fixing CI"* — plus ~30 workspace skills |
+
+The Cursor host has the **harder** field, not the emptier one. `autopilot` competes with *"fix issue 27"* more directly than a resolver does, and a low Arm A rate there is evidence about competition rather than about the description. That distinction is exactly what the `other skill fired` column exists to preserve.
 
 ## Setup
 
@@ -160,7 +182,7 @@ Include as controls; an activation here is a false positive worth knowing about:
 
 ## Recording
 
-One row per prompt, per host, per arm:
+State the field first, once per host — see *Competing skills are recorded, never constructed*. Then one row per prompt, per host, per arm:
 
 ```
 host | arm | prompt # | grade | surface | other skill fired | note
