@@ -27,15 +27,18 @@ You need the skill's own location. Take it, in this order:
 
 ```bash
 RG=/path/to/repo-governor          # the skill's directory, from above
+test -f "$RG/SKILL.md" || echo "RG is not the skill directory: '$RG'"
 cd /path/to/the/repository/you/are/governing
 ```
+
+**Check it.** An unset `$RG` expands to nothing, so `"$RG/engine/manifest.py"` becomes `/engine/manifest.py` — which fails as a missing *file* rather than a missing *variable*, and reads like the engine is not installed. That happened in a real session, and the agent carried on past it.
 
 Every command below assumes `$RG` is set and that you are standing in the target repository.
 
 ## Before anything else
 
 ```bash
-python3 "$RG/engine/manifest.py"            # is this repository governed?
+python3 "${RG:?set RG to the skill directory — see above}/engine/manifest.py"   # is this repository governed?
 ```
 
 - **`MANIFEST VALID`** → governed. Continue.
