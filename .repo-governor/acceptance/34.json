@@ -1,0 +1,26 @@
+{
+  "$comment": "Acceptance criteria for issue 34. The three Stage E scenarios are asserted as BEHAVIOUR through conformance/execution.py, not as the presence of code.",
+  "authority_id": "34",
+  "criteria": [
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/execution.py"
+    },
+    {
+      "check": "command_exit",
+      "target": "grep -q 'def execution_evidence' engine/completion.py"
+    },
+    {
+      "check": "command_exit",
+      "target": "test $(grep -c 'execution' engine/completion.py) -gt 5"
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/layer1.py"
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/vocabulary.py"
+    }
+  ]
+}

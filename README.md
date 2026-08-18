@@ -83,7 +83,7 @@ Governance depth scales with repository condition (L0 greenfield → L4 mature/h
 ```text
 adapters/      12 provider adapters, subprocess protocol, any language
 engine/        deterministic policy engine, Python stdlib only
-conformance/   9 suites — the evidence behind every gate claim
+conformance/   10 suites — the evidence behind every gate claim
 schemas/       manifest v1 JSON Schema
 docs/
   adrs/        26 architectural decisions (23 Accepted) + index + ratification review
@@ -99,6 +99,7 @@ docs/
 | `bindings.py` | the engine holds no adapter knowledge, and the permission gate is a gate |
 | `skill.py` | the agent surface teaches an invocation that works, and cites no moved decision |
 | `envelope.py` | §40 verbatim — the completion firewall admits no exception |
+| `execution.py` | execution state informs; it never grants authority |
 | `manifest.py` | 28 checks — 20 refusal cases; the loader's value is what it rejects |
 | `onboarding.py` | `RG-SIM-ONBOARDING-v0.1`, fixtures A–C |
 | `vocabulary.py` | closed sets cannot drift from the code |

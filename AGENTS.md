@@ -61,7 +61,7 @@ python3 engine/retirement.py <path>
 ## Before you commit
 
 ```bash
-for s in layer1 layer2 transport manifest onboarding vocabulary bindings skill envelope; do python3 conformance/$s.py; done
+for s in layer1 layer2 transport manifest onboarding vocabulary bindings skill envelope execution; do python3 conformance/$s.py; done
 python3 engine/manifest.py --validate
 ```
 

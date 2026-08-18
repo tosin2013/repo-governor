@@ -53,6 +53,55 @@ def _classify(u, profile="GOVERNOR_LITE"):
     return {**u, "dimension": dim, "blocking": blocking, "meaning": desc}
 
 
+def execution_evidence(authority_id, manifest=None):
+    """What is happening beneath this authority item. EVIDENCE, never authority.
+
+    ADR-013 makes execution a non-authoritative role and INV-002 says none of it
+    confers roadmap authority. So this can enrich a disposition and must never
+    change one: `_compose` reads it after the authority decision is already made.
+
+    Why it exists at all: no engine module consulted this role, so the scenario
+    the product was built for -- roadmap CANCELLED while subtasks run -- could
+    neither fail nor pass, because nothing observed the contradiction (#34).
+    Getting AUTHORITY_WITHDRAWN right by never looking is not the same as
+    getting it right.
+
+    An unbound role is reported as unbound. This repository deliberately binds
+    no execution provider (ADR-022 rule 4), so that is the common path and it
+    must read as absence of evidence, never as evidence of absence.
+    """
+    m = manifest
+    if m is None:
+        m, errs = MF.load()
+        if errs:
+            return {"state": "UNREADABLE", "detail": errs[0]}
+
+    bindings, err = B.resolve("execution", m)
+    if err:
+        return {"state": "UNBOUND",
+                "detail": "no execution provider is bound; nothing is known about work "
+                          "beneath this item, which is not the same as knowing there is none"}
+
+    out = {"state": "READ", "active": [], "completed": [], "discoveries": [], "unknowns": []}
+    for fn, key in (("get_active_work", "active"), ("get_completed_work", "completed"),
+                    ("get_discoveries", "discoveries")):
+        r = B.call("execution", fn, {"id": authority_id}, manifest=m)
+        if not r.get("ok"):
+            # NOT_FOUND means this item has no execution root -- an honest
+            # absence. Anything else is a provider problem worth reporting.
+            if r.get("error", {}).get("type") != "NOT_FOUND":
+                out["unknowns"].append({"function": fn, "reason": r["error"]["type"]})
+            continue
+        if r.get("unknown"):
+            out["unknowns"].append({"function": fn, "reason": r["unknown"]["reason"]})
+            continue
+        v = r.get("value") or {}
+        out[key] = v.get(key) or v.get("discoveries") or []
+    if not any(out[k] for k in ("active", "completed", "discoveries")) and not out["unknowns"]:
+        out["state"] = "NO_EXECUTION_ROOT"
+    return out
+
+
 def evaluate(authority_id, manifest=None):
     """Return the full governance decision for the completion axis.
 
@@ -76,8 +125,19 @@ def evaluate(authority_id, manifest=None):
     provenance += auth.get("provenance", [])
     authority = auth["value"]["authority"]
     if authority in ("CANCELLED", "WITHDRAWN", "REJECTED"):
-        return {"decision": "AUTHORITY_WITHDRAWN", "authority_id": authority_id,
-                "authority": authority, "unknowns": [], "provenance": provenance}
+        ex = execution_evidence(authority_id, manifest)
+        out = {"decision": "AUTHORITY_WITHDRAWN", "authority_id": authority_id,
+               "authority": authority, "unknowns": [], "provenance": provenance,
+               "execution": ex}
+        # The disposition does not change -- withdrawn is withdrawn. But work
+        # running against withdrawn authority is the actionable fact, and an
+        # engine that never looked could not report it.
+        if ex.get("active"):
+            out["execution_in_flight"] = [t.get("id") for t in ex["active"]]
+            out["detail"] = (f"{len(ex['active'])} execution task(s) are in flight beneath an "
+                             "item whose authority is withdrawn. They must stop; execution state "
+                             "does not reinstate authority (INV-002).")
+        return out
     if authority == "ADMITTED":
         return {"decision": "NO_EXECUTION_AUTHORITY", "authority_id": authority_id,
                 "authority": authority,
@@ -97,7 +157,8 @@ def evaluate(authority_id, manifest=None):
         unknowns.append(u)
         return {"decision": "CONTINUE", "authority_id": authority_id, "authority": authority,
                 "stop_condition": {"acceptance_conditions_satisfied": "UNKNOWN"},
-                "unknowns": unknowns, "provenance": provenance}
+                "unknowns": unknowns, "provenance": provenance,
+                "execution": execution_evidence(authority_id, manifest)}
     provenance += crit.get("provenance", [])
     criteria = crit["value"]["criteria"]
 
@@ -131,10 +192,23 @@ def evaluate(authority_id, manifest=None):
     else:
         decision, satisfied = "STOP_COMPLETE", True
 
-    return {"decision": decision, "authority_id": authority_id, "authority": authority,
-            "criteria": results,
-            "stop_condition": {"acceptance_conditions_satisfied": satisfied},
-            "unknowns": unknowns, "provenance": provenance}
+    out = {"decision": decision, "authority_id": authority_id, "authority": authority,
+           "criteria": results,
+           "stop_condition": {"acceptance_conditions_satisfied": satisfied},
+           "unknowns": unknowns, "provenance": provenance,
+           "execution": execution_evidence(authority_id, manifest)}
+    # Scenario 3: work finished, and something was found along the way. The
+    # discoveries are surfaced with the disposition rather than left for the
+    # agent to remember -- but they are surfaced as CAPTURE_ONLY candidates, and
+    # STOP_COMPLETE is unaffected by their existence (§40).
+    disc = (out["execution"] or {}).get("discoveries") or []
+    if disc and decision == "STOP_COMPLETE":
+        out["captured"] = [{"id": d.get("id"), "type": d.get("type"),
+                            "disposition": "CAPTURE_ONLY"} for d in disc]
+        out["detail"] = (f"{len(disc)} discovery(ies) recorded beneath completed work. Each is "
+                         "CAPTURE_ONLY: completion exhausts this authorization, and a discovery "
+                         "made under it inherits no authority from it (INV-001, §40).")
+    return out
 
 
 def _repo_is_public():
