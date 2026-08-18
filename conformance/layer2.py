@@ -224,6 +224,21 @@ def matches(obs, expect):
 
 def main():
     absent = _preflight.banner()
+
+    # The live tool is the other half of this question. Its first versions
+    # scored one-sided rows as AGREE and compared unknown *reasons*, undoing
+    # the projection lesson this file exists to enforce. `--self-test` is the
+    # gate that those cannot silently return; it needs no network. Run it
+    # first, and flush, so a failure is not buried under buffered scenario
+    # output.
+    sys.stdout.flush()
+    live = subprocess.run(
+        [sys.executable, str(ROOT / "tools" / "live-equivalence.py"), "--self-test"],
+        cwd=ROOT,
+    )
+    if live.returncode != 0:
+        return 1
+
     covered = diverged = mismatched = 0
     findings = []
     print("Layer 2 — cross-provider equivalence\n")
