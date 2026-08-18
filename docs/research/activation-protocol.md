@@ -116,7 +116,9 @@ If governance, authorization, or Repo Governor appears in the answer, **Arm A ca
 
 The same session revealed a second, independent contamination: the workspace had **two roots**, `repo-governor` and the target. `repo-governor/AGENTS.md` was therefore applied — a root-level file, nothing to do with skill installation, unfixable by pruning.
 
-**Arm A requires a single-root workspace containing only the target.** A repository that is silent about governance stops being silent the moment it shares a workspace with one that is not, and no amount of care about the skill directory helps. Confirm root count before every Arm A session; it is the cheapest of these checks and the one that voids the run most completely.
+**Arm A requires a single-root workspace containing only the target.**
+
+**And it must be the same window for the whole arm.** A prompt run against the wrong repository produces a completely plausible answer — a governance refusal reads the same in any project, and rarely names the repository it evaluated. One control in this run was caught only because the agent happened to mention the repo by name; the same slip inside a measured prompt would have scored silently. Open the window once, keep it open, and do not let the host reopen a recent workspace in its place. A repository that is silent about governance stops being silent the moment it shares a workspace with one that is not, and no amount of care about the skill directory helps. Confirm root count before every Arm A session; it is the cheapest of these checks and the one that voids the run most completely.
 
 Record the answer either way — "the host does not load nested instruction files" is a finding worth having, and it is the difference between a measurement and a number.
 
