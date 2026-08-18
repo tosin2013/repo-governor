@@ -41,13 +41,15 @@ Leave it installed. In the wild, governance always competes with something offer
 
 ## Setup
 
+**The install path differs per host, and `.claude/skills/` is wrong for two of the three.** Cursor reads `.agents/skills/` and `.cursor/skills/`; Codex reads `.agents/skills/` and `.codex/skills/`; only Claude Code reads `.claude/skills/`. See [installation](../installation.md) for the table.
+
 ```bash
-git clone https://github.com/tosin2013/repo-governor <somewhere>
-mkdir -p <target-repo>/.claude/skills
-cp -R <somewhere> <target-repo>/.claude/skills/repo-governor
+git clone https://github.com/tosin2013/repo-governor <target-repo>/.agents/skills/repo-governor
 ```
 
-`.claude/` is untracked in the target, so nothing is committed to it. Verify the skill is discoverable before starting — a run where the skill was never installed measures installation, not activation.
+Add the vendor pointer the host needs, and keep `.agents/skills/` untracked in the target so nothing is committed to it.
+
+**Verify the host can see the skill before the first prompt.** A host that cannot find it behaves identically to one that found it and chose not to use it, so an unverified install turns every `NONE` into a measurement of installation rather than activation. Start a fresh session, ask the host to list its available skills, and confirm `repo-governor` appears with its description. Skills are discovered at session start, so a skill added mid-session is invisible until a new one opens.
 
 ### Contamination checklist, before the first prompt of an Arm A session
 

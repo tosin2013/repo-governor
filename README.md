@@ -113,7 +113,7 @@ docs/
 
 ## Design commitments
 
-- **Ships as an [Agent Skill](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview)** — an open standard adopted by 26+ platforms. Clone it into a skills directory; no install, no service, no vendor lock. ([ADR-001](docs/adrs/001-agent-skill-as-primary-delivery-surface.md))
+- **Ships as an [Agent Skill](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview)** — an open standard adopted by 26+ platforms. Clone it into a skills directory ([which one depends on the host](docs/installation.md)); no install, no service, no vendor lock. ([ADR-001](docs/adrs/001-agent-skill-as-primary-delivery-surface.md))
 - **Deterministic, not model-judged** — invariants are executable predicates, not prose an agent is asked to honor. Same inputs, same disposition, always. ([ADR-002](docs/adrs/002-deterministic-policy-engine-separate-from-model-judgment.md))
 - **Zero dependencies** — Python stdlib only. A tool that rules on what agents may change shouldn't drag in a transitive dependency tree. Adapters may be written in any language. ([ADR-011](docs/adrs/011-python-stdlib-only-engine-with-language-agnostic-adapters.md))
 - **Deny by default** — no permission is inferred from an available credential. ([ADR-005](docs/adrs/005-deny-by-default-permission-model.md))
