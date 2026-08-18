@@ -1,0 +1,22 @@
+{
+  "$comment": "Acceptance criteria for issue 2. The bar is a MEASUREMENT on repositories this project does not own, so the criteria check the instrument exists and runs -- the finding itself is recorded on the issue and in ADR-024's status.",
+  "authority_id": "2",
+  "criteria": [
+    {
+      "check": "file_exists",
+      "target": "tools/envelope-census.py"
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 tools/envelope-census.py tosin2013/repo-governor | grep -q 'UPPER BOUNDS'"
+    },
+    {
+      "check": "command_exit",
+      "target": "grep -q 'checklist_only' tools/envelope-census.py"
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/envelope.py"
+    }
+  ]
+}
