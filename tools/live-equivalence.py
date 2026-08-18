@@ -265,6 +265,17 @@ def self_test():
           score(wrong_but_agreeing, dict(wrong_but_agreeing), correct_withdrawal) == "wrong")
     check("providers disagreeing with each other scores diverge",
           score(wrong_but_agreeing, disagreeing, correct_withdrawal) == "diverge")
+    # `matches` is a SUBSET test, so two different projections can both satisfy
+    # the same expectation by differing only on a key the expectation omits.
+    # Without this case, `if same and correct` degrades to `if correct` with the
+    # suite still green: the three cases above all fail `correct` when they
+    # disagree, so the mutant reaches the right answer by accident. Here one
+    # provider reports `blocking` and the other is silent -- a real divergence
+    # that both sides map correctly.
+    check("providers differing outside the expected keys still diverge",
+          score({"authority": "CANCELLED", "admitted": False, "blocking": True},
+                {"authority": "CANCELLED", "admitted": False},
+                correct_withdrawal) == "diverge")
     check("a payload missing title is a usage error, not a divergence",
           mcp_missing([{"id": "x", "statusType": "backlog"}]) == ["status", "title"])
 
