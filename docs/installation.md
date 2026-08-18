@@ -17,10 +17,12 @@ Then add whatever pointer your host needs beside it:
 | Host | Reads | Status |
 |---|---|---|
 | **Claude Code** | `.claude/skills/<name>/SKILL.md` | **verified** — used throughout this repository's own development |
-| **Cursor** | `.agents/skills/`, `.cursor/skills/`, `~/.agents/skills/`, `~/.cursor/skills/` | from vendor docs; **unverified here** |
+| **Cursor** | `.agents/skills/`, `.cursor/skills/`, `~/.agents/skills/`, `~/.cursor/skills/` | **verified** 2026-08-18 — `.agents/skills/repo-governor/SKILL.md` was listed by a fresh Cursor session with its description ([#38](https://github.com/tosin2013/repo-governor/issues/38)) |
 | **Codex** | `.agents/skills/`, `.codex/skills/`, `~/.codex/skills/` | from vendor docs; **unverified here** |
 
-Only the Claude Code row is something this project has run. The other two are what the vendors document, and [#37](https://github.com/tosin2013/repo-governor/issues/37) and [#38](https://github.com/tosin2013/repo-governor/issues/38) are the runs that will replace "documented" with "verified" — or find that the docs are wrong, which is the more useful outcome.
+Codex is still vendor documentation rather than knowledge; [#37](https://github.com/tosin2013/repo-governor/issues/37) is the run that settles it. Cursor was settled by [#38](https://github.com/tosin2013/repo-governor/issues/38) and the docs were right.
+
+**`.claude/skills/` is wrong for Cursor and Codex**, which is worth stating plainly because it fails silently: the files are there, the host sees nothing, and the skill looks like it declined to activate rather than like it was never found.
 
 For a host that only reads a vendor-specific path, point it at the one copy rather than keeping two:
 
@@ -30,6 +32,18 @@ ln -s ../../.agents/skills/repo-governor .claude/skills/repo-governor
 ```
 
 Two real copies drift, and a drifted skill fails in the way that is hardest to notice: it works, and it is answering from the wrong version.
+
+## Two things that arrive with the clone
+
+The skill is a clone of this repository, so it brings this repository's own files with it.
+
+**A second skill.** `.claude/skills/github-project-release-manager/` is this project's board-management tooling. Hosts that walk the skills root recursively will list it as available — observed on Cursor. Harmless, and probably not what you wanted:
+
+```bash
+rm -rf <skills-dir>/repo-governor/.claude
+```
+
+**An `AGENTS.md` that talks about the wrong repository.** It says *this repository is governed by Repo Governor*, meaning `repo-governor`. On a host that loads nested agent-instruction files, it reads as a statement about whatever repository you installed into. In ordinary use that is closer to true than false and does no harm. For [measuring activation](research/activation-protocol.md) it is fatal, and the protocol carries the test for it.
 
 ## Verify the host can actually see it
 

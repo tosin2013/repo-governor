@@ -61,10 +61,40 @@ Arm A only means anything if the repository is genuinely silent about governance
 Confirm before starting:
 
 ```bash
-ls -a <target> | grep -iE 'repo-governor|governor|AGENTS'    # expect: nothing
+# Skill directories are the install, not contamination -- exclude them by exact
+# name. An earlier version of this check grepped for 'AGENTS' case-insensitively
+# and flagged `.agents/`, the very directory the skill has to live in, which
+# fails the check on every correct install.
+ls -a <target> \
+  | grep -vxE '\.(agents|claude|cursor|codex)' \
+  | grep -iE 'repo-governor|governor' ; \
+  ls <target>/AGENTS.md 2>/dev/null
+# expect: nothing from either
 ```
 
 A run that fails this check is not a low activation rate — it is no measurement at all.
+
+### The nested-instruction test, which decides whether Arm A is possible at all
+
+The installed skill is a clone of this repository, so `<skills-dir>/repo-governor/AGENTS.md` exists and states that the repository is governed. It is talking about `repo-governor`. **If the host loads nested agent-instruction files, it reads as though it were talking about the target**, and Arm A silently becomes Arm B.
+
+This is not answerable from the filesystem. Ask the host, in a fresh session with the target as the workspace, **before any measured prompt**:
+
+> What instructions, rules, or context files are currently applied to this workspace? List them.
+
+If governance, authorization, or Repo Governor appears in the answer, **Arm A cannot be measured on this host as installed**. Options, in order of preference: install the skill outside the target (a user-level skills directory), or record Arm A as unavailable for that host and report Arm B only. Do not proceed and hope.
+
+Record the answer either way — "the host does not load nested instruction files" is a finding worth having, and it is the difference between a measurement and a number.
+
+### A second skill arrives with the first
+
+This repository carries `.claude/skills/github-project-release-manager/` for its own board management. Cloning Repo Governor as a skill brings that along, and hosts that walk the skills root recursively will list it as an available skill. Observed on Cursor.
+
+It is unrelated to governance, so it does not leak the Arm A signal — but it **is** a competing skill that the measurement itself introduced, which is different from the competitors that were already there. Record it in the `other skill fired` column if it ever activates. To drop it from an install:
+
+```bash
+rm -rf <skills-dir>/repo-governor/.claude
+```
 
 ## Scoring
 
