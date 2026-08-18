@@ -54,14 +54,18 @@ AUTHORIZE_LABEL = os.environ.get("REPO_GOVERNOR_GH_AUTHORIZE_LABEL", "")
 # that window. Verified against a real repository with 380 issues: #1391 exists
 # and was reported as not existing. NOT_FOUND means "this work item does not
 # exist", so a pagination limit was being reported as an absence of authority.
-ISSUE_QUERY = """
-query($owner:String!, $repo:String!, $number:Int!) {
-  repository(owner:$owner, name:$repo) {
-    issue(number:$number) {
-        number title state stateReason
-        labels(first:20){ nodes{ name } }
-        assignees(first:5){ nodes{ login } }
-        milestone { title state }
+# `projectItems` is requested ONLY under the `project_status` signal. It used to
+# be requested always, which cost a real run: a token without Projects read made
+# `gh` exit 1, the adapter reported the whole provider unavailable, and the
+# engine returned a blocking UNKNOWN -- on a repository whose declared signal is
+# `milestone`, whose milestone field the same response had already returned
+# successfully. Every fact needed to answer was in hand and the answer was
+# refused because of a field nobody had asked a question about.
+#
+# Asking for a permission the declared signal does not need is also just
+# over-reach (§51 least privilege, ADR-005): the adapter should require exactly
+# the access its configuration implies, and no more.
+_PROJECT_ITEMS = """
         projectItems(first:5) {
           nodes {
             project { number title }
@@ -72,10 +76,21 @@ query($owner:String!, $repo:String!, $number:Int!) {
             }
           }
         }
+"""
+
+ISSUE_QUERY = """
+query($owner:String!, $repo:String!, $number:Int!) {
+  repository(owner:$owner, name:$repo) {
+    issue(number:$number) {
+        number title state stateReason
+        labels(first:20){ nodes{ name } }
+        assignees(first:5){ nodes{ login } }
+        milestone { title state }
+%s
     }
   }
 }
-"""
+""" % (_PROJECT_ITEMS if ADMISSION == "project_status" else "")
 
 # --- the normalization map, stated explicitly -------------------------------
 # Board status -> whether execution is authorized. GitHub cannot express
