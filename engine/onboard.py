@@ -21,6 +21,7 @@ Usage:  python3 engine/onboard.py <repo-path> [--json] [--write]
 from __future__ import annotations
 
 import json
+import importlib.machinery
 import subprocess
 import sys
 from pathlib import Path
@@ -91,6 +92,35 @@ def assess(repo: Path):
 
 
 # --- detection (§19). Filesystem evidence only; never credentials. -----------
+def _adr_status(path):
+    """Read one decision's status with the ADAPTER's own parser.
+
+    Importing it rather than reimplementing is the point: a detector with its own
+    notion of "has a status" is a second parser that will disagree with the first
+    (#27). If the adapter learns a dialect, detection learns it in the same commit.
+    """
+    import importlib.util
+    global _ADR_MOD
+    if "_ADR_MOD" not in globals() or _ADR_MOD is None:
+        spec = importlib.util.spec_from_loader(
+            "_adr_adapter",
+            importlib.machinery.SourceFileLoader(
+                "_adr_adapter",
+                str(Path(__file__).resolve().parent.parent / "adapters" / "adr")))
+        _ADR_MOD = importlib.util.module_from_spec(spec)
+        try:
+            spec.loader.exec_module(_ADR_MOD)
+        except Exception:  # noqa: BLE001 -- detection must degrade, never crash
+            _ADR_MOD = False
+    if _ADR_MOD is False:
+        return None
+    try:
+        m = _ADR_MOD.STATUS_RE.search(path.read_text(errors="ignore"))
+        return m.group(1).strip() if m else None
+    except OSError:
+        return None
+
+
 def _cite(repo, rel, note):
     return f"{rel}: {note}"
 
@@ -111,8 +141,10 @@ def detect(repo: Path):
         add("repository", "git", "adapters/git", "PROVIDER_DETECTED",
             [_cite(repo, ".git", "valid git repository")])
 
-    # architecture — ADR directory
-    for d in ("docs/adr", "docs/adrs", "docs/decisions"):
+    # architecture — ADR directory. `doc/adr` is adr-tools' default and `adrs/`
+    # is common at the repository root; missing them reported real collections
+    # as no provider at all (#27).
+    for d in ("docs/adr", "docs/adrs", "docs/decisions", "doc/adr", "adrs"):
         p = repo / d
         if p.is_dir():
             md = sorted(p.glob("*.md"))
@@ -120,22 +152,35 @@ def detect(repo: Path):
             import re as _re
             _num = _re.compile(r"^(?:adr[-_])?\d{3,4}[-_.]", _re.I)
             numbered = [f for f in md if _num.match(f.name)]
-            with_status = [f for f in numbered if "## Status" in f.read_text(errors="ignore")
-                           or "**Status**" in f.read_text(errors="ignore")]
-            strong = len(numbered) >= 2 and len(with_status) >= max(1, len(numbered) // 2)
+            # Count with the ADAPTER's parser, not a substring test. A substring
+            # test said 20 of 22 files "declare a Status" on a real repository
+            # where the adapter could read 2 -- detection promising a provider
+            # the adapter cannot deliver (#27). ADR-010 stops detection assigning
+            # AUTHORITY; it did not stop it overstating CAPABILITY.
+            readable = [f for f in numbered if _adr_status(f) is not None]
+            strong = len(numbered) >= 2 and len(readable) >= max(1, len(numbered) // 2)
             add("architecture", "adr", "adapters/adr",
                 "PROVIDER_DETECTED" if strong else "PROVIDER_UNCONFIRMED",
                 [_cite(repo, d, f"{len(numbered)} numbered file(s)"),
-                 _cite(repo, d, f"{len(with_status)} declare a Status")],
-                [] if strong else [_cite(repo, d, "too few files, or Status lines absent")],
+                 _cite(repo, d, f"{len(readable)} with a Status this adapter can read")],
+                [] if strong else [_cite(repo, d, f"only {len(readable)} of {len(numbered)} "
+                                                  "have a readable Status")],
                 path=d)
 
     # change_signals — Renovate / Dependabot
     for f, t in (("renovate.json", "renovate"), (".renovaterc.json", "renovate"),
                  (".github/dependabot.yml", "dependabot")):
         if (repo / f).exists():
-            add("change_signals", t, "adapters/change-signals-file", "PROVIDER_DETECTED",
-                [_cite(repo, f, "configuration present")])
+            # UNCONFIRMED, not DETECTED. The config proves the SERVICE is
+            # configured; it does not prove any bound adapter can read it.
+            # `change-signals-file` reads a local signals file, not a Renovate or
+            # Dependabot config -- proposing it here is detection naming an
+            # adapter that cannot serve the provider it detected (#27).
+            add("change_signals", t, "adapters/change-signals-file", "PROVIDER_UNCONFIRMED",
+                [_cite(repo, f, "configuration present")],
+                [_cite(repo, f, f"no adapter here reads {t}; change-signals-file reads a local "
+                                "signals file, so this binding needs a real adapter or a human "
+                                "exporting signals into that file")])
 
     # execution — Beads
     if (repo / ".beads").is_dir():

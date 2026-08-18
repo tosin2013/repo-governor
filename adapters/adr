@@ -14,10 +14,12 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from _protocol import cite, fail, main, ok, unknown  # noqa: E402
+from _protocol import cite, configured, fail, main, ok, unknown  # noqa: E402
 
 ROLE = "architecture"
-ADR_DIR = Path(os.environ.get("REPO_GOVERNOR_ADR_DIR", "docs/adrs"))
+# Where the decisions live is the BINDING's business, not this file's default
+# (#27). `docs/adrs` remains the fallback only when nobody said otherwise.
+ADR_DIR = Path(configured("REPO_GOVERNOR_ADR_DIR", "path", "docs/adrs"))
 
 STATUS_RE = re.compile(r"^\*\*Status\*\*:\s*(.+?)\s*$", re.M)
 TITLE_RE = re.compile(r"^#\s*(?:\d+\.\s*)?(.+?)\s*$", re.M)

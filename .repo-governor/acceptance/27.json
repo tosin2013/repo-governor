@@ -1,0 +1,26 @@
+{
+  "$comment": "Acceptance criteria for issue 27 -- the seam between detection and execution. All three checks assert behaviour, not that code changed.",
+  "authority_id": "27",
+  "criteria": [
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/bindings.py"
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/onboarding.py"
+    },
+    {
+      "check": "command_exit",
+      "target": "grep -q 'doc/adr' engine/onboard.py && grep -q '\"adrs\"' engine/onboard.py"
+    },
+    {
+      "check": "command_exit",
+      "target": "! grep -q '\"## Status\" in' engine/onboard.py"
+    },
+    {
+      "check": "command_exit",
+      "target": "grep -q 'configured(\"REPO_GOVERNOR_ADR_DIR\", \"path\"' adapters/adr"
+    }
+  ]
+}

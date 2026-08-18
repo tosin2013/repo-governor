@@ -102,6 +102,35 @@ def fail(role, function, etype, message):
 SUBJECT = os.environ.get("REPO_GOVERNOR_SUBJECT", "")
 
 
+def binding():
+    """The manifest binding for this invocation, or {} when driven directly."""
+    try:
+        b = json.loads(os.environ.get("REPO_GOVERNOR_BINDING", "") or "{}")
+        return b if isinstance(b, dict) else {}
+    except json.JSONDecodeError:
+        return {}
+
+
+def configured(env_var, binding_key, default):
+    """Resolve a repo-local path: explicit env, then the manifest binding, then a default.
+
+    `engine/onboard.py` detects where a provider's files actually live and writes
+    that into the proposed binding as `path`. Nothing read it. A repository with
+    149 decisions in `docs/adr` was detected correctly, bound correctly, and then
+    read at `docs/adrs` -- which does not exist -- so it governed as
+    PROVIDER_UNAVAILABLE (#27). Detection and execution were wired to different
+    values, and each looked right on its own.
+
+    Env wins over the binding so a conformance suite can drive an adapter at a
+    fixture without a manifest; the binding wins over the default so a human's
+    declared layout beats this project's convention.
+    """
+    explicit = os.environ.get(env_var)
+    if explicit:
+        return explicit
+    return binding().get(binding_key) or default
+
+
 def cite(source, ref, field=None):
     """One provenance entry. No timestamp — see module docstring.
 

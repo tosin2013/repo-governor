@@ -14,6 +14,7 @@ Usage:  python3 conformance/bindings.py
 from __future__ import annotations
 
 import copy
+import os as _os
 import json
 import sys
 import tempfile
@@ -196,6 +197,43 @@ def main():
     named = [p.name for p in sorted((ROOT / "adapters").iterdir())
              if p.is_file() and "tosin2013" in p.read_text(errors="ignore")]
     fails += check("no adapter contains the author's repository slug", not named, str(named))
+
+    print("\nDetection and execution are wired to the same value\n")
+
+    import subprocess as _sp2, tempfile as _tf2
+    with _tf2.TemporaryDirectory() as td:
+        alt = Path(td) / "alt"
+        (alt / "docs" / "adr").mkdir(parents=True)          # NOT docs/adrs
+        (alt / "docs" / "adr" / "001-d.md").write_text("# 1. D\n\n**Status**: Accepted\n")
+        (alt / "docs" / "adr" / "002-d.md").write_text("# 2. D\n\n**Status**: Accepted\n")
+
+        # 15. Onboarding must FIND a non-default layout. `doc/adr` is adr-tools'
+        #     default and `adrs/` is common; missing them reported real
+        #     collections as no provider at all (#27).
+        out = _sp2.run([sys.executable, str(ROOT / "engine" / "onboard.py"), str(alt)],
+                       capture_output=True, text=True, cwd=str(ROOT), timeout=120).stdout
+        fails += check("onboarding detects ADRs outside docs/adrs", "docs/adr:" in out, out[:120])
+
+        # 16. And the path it detected must REACH the adapter. Detection wrote
+        #     `path` into the proposed binding and nothing read it, so a detected
+        #     provider governed as PROVIDER_UNAVAILABLE.
+        r = _sp2.run([sys.executable, str(ROOT / "adapters" / "adr"),
+                      "query", "architecture", "get_provenance"],
+                     capture_output=True, text=True, cwd=str(alt), timeout=60,
+                     env={**_os.environ,
+                          "REPO_GOVERNOR_BINDING": json.dumps({"adapter": "adapters/adr",
+                                                               "path": "docs/adr"})})
+        got = json.loads(r.stdout)
+        fails += check("a binding `path` reaches the adapter",
+                       (got.get("value") or {}).get("documents") == 2, r.stdout[:120])
+
+    # 17. Detection must not promise more than the adapter can read. It counted
+    #     statuses with a substring test (20 of 22) where the adapter's parser
+    #     read 2 -- ADR-010 stops detection assigning authority, not overstating
+    #     capability.
+    src = (ROOT / "engine" / "onboard.py").read_text()
+    fails += check("detection counts statuses with the adapter's parser, not a substring test",
+                   '"## Status" in' not in src and "_adr_status(" in src)
 
     print(f"\n{'BINDINGS: CONFORMANT' if not fails else f'BINDINGS: NON-CONFORMANT ({fails})'}")
     return 0 if not fails else 1
