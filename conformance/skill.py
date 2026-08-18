@@ -100,6 +100,18 @@ def main():
         fails += check("an ungoverned repository yields AUTHORITY_SOURCE_MISSING naming its path",
                        "AUTHORITY_SOURCE_MISSING" in out and td in out, out[:120])
 
+    print("\nNo third-party workspace content is carried in this public repository\n")
+
+    # §51 forbids cross-repository leakage, and this repository is public. The
+    # rule was asserted all through the Linear work and was ALREADY broken --
+    # ADR-016 quoted a real issue identifier from a private workspace, found
+    # only when the check was finally run rather than repeated. Synthetic
+    # prefixes (ENG-, SIM-) are fine; a real workspace prefix is not.
+    import subprocess as _sp3
+    leaked = _sp3.run(["git", "grep", "-lIE", r"\bTOS-[0-9]{2,}"],
+                      capture_output=True, text=True, cwd=str(ROOT)).stdout.split()
+    fails += check("no real Linear workspace identifier is committed", not leaked, str(leaked))
+
     print("\nAny stated ADR count matches the ledger\n")
 
     # A count is a duplicated derivable fact, and duplicated state eventually

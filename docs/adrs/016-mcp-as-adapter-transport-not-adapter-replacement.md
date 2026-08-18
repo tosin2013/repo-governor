@@ -41,7 +41,7 @@ MCP *can* return typed data — the protocol supports structured content, and so
 > **Measured against a first-party server, 2026-08-17.** The original claim that "the common case in the wild is prose" was drawn from two samples and was too broad. Linear's official MCP server returns **typed JSON**:
 >
 > ```json
-> {"id":"TOS-299","title":"...","status":"Backlog","statusType":"backlog"}
+> {"id":"ENG-299","title":"...","status":"Backlog","statusType":"backlog"}
 > [{"type":"started","name":"In Review"},{"type":"backlog","name":"Backlog"}]
 > ```
 >
