@@ -17,6 +17,10 @@ Three ways to accidentally measure nothing, all of which this document exists to
    A batched session is not worthless — *"does it stay activated across a long conversation?"* is a real question, and one this protocol does not otherwise ask. Record it separately as a **primed-session** observation. Do not put it in the activation table.
 3. **Correcting the agent mid-run.** A missed activation is the finding. Rescuing it destroys the data point.
 
+   **This includes stopping a session early because it looks like it is about to act.** Let it run until it writes something or stops on its own. An agent that consults governance, selects an item, reads its scope and *then* stops is a different result from one that starts editing, and interrupting between those two makes them indistinguishable. Observed on Cursor, 2026-08-18: an Arm B session was halted while moving toward authorized work, and whether it would have edited a file is now unanswerable.
+
+   Working-tree changes are cheap to undo — check `git status --short` after each prompt and `git checkout -- .` if needed. The exception is a prompt that can mutate a remote: closing issues is not revertible by checkout, so interrupt if a session begins closing rather than proposing.
+
 ## Two arms
 
 The comparison is the measurement. A single activation rate is uninterpretable — 60% is neither good nor bad without knowing what the alternative surface buys.
