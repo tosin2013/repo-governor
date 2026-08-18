@@ -20,6 +20,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _preflight  # noqa: E402
 
 PROVIDERS = {
     "file-roadmap": {
@@ -221,6 +223,7 @@ def matches(obs, expect):
 
 
 def main():
+    absent = _preflight.banner()
     covered = diverged = mismatched = 0
     findings = []
     print("Layer 2 — cross-provider equivalence\n")
@@ -281,6 +284,8 @@ def main():
             print(f"  [{kind}] {sid}: {detail[:150]}")
     verdict = "EQUIVALENT" if not diverged and not mismatched else "NOT EQUIVALENT"
     print(f"\nLAYER 2: {verdict} across {covered} tested scenario(s)")
+    if verdict != "EQUIVALENT":
+        _preflight.attribute(absent)
     return 0 if verdict == "EQUIVALENT" else 1
 
 

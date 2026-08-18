@@ -28,6 +28,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _preflight  # noqa: E402
 
 # adapter -> (role, probe args, capability->function map, env that breaks the backend)
 SUITE = {
@@ -354,6 +356,7 @@ def check_adapter(adapter, spec, rep):
 
 
 def main(argv):
+    absent = _preflight.banner()
     targets = argv or list(SUITE)
     rep = Report()
     for adapter in targets:
@@ -373,6 +376,8 @@ def main(argv):
     fails = rep.failures()
     print(f"\n{len(rep.rows) - len(fails)}/{len(rep.rows)} checks passed")
     print("LAYER 1: " + ("CONFORMANT" if not fails else f"NON-CONFORMANT ({len(fails)} failures)"))
+    if fails:
+        _preflight.attribute(absent)
     return 0 if not fails else 1
 
 
