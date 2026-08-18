@@ -33,7 +33,7 @@ PROVIDERS = {
     },
     "dolt-decisions": {
         "adapter": "adapters/decision-history-dolt",
-        "env": {"REPO_GOVERNOR_DECISIONS_DB": ".repo-governor/decisions-db"},
+        "env": {"REPO_GOVERNOR_DECISIONS_DB": "conformance/fixtures/decisions-db"},
         "role": "decision_history",
     },
     "github-decisions": {

@@ -318,11 +318,26 @@ def check_adapter(adapter, spec, rep):
     # C9 writers are gated on writability, not merely on reachability (#17)
     if spec.get("readonly_env"):
         ro = dict(base or {}); ro.update(spec["readonly_env"])
+        # Establish read-only HERE rather than relying on committed permissions.
+        # git does not preserve directory modes, so the fixture cloned writable
+        # and this check quietly tested nothing on every machine but the one it
+        # was written on -- a fixture whose property does not survive the
+        # transport that carries it.
+        import os as _os9, stat as _st9
+        _ro_dir = ROOT / list(spec["readonly_env"].values())[0]
+        _restore = []
+        if _ro_dir.is_dir():
+            for _d in [_ro_dir, _ro_dir / ".dolt"]:
+                if _d.is_dir():
+                    _restore.append((_d, _d.stat().st_mode))
+                    _os9.chmod(_d, _st9.S_IRUSR | _st9.S_IXUSR)
         rc3, out3, _ = run(adapter, ["describe"], ro)
         try:
             d3 = json.loads(out3)
             t = d3.get("transport", {})
             good = t.get("reachable") is True and t.get("writable") is False and d3.get("writers") == []
+            for _d, _m in _restore:
+                _os9.chmod(_d, _m)
             rep.add(adapter, "C9 unwritable transport advertises no writers", good,
                     "" if good else f"reachable={t.get('reachable')} writable={t.get('writable')} "
                                     f"writers={d3.get('writers')}")
