@@ -1,0 +1,30 @@
+{
+  "$comment": "Acceptance criteria for issue 41 (live withdrawal scenario). Criterion 3 is the load-bearing one: it fails unless the run reports 5 of 5 with nothing skipped, so a file recording another partial run cannot pass. Criterion 5 enforces §51 mechanically rather than by reminder -- it fails the file if a real Linear identifier appears in it, which is the defect that was actually caught once before in ADR-016.",
+  "authority_id": "41",
+  "criteria": [
+    {
+      "check": "file_exists",
+      "target": "docs/research/withdrawal-live.md"
+    },
+    {
+      "check": "command_exit",
+      "target": "grep -qi 'authority withdrawn' docs/research/withdrawal-live.md"
+    },
+    {
+      "check": "command_exit",
+      "target": "grep -qE '5 of 5' docs/research/withdrawal-live.md && grep -qE 'skipped: 0' docs/research/withdrawal-live.md"
+    },
+    {
+      "check": "command_exit",
+      "target": "grep -qiE 'EQUIVALENT|DIVERGENCE' docs/research/withdrawal-live.md"
+    },
+    {
+      "check": "command_exit",
+      "target": "! grep -qE 'TOS-[0-9]+' docs/research/withdrawal-live.md"
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/layer2.py"
+    }
+  ]
+}
