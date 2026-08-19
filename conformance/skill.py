@@ -238,6 +238,28 @@ def main():
     for tool in ("onboard-interactive.py", "selftest.py"):
         fails += check(f"README points at {tool}", tool in rd)
 
+    print("\nThe lanes point at the governed repository's own conventions\n")
+
+    # Repo Governor rules on authority and says nothing about house style --
+    # which is correct, and was silently total: no workflow page mentioned
+    # CONTRIBUTING.md, AGENTS.md, commits or pull requests at all. An agent
+    # got a correct verdict and no signal to branch, to run the repository's
+    # own checks, or to respect its commit rules. Every one of those happened
+    # HERE only because this repository's AGENTS.md points at its
+    # CONTRIBUTING.md, and that chain exists nowhere else.
+    for page in ("starting-work.md", "finishing-work.md"):
+        text = (ROOT / "docs" / "workflows" / page).read_text(encoding="utf-8")
+        fails += check(f"{page} names the governed repository's CONTRIBUTING.md",
+                       "CONTRIBUTING.md" in text,
+                       "the lane that starts or lands work must say whose rules apply")
+        fails += check(f"{page} names its AGENTS.md too",
+                       "AGENTS.md" in text,
+                       "not every harness loads it automatically")
+        fails += check(f"{page} says the repository is the GOVERNED one, not the skill",
+                       "governed" in text.lower(),
+                       "an install carries files with the same names; naming which "
+                       "repository is meant is the whole point (ADR-027)")
+
     print("\nThe conformance suite set is one fact, not six\n")
 
     # Same defect as the ADR counts above, different noun. The suite count has

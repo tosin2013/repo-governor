@@ -461,6 +461,32 @@ def main():
         fails += check("an explicitly declared host installs",
                        (tgt / ".cursor" / "hooks.json").exists())
 
+    # What an install CARRIES, not only what it removes. The prune list is one
+    # place a licence obligation could be dropped by accident, and until now
+    # nothing looked. Apache-2.0 section 4(a) requires recipients get a copy of
+    # the License and 4(d) requires the NOTICE travel with it, so their
+    # SURVIVAL is as much a contract as CONTRIBUTING.md's removal.
+    with tempfile.TemporaryDirectory() as td:
+        tgt = pathlib.Path(td) / "carry"
+        tgt.mkdir()
+        subprocess.run(["git", "init", "-q", str(tgt)], capture_output=True)
+        (tgt / ".repo-governor.json").write_text(
+            (ROOT / ".repo-governor.json").read_text(), encoding="utf-8")
+        subprocess.run(["bash", str(ROOT / "tools" / "install-skill.sh"),
+                        str(tgt), ".agents/skills", "no"],
+                       capture_output=True, text=True, stdin=subprocess.DEVNULL)
+        dest = tgt / ".agents" / "skills" / "repo-governor"
+        for keep in ("LICENSE", "NOTICE"):
+            fails += check(f"the install carries {keep} (Apache-2.0 4a/4d)",
+                           (dest / keep).exists(),
+                           "a distribution without it is a licence violation, and the "
+                           "prune list is where that would happen silently")
+        fails += check("the install does NOT carry Repo Governor's CONTRIBUTING.md",
+                       not (dest / "CONTRIBUTING.md").exists(),
+                       "it states this project's branch policy and conformance counts, "
+                       "which are false inside the repository it was installed into")
+        fails += check("SKILL.md survives the prune", (dest / "SKILL.md").exists())
+
     # Onboarding advice must reach a target with NO recognisable host directory
     # and NO terminal. It was nested inside the host block and gated on a TTY,
     # so a plain repo installed non-interactively got no guidance at all -- and
