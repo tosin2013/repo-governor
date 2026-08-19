@@ -48,6 +48,14 @@ ENGINE = SKILL / "engine"
 # stop all editing in every repository that has not onboarded.
 REFUSAL = ("NO_EXECUTION_AUTHORITY", "AUTHORITY_WITHDRAWN", "CONFLICT", "UNKNOWN")
 
+# Substrings of tool names that change a file, across hosts: Claude's Edit/Write/
+# NotebookEdit, VS Code's create_file/insert_edit_into_file/replace_string_in_file,
+# Gemini's write_file/replace, Codex's apply_patch. Matched as substrings because
+# every host names its tools differently and a closed list would silently miss
+# the next one. An unknown tool name is ALLOWED, not refused -- failing closed on
+# a name we do not recognise would block work for a naming difference.
+EDIT_TOOLS = ("edit", "write", "patch", "replace", "notebook", "create_file")
+
 
 def _payload():
     try:
@@ -142,6 +150,8 @@ def _emit(context=None, deny_reason=None, user_msg=None, exit2=False, event=None
             "permissionDecisionReason": deny_reason,
         })
         out["permission"] = "deny"          # Cursor's spelling
+        out["decision"] = "deny"            # Gemini CLI's spelling
+        out["reason"] = deny_reason         # Gemini reads the reason from here
     if out:
         print(json.dumps(out))
     if deny_reason and exit2:
@@ -209,6 +219,15 @@ def moment_write(pl, repo, mf, enforcing, exit2):
     """
     if mf is None:
         return 0
+
+    # Filter on the tool ourselves. VS Code PARSES matchers and does not APPLY
+    # them, so this fires on every tool call there -- including reads and shell
+    # commands. A governance layer that interrupts `ls` is one that gets
+    # uninstalled, and nothing here can rule on a tool that changes no file.
+    tool = (pl.get("tool_name") or pl.get("toolName") or "").lower()
+    if tool and not any(k in tool for k in EDIT_TOOLS):
+        return 0
+
     sf = _session_file(repo, pl)
 
     if not sf.exists():

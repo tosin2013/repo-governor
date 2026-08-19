@@ -126,16 +126,21 @@ case "$SKILLS_DIR" in
   *.claude*) HOST=claude ;;
   *.cursor*) HOST=cursor ;;
   *.codex*)  HOST=codex ;;
+  *.gemini*) HOST=gemini ;;
+  *vscode*|*.github*) HOST=vscode ;;
   *)
     if   [ -d "$TARGET/.cursor" ]; then HOST=cursor
     elif [ -d "$TARGET/.claude" ]; then HOST=claude
     elif [ -d "$TARGET/.codex"  ]; then HOST=codex
+    elif [ -d "$TARGET/.gemini" ]; then HOST=gemini
     else HOST=unknown; fi ;;
 esac
 case "$HOST" in
   claude) HOST_CFG=".claude/settings.json" ;;
   cursor) HOST_CFG=".cursor/hooks.json" ;;
   codex)  HOST_CFG=".codex/hooks.json" ;;
+  gemini) HOST_CFG=".gemini/settings.json" ;;
+  vscode) HOST_CFG=".github/hooks/repo-governor.json" ;;
   *)      HOST_CFG="" ;;
 esac
 [ -n "$HOST_CFG" ] && HOST_KNOWN=1 || HOST_KNOWN=0
@@ -215,10 +220,27 @@ if kept:
     print(f"  NOTE: replaced your existing {', '.join(kept)} entries -- check them")
 if host != "claude":
     print(f"  WARNING: the {host} template is UNVERIFIED. Event names come from its")
-    print("  docs; the stdin field names have never been confirmed against a real")
-    print("  host. Before trusting a result from it, check the hook actually")
-    print("  reaches the model -- see 'Proving the hook actually ran' in")
-    print("  docs/installation.md.")
+    print("  docs; the stdin field names have never been confirmed on a real host.")
+    print()
+    print("  A hook that runs and delivers nothing looks EXACTLY like a model")
+    print("  ignoring governance. That happened on Claude Code: the operator saw a")
+    print("  delivery token and the model reported none. So check delivery before")
+    print("  you trust anything this hook does or fails to do:")
+    print()
+    print("    export RG_HOOK_VERBOSE=1")
+    print(f"    echo '{{\"session_id\":\"x\",\"cwd\":\"{target}\"}}' \\")
+    print(f"      | python3 {rg}/tools/hooks/governance-hook.py prompt")
+    print()
+    print("  Then, in a fresh session of your agent, ask it -- with no tool calls --")
+    print("  whether it has a governance delivery token, and compare. If it does not")
+    print("  match, the hook is not reaching the model and any result from it is not")
+    print("  evidence. Report either way: docs/installation.md names the issue.")
+if host == "codex":
+    print()
+    print("  CODEX: project hooks load only when .codex/ is TRUSTED. An untrusted")
+    print("  directory behaves exactly like a hook that does nothing. Codex also")
+    print("  documents no prompt-submit event, so only the write check is installed")
+    print("  -- an AGENTS.md is the whole activation remedy on this host.")
 print("  advisory only. Blocking needs repo_governor.enforcement='blocking' in the")
 print("  manifest AND --exit2-on-deny on the write hook; neither was added.")
 PYHOOK
