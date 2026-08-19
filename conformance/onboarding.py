@@ -254,6 +254,17 @@ def main():
                 known = set(_re2.findall(
                     r'os\.environ\.get\(\s*"(REPO_GOVERNOR_GH_[A-Z_]+)"', adp))
                 stray = sorted(set(env_) - known)
+                # Validation is not enough and the tool must say so. Three
+                # onboarding attempts declared project_status on a repository
+                # with no Project; --validate stayed green and every id read
+                # NOT_ON_BOARD. Only asking a real question exposes that.
+                rep.add("proposal-e2e", "the tool tells you to ask a real question",
+                        "completion.py" in r.stdout and "validation does not catch" in r.stdout,
+                        "--validate passes on a wrong admission signal (issue 51)")
+                rep.add("proposal-e2e", "it says what a wrong signal looks like",
+                        "NOT_ON_BOARD" in r.stdout and "NOT_ADMITTED" in r.stdout,
+                        "the same reason for every id is the tell")
+
                 rep.add("proposal-e2e", "the manifest sets no env the adapter ignores",
                         not stray, f"{stray} is dead config that reads as configuration")
 

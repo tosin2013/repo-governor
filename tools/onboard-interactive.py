@@ -196,6 +196,19 @@ def main(argv):
     print(f"  cd {repo} && mv {PROPOSAL} .repo-governor.json")
     print(f"  python3 {SKILL / 'engine' / 'manifest.py'} --validate")
     print("\nIf validation fails, rename it back. Nothing governs until it passes.")
+    # --validate does NOT catch a wrong admission signal, or a binding that
+    # cannot answer at all (issue 51). Only asking a real question does. Three
+    # separate onboarding attempts declared project_status on a repository with
+    # no Project; every id then read NOT_ON_BOARD, and validation stayed green
+    # throughout.
+    print("\nTHEN ASK IT A REAL QUESTION -- validation does not catch a wrong signal:")
+    print(f"  python3 {SKILL / 'engine' / 'completion.py'} <an open issue number>")
+    print("\n  A real verdict (EXECUTE, CONTINUE, NO_EXECUTION_AUTHORITY,")
+    print("  STOP_COMPLETE) means the binding works.")
+    print("  UNKNOWN with the SAME reason for every id you try means the")
+    print("  admission signal is probably wrong -- NOT_ON_BOARD when there is no")
+    print("  Project, NOT_ADMITTED for everything when nothing carries the")
+    print("  milestone or label you named. Re-run this tool and pick again.")
     return 0
 
 
