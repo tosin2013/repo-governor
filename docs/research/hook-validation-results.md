@@ -5,6 +5,10 @@
 
 ## Host
 
+**Host:** Claude Code v2.1.235, Opus 4.6 (Google Vertex AI), Linux.
+
+> That plain line exists because issue 44's criteria `grep` for the literal string `host:`, and the table below — which carries the same information — did not match. **The criterion tests formatting while claiming to test content.** Adding the line is honest, since the requirement is that the host be identifiable and it is; but the check would have passed on `host: banana` and failed on any correctly-recorded result written as a table. Recorded rather than quietly satisfied, and worth remembering the next time criteria are written: `grep` for a value that is hard to fake, not for a label that is easy to type.
+
 | | |
 |---|---|
 | Host | Claude Code v2.1.235, Linux (`/home/vpcuser`) |
