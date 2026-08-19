@@ -1,0 +1,8 @@
+{
+  "$comment": "Acceptance criteria for issue 80. The deliverable is a DECISION RECORD in Proposed state, not an implementation -- the premise (that level predicts the need for a stronger backend) is unmeasured, and encoding it before measuring is what the issue warns against. Acceptance of the ADR is a human act (section 68) and is deliberately NOT a criterion here: this work is done when the question is recorded well, not when somebody agrees with it.",
+  "authority_id": "80",
+  "criteria": [
+    {"check": "command_exit", "target": "./tools/run-conformance.sh skill"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh vocabulary"}
+  ]
+}

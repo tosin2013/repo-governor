@@ -1,0 +1,8 @@
+{
+  "$comment": "Acceptance criteria for issue 81. WHAT THIS CANNOT EXPRESS: whether a third party can actually follow the document. Only somebody outside this repository writing an adapter against it settles that, which is why the contribution issues exist. A conformance check can assert the document states the pass-through rule and is reachable from providers.md; it cannot assert the rule was understood.",
+  "authority_id": "81",
+  "criteria": [
+    {"check": "file_exists",  "target": "references/integrations.md"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh skill"}
+  ]
+}

@@ -306,6 +306,23 @@ def main(argv):
                 print(f"  {e}")
             return 1
         findings = check_adapters(m)
+        # ADR-006 line 18: the profile determines which providers are REQUIRED.
+        # The mapping has been in policies/*.json since the profiles were
+        # written and was read by nothing (issue 79). --validate is what a
+        # person runs to find out whether they onboarded correctly, so an
+        # unmet requirement belongs here rather than only in a status view.
+        #
+        # A role bound to an adapter reporting configured=false does NOT count
+        # as met: structurally present and unable to answer is the state issue
+        # 51 was about.
+        import vocabulary as _V  # noqa: PLC0415 -- local, avoids an import cycle
+        unusable = {role for role, _a, kind, _d in findings if kind == "NOT_CONFIGURED"}
+        bound = {r for r in (m.get("providers") or {}) if not r.startswith("$")} - unusable
+        for role in sorted(set(_V.required_roles(m["condition"]["profile"])) - bound):
+            findings.append((role, "(unbound)", "REQUIRED_ROLE_UNBOUND",
+                             f"{m['condition']['profile']} requires this role; it is not "
+                             "usable here. Bind it, or reassess the condition -- the level "
+                             "is a human's to change (ADR-006 rule 1)."))
         for role, adapter, kind, detail in findings:
             print(f"  [{kind}] {role} -> {adapter}: {detail}")
         n = len(m["providers"]) 
