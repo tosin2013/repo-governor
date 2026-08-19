@@ -1,6 +1,6 @@
 # 29. Hooks as a Deterministic Delivery Surface
 
-**Status**: Proposed — **narrowed 2026-08-19 by its own validation**. The activation claim was refuted; see *Measured consequences*. The enforcement claim stands untested.
+**Status**: Proposed — **ready for ratification**. Validated 2026-08-19 by a four-condition controlled comparison: the activation claim holds only where no `AGENTS.md` exists, and the enforcement claim is proven. Acceptance is a human act (§68).
 **Date**: 2026-08-19
 **Domain**: Distribution & agent integration
 **Amends**: [ADR-001](001-agent-skill-as-primary-delivery-surface.md) — promotes "coding-agent hooks" from a deferred §65 candidate to a secondary delivery surface. The Agent Skill remains primary.
@@ -62,7 +62,20 @@ This ADR was written to fix an activation miss. **Validation refuted that.**
 
 Worse for the original motivation: the hook is deliberately silent in un-onboarded repositories, and prompt 1 failed in an un-onboarded repository. **The surface could never have spoken in the case that prompted it.** The only row where it improves activation is a governed repository with no `AGENTS.md` — which one file would also fix.
 
-**What survives is enforcement, and only that.** `AGENTS.md` is prose and cannot stop a write; `PreToolUse` with exit 2 can. ADR-001's second named weakness — *"A skill advises; it cannot block"* — is untouched by prose and remains the hook's sole unrefuted justification. It has not been tested. Until it is, this ADR stays `Proposed`, and the activation argument in its Context above should be read as **the reason it was written, not as a finding it established**.
+**Resolved by a controlled comparison**, same repository and prompt, one variable at a time:
+
+| `AGENTS.md` | prompt hook | write hook | Result |
+|---|---|---|---|
+| present | on | on | refuses |
+| absent | on | on | refuses, quoting text found only in the injection |
+| absent | **off** | off | **edits immediately** |
+| absent | off | **on** | attempts the edit, **blocked by exit 2** |
+
+- Activation: the hook adds nothing where `AGENTS.md` exists, and **governs on its own where it does not** (row 2 vs row 3). Row 3 also shows the skill description alone does not activate in a governed repository — the un-onboarded confound behind Arm A prompt 1's NONE is removed.
+- Enforcement: **proven** (row 4). A write was prevented by mechanism rather than persuasion, which is what ADR-001 said the skill layer could not do.
+- Reachability: blocking only engages when advisory delivery is absent. Where injection works the agent stops first, so **enforcement is a backstop against a non-compliant agent, not part of the normal path**.
+
+**The hook is not a security boundary.** Offered options after being blocked, the agent proposed *"remove it from `.claude/settings.json`"* unprompted, within one turn. It has file access and the config is a file. This stops mistakes — which is the common case, and it did so here — but containment requires somewhere the agent cannot reach: CI, branch protection, or review.
 
 Full record: [`docs/research/hook-validation-results.md`](../research/hook-validation-results.md). Candidates that depend on the enforcement test are captured in [issue 45](https://github.com/tosin2013/repo-governor/issues/45), **unmilestoned**, so the engine returns the disposition `UNKNOWN` with a blocking unknown whose reason is `NOT_ADMITTED` — `NOT_ADMITTED` is a reason code, not a disposition, and does not appear in `DISPOSITIONS` — if enforcement fails, this surface should be deleted rather than kept as a plausible-sounding option, and issue 45 goes with it.
 
