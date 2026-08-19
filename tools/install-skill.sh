@@ -26,6 +26,7 @@ set -euo pipefail
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TARGET="${1:-}"
 SKILLS_DIR="${2:-.agents/skills}"
+HOOKS_OPT="${3:-ask}"     # ask | yes | no -- see the hook block at the end
 
 if [ -z "$TARGET" ]; then
   echo "usage: tools/install-skill.sh <target-repo> [skills-dir]" >&2
@@ -112,4 +113,64 @@ else
   echo "  Fix it with EITHER (an AGENTS.md is simpler and vendor-neutral):"
   echo "    1. an AGENTS.md saying the repository is governed and how to run the engine"
   echo "    2. the hook surface -- see docs/installation.md, section 'Hooks'"
+fi
+
+# --- the hook offer -------------------------------------------------------
+# Consent-gated, never default-on. Writing hook config into a settings.json the
+# user owns is fine when they said yes and wrong when they did not; the rule is
+# no SILENT write, not no write. Same shape as SKILL.md's --write.
+case "$SKILLS_DIR" in
+  *.claude*) HOST_IS_CLAUDE=1 ;;
+  *)         HOST_IS_CLAUDE=0 ;;
+esac
+
+if [ "$HOST_IS_CLAUDE" = "1" ] && [ "$HOOKS_OPT" != "no" ]; then
+  echo
+  if [ ! -f "$TARGET/.repo-governor.json" ]; then
+    echo "NOTE: the hook would be SILENT here -- $TARGET has no .repo-governor.json."
+    echo "      The hook only speaks in a governed repository. Onboarding this one"
+    echo "      makes it no longer silent about governance, which ends any activation"
+    echo "      measurement in progress against it (docs/research/activation-protocol.md)."
+    echo "      Not offering to install it."
+  else
+    REPLY_H="n"
+    if [ "$HOOKS_OPT" = "yes" ]; then
+      REPLY_H="y"
+    elif [ -t 0 ]; then
+      printf "Enable the governance hook for Claude Code in %s? [y/N] " "$TARGET"
+      read -r REPLY_H || REPLY_H="n"
+    else
+      echo "Hook not installed (non-interactive). Re-run with 'yes' as the 3rd argument to install it."
+    fi
+    case "$REPLY_H" in
+      [yY]*)
+        RG_ABS="$(cd "$DEST" && pwd)"
+        python3 - "$TARGET" "$RG_ABS" <<'PYHOOK'
+import json, pathlib, sys
+target, rg = pathlib.Path(sys.argv[1]), sys.argv[2]
+h = f"{rg}/tools/hooks/governance-hook.py"
+cfg = {
+  "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "python3",
+      "args": [h, "prompt"], "timeout": 20, "statusMessage": "Checking governance..."}]}],
+  "PreToolUse": [{"matcher": "Edit|Write|NotebookEdit", "hooks": [{"type": "command",
+      "command": "python3", "args": [h, "write"], "timeout": 20}]}],
+  "PostToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "python3",
+      "args": [h, "capture"], "timeout": 20}]}],
+}
+p = target / ".claude" / "settings.json"
+cur = json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+kept = [k for k in cfg if k in cur.get("hooks", {})]
+cur.setdefault("hooks", {}).update(cfg)          # merge; never replace the file
+p.parent.mkdir(parents=True, exist_ok=True)
+p.write_text(json.dumps(cur, indent=2) + "\n", encoding="utf-8")
+print(f"  hook installed -> {p}")
+if kept:
+    print(f"  NOTE: replaced your existing {', '.join(kept)} entries -- check them")
+print("  advisory only. Blocking needs repo_governor.enforcement='blocking' in the")
+print("  manifest AND --exit2-on-deny on the write hook; neither was added.")
+PYHOOK
+        ;;
+      *) echo "  Hook not installed. See docs/installation.md if you change your mind." ;;
+    esac
+  fi
 fi

@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import json
 import os
+import pathlib
 import re
 import subprocess
 import sys
@@ -270,21 +271,59 @@ def main():
     fails += check("the hook section calls the surface optional",
                    "optional" in hook_sec.lower())
 
-    # --- the installer advises, and must never configure ---------------------
-    # Writing hook config into a user's settings.json is the same error the
-    # prune exists to prevent (d8a21a4), with executable config instead of
-    # prose. The installer may warn; it may not write.
+    # --- the installer may advise and offer; it may never write silently -----
+    # Tested by RUNNING it, not by grepping. The first version grepped for
+    # "settings.json" and fired on the comment explaining why we do not write
+    # it. The rule is no SILENT write -- an explicit yes is consent, not
+    # imposition, which is the same line SKILL.md draws for --write.
     inst_sh = (ROOT / "tools" / "install-skill.sh").read_text()
     fails += check("installer warns when the target has no AGENTS.md",
                    "no AGENTS.md" in inst_sh)
-    # Comments are stripped first: the comment explaining WHY we do not write
-    # settings.json naturally names it, and the first version of this check
-    # failed on the clean file because of that. A guard that fires on its own
-    # rationale is worse than none.
-    code = "\n".join(l for l in inst_sh.splitlines() if not l.strip().startswith("#"))
-    fails += check("installer never writes to a host settings.json",
-                   "settings.json" not in code,
-                   "advice only -- configuring the user's host is the prune's own error")
+
+    installer = ROOT / "tools" / "install-skill.sh"
+    with tempfile.TemporaryDirectory() as td:
+        tgt = pathlib.Path(td) / "governed"
+        tgt.mkdir()
+        subprocess.run(["git", "init", "-q", str(tgt)], capture_output=True)
+        (tgt / ".repo-governor.json").write_text(
+            (ROOT / ".repo-governor.json").read_text(), encoding="utf-8")
+        r = subprocess.run(["bash", str(installer), str(tgt), ".claude/skills"],
+                           capture_output=True, text=True, stdin=subprocess.DEVNULL)
+        wrote = (tgt / ".claude" / "settings.json").exists()
+        fails += check("non-interactive install writes no settings.json",
+                       r.returncode == 0 and not wrote,
+                       "a silent host reconfiguration is the prune's own error")
+        fails += check("non-interactive install says how to opt in",
+                       "non-interactive" in r.stdout)
+
+    with tempfile.TemporaryDirectory() as td:
+        tgt = pathlib.Path(td) / "governed"
+        tgt.mkdir(); (tgt / ".claude").mkdir()
+        subprocess.run(["git", "init", "-q", str(tgt)], capture_output=True)
+        (tgt / ".repo-governor.json").write_text(
+            (ROOT / ".repo-governor.json").read_text(), encoding="utf-8")
+        (tgt / ".claude" / "settings.json").write_text(
+            json.dumps({"permissions": {"allow": ["Bash(ls:*)"]}}), encoding="utf-8")
+        subprocess.run(["bash", str(installer), str(tgt), ".claude/skills", "yes"],
+                       capture_output=True, text=True, stdin=subprocess.DEVNULL)
+        got = json.loads((tgt / ".claude" / "settings.json").read_text())
+        fails += check("explicit yes installs the hook",
+                       "UserPromptSubmit" in got.get("hooks", {}))
+        fails += check("explicit yes preserves the user's own settings",
+                       "permissions" in got,
+                       "merging must never replace a file the user owns")
+
+    with tempfile.TemporaryDirectory() as td:
+        tgt = pathlib.Path(td) / "ungoverned"
+        tgt.mkdir()
+        subprocess.run(["git", "init", "-q", str(tgt)], capture_output=True)
+        r = subprocess.run(["bash", str(installer), str(tgt), ".claude/skills", "yes"],
+                           capture_output=True, text=True, stdin=subprocess.DEVNULL)
+        fails += check("even 'yes' does not install into an un-onboarded repository",
+                       not (tgt / ".claude" / "settings.json").exists()
+                       and "SILENT" in r.stdout,
+                       "the hook cannot speak without a manifest; installing it there "
+                       "only ends an activation measurement")
 
     # --- stdlib only (ADR-011) ----------------------------------------------
     # Tested against sys.stdlib_module_names, not a hand-maintained allowlist.

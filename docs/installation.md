@@ -131,6 +131,20 @@ The hook was built to fix an activation miss ([#36](https://github.com/tosin2013
 | Cursor | `.cursor/hooks.json` | events and exit codes yes; **stdin field names no** |
 | Codex CLI | `.codex/hooks.json` | **no** — no Codex host has been available to this project ([#37](https://github.com/tosin2013/repo-governor/issues/37)) |
 
+The installer offers it when the host is Claude Code and the target is **governed**:
+
+```bash
+tools/install-skill.sh <target> .claude/skills          # prompts: Enable the hook? [y/N]
+tools/install-skill.sh <target> .claude/skills yes      # non-interactive opt-in
+tools/install-skill.sh <target> .claude/skills no       # never ask
+```
+
+Defaults to **no**. Non-interactive runs never write. It merges into an existing `.claude/settings.json` rather than replacing it, and reports any of its own keys it overwrote. It installs **advisory** hooks only — blocking needs `enforcement: "blocking"` in the manifest *and* `--exit2-on-deny` on the write hook, neither of which the installer adds.
+
+**It refuses outright in an un-onboarded repository**, because the hook cannot speak without a manifest and onboarding one purely to enable a hook ends any activation measurement running against it.
+
+To configure it by hand instead:
+
 ```bash
 RG=/absolute/path/to/installed/skill      # the directory containing SKILL.md
 
