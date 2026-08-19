@@ -274,6 +274,30 @@ def main():
                 rep.add("templates", f"activation form asks about: {phrase}",
                         phrase.lower() in av.lower(), why)
 
+            # The self-test must not become a mechanical checklist. Its whole
+            # point is that the mechanical half proves nothing: a skill can be
+            # installed, a manifest valid, and the model still never consult it.
+            st = (ROOT_ / "tools" / "selftest.py")
+            rep.add("templates", "selftest exists", st.exists())
+            if st.exists():
+                sb = st.read_text()
+                rep.add("templates", "selftest says the mechanical half is insufficient",
+                        "nowhere near sufficient" in sb,
+                        "a green checklist that does not measure activation is the "
+                        "exact failure ADR-001 names")
+                rep.add("templates", "selftest carries a control prompt",
+                        "CONTROL" in sb and "false positive" in sb,
+                        "without one, a skill that fires on everything scores perfectly")
+                rep.add("templates", "selftest tells the user what to do at <3/3",
+                        "AGENTS.md" in sb and "hook" in sb,
+                        "a diagnostic with no remedy is a complaint")
+                rep.add("templates", "selftest links the report form",
+                        "activation-result.yml" in sb)
+                r_st = _sp.run([sys.executable, str(st), td], capture_output=True, text=True)
+                rep.add("templates", "selftest runs on an ungoverned repo without crashing",
+                        r_st.returncode == 0 and "not onboarded" in r_st.stdout,
+                        r_st.stderr[:120])
+
             # The PR form must carry the two defects this repository actually has.
             pr = (ROOT_ / ".github" / "PULL_REQUEST_TEMPLATE.md").read_text()
             rep.add("templates", "PR template asks whether the test was mutated",

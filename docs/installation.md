@@ -246,3 +246,17 @@ python3 <skill>/engine/manifest.py --validate      # want: READY_FOR_GOVERNANCE
 If it fails, rename it back. Nothing governs until it passes.
 
 **If your tracker is not one we support**, pick *"Something else"* — the tool prints a `gh issue create` line for an adapter request and points at `adapters/_protocol.py`, which is the whole contract. Every shipped adapter is a single file, and the engine never changes to accommodate one ([ADR-003](adrs/003-seven-provider-roles-with-normalized-contracts.md)).
+
+## Does it actually work on your harness?
+
+Installing the skill does not mean it will fire. Activation is model-mediated: published benchmarks put roughly half of skill invocations at never firing, and this project measured **20/20 on one host and 0/2 on another** using the same skill, the same prompts and the same repository.
+
+```bash
+python3 tools/selftest.py [repo-path]
+```
+
+The mechanical half — skill present, manifest valid, always-on file present — is checked for you and **proves nothing on its own**. The half that decides it cannot be scripted: whether your model consults governance before acting is a fact about your model. So the tool prints four prompts (three that should activate, one control that should not), tells you what each is testing, and what to do about each score.
+
+Ten minutes, run in your own agent. If it scores below 3/3 the remedy is ordered by what our data supports: **add an `AGENTS.md` first** — it was the strongest single predictor we measured and every harness reads it — then consider the hook, which changed nothing where such a file already existed.
+
+**A low score is worth reporting.** A result from a model nobody here can run is worth more than another high score from one we already have: [report it](https://github.com/tosin2013/repo-governor/issues/new?template=activation-result.yml).
