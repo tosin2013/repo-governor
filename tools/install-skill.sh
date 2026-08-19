@@ -115,6 +115,42 @@ else
   echo "    2. the hook surface -- see docs/installation.md, section 'Hooks'"
 fi
 
+# --- onboarding advice -----------------------------------------------------
+# Deliberately OUTSIDE the host block and NOT gated on a TTY. Onboarding has
+# nothing to do with which agent you use, and a target with no recognisable
+# host directory was silently getting no guidance at all. The offer to RUN it
+# needs a terminal; the advice to run it does not.
+if [ ! -f "$TARGET/.repo-governor.json" ]; then
+  echo
+  echo "This repository is not onboarded, so the engine can only ever answer"
+  echo "AUTHORITY_SOURCE_MISSING. Onboarding runs detection, shows the evidence,"
+  echo "then asks the two things no amount of file-reading can answer: which"
+  echo "system is the roadmap authority, and what ADMITTED means in it."
+  echo
+  echo "    python3 $DEST/tools/onboard-interactive.py $TARGET"
+  echo
+  echo "It writes a PROPOSAL. Review it, then:"
+  echo "    mv $TARGET/.repo-governor.proposed.json $TARGET/.repo-governor.json"
+  echo "    python3 $DEST/engine/manifest.py --validate"
+  echo
+  echo "CAUTION: the proposal lands in the repository root and is itself a"
+  echo "governance signal. Do not run it against a repository under activation"
+  echo "measurement."
+  if [ "$HOOKS_OPT" != "no" ] && [ -t 0 ]; then
+    printf "Start onboarding now? [y/N] "
+    read -r REPLY_O || REPLY_O="n"
+    case "$REPLY_O" in
+      [yY]*)
+        python3 "$DEST/tools/onboard-interactive.py" "$TARGET" || true
+        echo
+        echo "  Once bound, re-run this script to be offered the hook:"
+        echo "    $SRC/tools/install-skill.sh $TARGET $SKILLS_DIR"
+        echo "  The re-run is not busywork -- the hook is silent without a"
+        echo "  manifest, so there is nothing to offer until you have bound one." ;;
+    esac
+  fi
+fi
+
 # --- the hook offer -------------------------------------------------------
 # Consent-gated, never default-on. Writing hook config into a settings.json the
 # user owns is fine when they said yes and wrong when they did not; the rule is
@@ -152,38 +188,7 @@ if [ "$HOST_KNOWN" = "1" ] && [ "$HOOKS_OPT" != "no" ]; then
     echo "      The hook only speaks in a governed repository. Onboarding this one"
     echo "      makes it no longer silent about governance, which ends any activation"
     echo "      measurement in progress against it (docs/research/activation-protocol.md)."
-    echo "      Not offering to install it."
-    echo
-    # Detection is the tedious half of onboarding and it is safe to automate:
-    # it reads the filesystem, cites evidence, probes nothing, and produces a
-    # PROPOSAL. Binding stays a human act -- the manifest declares which
-    # provider is the roadmap authority and what signal means admission, and
-    # guessing that is how a second roadmap of record gets created (ADR-022).
-    # onboard.py's own docstring: the engine never reads the proposal, which
-    # is why silent binding is unimplementable rather than merely forbidden.
-    if [ "$HOOKS_OPT" = "yes" ] || { [ "$HOOKS_OPT" = "ask" ] && [ -t 0 ]; }; then
-      echo "Onboarding detection can survey this repository for you. It reads the"
-      echo "filesystem only, contacts nothing, and writes .repo-governor.proposed.json"
-      echo "-- a PROPOSAL. You review it, declare the admission signal, and rename it."
-      echo
-      echo "CAUTION: that file lands in the repository root and is itself a governance"
-      echo "signal. Do not run it against a repository under activation measurement."
-      REPLY_O="n"
-      if [ "$HOOKS_OPT" = "yes" ]; then REPLY_O="n"      # never automatic; ask means ask
-      else printf "Run onboarding detection now? [y/N] "; read -r REPLY_O || REPLY_O="n"
-      fi
-      case "$REPLY_O" in
-        [yY]*)
-          python3 "$DEST/engine/onboard.py" "$TARGET" --write || true
-          echo
-          echo "  That file is EVIDENCE, not a manifest -- renaming it does not bind."
-          echo "  For a manifest-shaped proposal, which asks the two things detection"
-          echo "  cannot see (roadmap authority, and what admission means there):"
-          echo "    python3 $DEST/tools/onboard-interactive.py $TARGET"
-          ;;
-        *) echo "  Skipped. Run it later: python3 $DEST/engine/onboard.py $TARGET --write" ;;
-      esac
-    fi
+    echo "      Not offering to install it. Onboard first -- see above."
   else
     REPLY_H="n"
     if [ "$HOOKS_OPT" = "yes" ]; then

@@ -427,6 +427,29 @@ def main():
                                "a hook that runs and delivers nothing looks exactly like "
                                "a model ignoring governance")
 
+    # Onboarding advice must reach a target with NO recognisable host directory
+    # and NO terminal. It was nested inside the host block and gated on a TTY,
+    # so a plain repo installed non-interactively got no guidance at all -- and
+    # the hook offer it was blocking on can never fire until onboarding happens.
+    with tempfile.TemporaryDirectory() as td:
+        tgt = pathlib.Path(td) / "plain"
+        tgt.mkdir()
+        subprocess.run(["git", "init", "-q", str(tgt)], capture_output=True)
+        r = subprocess.run(["bash", str(ROOT / "tools" / "install-skill.sh"),
+                            str(tgt), ".agents/skills"],
+                           capture_output=True, text=True, stdin=subprocess.DEVNULL)
+        fails += check("ungoverned target is told it is not onboarded",
+                       "not onboarded" in r.stdout,
+                       "no host dir and no TTY must not mean no guidance")
+        fails += check("advice names onboard-interactive.py, not engine/onboard.py",
+                       "onboard-interactive.py" in r.stdout,
+                       "engine/onboard.py emits evidence; renaming it does not bind")
+        fails += check("advice gives the bind step",
+                       ".repo-governor.proposed.json" in r.stdout
+                       and "--validate" in r.stdout)
+        fails += check("advice warns the proposal is a governance signal",
+                       "measurement" in r.stdout)
+
     with tempfile.TemporaryDirectory() as td:
         tgt = pathlib.Path(td) / "noproposal"
         tgt.mkdir()
