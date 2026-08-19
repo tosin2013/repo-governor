@@ -243,6 +243,41 @@ def main():
     for tool in ("onboard-interactive.py", "selftest.py"):
         fails += check(f"README points at {tool}", tool in rd)
 
+    print("\nAn integration contract exists, and leads with the rule that matters\n")
+
+    # The product is tool-independent by thesis, which only holds if somebody
+    # else can wire in a tracker without touching the engine. The contract was
+    # scattered across storage-backends.md (decision_history-shaped), ADR-003,
+    # ADR-008 and the suites, and the single most important rule -- that an
+    # integration carries governance through rather than reinventing it -- was
+    # written down nowhere.
+    integ = ROOT / "references" / "integrations.md"
+    fails += check("references/integrations.md exists", integ.is_file())
+    if integ.is_file():
+        text = integ.read_text(encoding="utf-8")
+        fails += check("it states the pass-through rule",
+                       "does not reinvent it" in text.lower()
+                       or "carries governance through" in text.lower(),
+                       "an integration that reinterprets state is the failure Layer 2 "
+                       "exists to catch, and it must be named first")
+        fails += check("it names the 'task says READY' failure specifically",
+                       "Ready, so I should work on it" in text,
+                       "the abstract rule is forgettable; the concrete failure is not")
+        fails += check("it cites INV-002 (admission is not authorization)",
+                       "INV-002" in text)
+        fails += check("it names both conformance layers as the bar",
+                       "layer1.py" in text and "layer2.py" in text,
+                       "a contract checked by review rather than by suite is a "
+                       "contract nobody outside this repository can meet")
+        fails += check("it describes all three integration tiers",
+                       all(k in text for k in ("filesystem", "Dolt", "Beads")))
+        fails += check("it marks Beads as NOT admitted",
+                       "not admitted" in text.lower(),
+                       "documenting a contract must not read as deciding to build it")
+        fails += check("providers.md points at it",
+                       "integrations.md" in (ROOT / "references" / "providers.md").read_text(encoding="utf-8"),
+                       "the roles table must not be the only thing an implementer finds")
+
     print("\nThe lanes point at the governed repository's own conventions\n")
 
     # Repo Governor rules on authority and says nothing about house style --
