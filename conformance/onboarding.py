@@ -207,7 +207,7 @@ def main():
 
             # 2. the interactive tool must produce something that actually validates
             r = _sp.run([sys.executable, str(ROOT_ / "tools" / "onboard-interactive.py"), str(tgt)],
-                        input="1\n1\n", capture_output=True, text=True)
+                        input="1\nn\n1\n", capture_output=True, text=True)
             tool_out = r.stdout      # `r` is reused for --validate below
             prop = tgt / ".repo-governor.proposed.json"
             rep.add("proposal-e2e", "onboard-interactive writes a proposal", prop.exists(), r.stderr[:120])
@@ -259,6 +259,21 @@ def main():
                 # onboarding attempts declared project_status on a repository
                 # with no Project; --validate stayed green and every id read
                 # NOT_ON_BOARD. Only asking a real question exposes that.
+                # The survey is consent-gated: declining it must still produce a
+                # working manifest. It informs the choice; it is not a step.
+                rep.add("proposal-e2e", "declining the signal survey still binds",
+                        m["providers"]["roadmap_authority"]["admission"]["signal"]
+                        == "milestone",
+                        "the lookup is a convenience, not a required step")
+                src_t = (ROOT_ / "tools" / "onboard-interactive.py").read_text()
+                rep.add("proposal-e2e", "the roadmap option does not say 'Projects'",
+                        '"GitHub"' in src_t and "GitHub issues / Projects" not in src_t,
+                        "naming Projects there primed four consecutive operators to "
+                        "pick 'Project column/status' at the NEXT question")
+                rep.add("proposal-e2e", "the survey warns existing != means admitted",
+                        "not the same as MEANING admitted" in src_t,
+                        "a repo can have milestones that are release buckets")
+
                 rep.add("proposal-e2e", "the tool tells you to ask a real question",
                         "completion.py" in tool_out and "validation does not catch" in tool_out,
                         "--validate passes on a wrong admission signal (issue 51)")
@@ -287,7 +302,7 @@ def main():
             # defect ADR-028 exists for, and precisely what an earlier version of
             # this check missed by asserting on a repo that had a remote.
             r = _sp.run([sys.executable, str(ROOT_ / "tools" / "onboard-interactive.py"),
-                         str(bare)], input="me/mine\n1\n1\n", capture_output=True, text=True)
+                         str(bare)], input="me/mine\n1\nn\n1\n", capture_output=True, text=True)
             bp = bare / ".repo-governor.proposed.json"
             got = json.loads(bp.read_text())["repository"]["id"] if bp.exists() else None
             # The tool prints a URL. A URL that 404s is worse than no URL: it

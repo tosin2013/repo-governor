@@ -36,7 +36,7 @@ PROPOSAL = ".repo-governor.proposed.json"
 # Roadmap providers with a shipped adapter. "Something else" is a first-class
 # answer: a tracker we do not support is a contribution signal, not a dead end.
 ROADMAP = [
-    ("github-projects", "adapters/github-projects", "GitHub issues / Projects"),
+    ("github-projects", "adapters/github-projects", "GitHub"),
     ("linear",          "adapters/linear",          "Linear (MCP transport)"),
     ("file-roadmap",    "adapters/file-roadmap",    "A file in the repository"),
 ]
@@ -98,6 +98,57 @@ def contribute(repo, what):
     print("  shipped adapter is a single file. See CONTRIBUTING.md.")
 
 
+
+def _survey(rid):
+    """Show which admission signals actually EXIST, with the operator's consent.
+
+    Detection must never probe a remote (ADR-010 rule 4): a probe that succeeds
+    because a token happens to be present is capability implying permission.
+    This is a different act. A person is asking to look at their own repository,
+    the result only informs THEIR choice, and nothing is bound or inferred from
+    it -- the answer to the next question is still theirs to give.
+
+    It exists because four consecutive onboarding attempts declared
+    project_status on a repository with zero Projects. Every id then read
+    NOT_ON_BOARD while validation stayed green. Asking someone to declare a
+    signal without showing them which signals exist is a question with a trap in
+    it.
+    """
+    if input(f"\nLook up which admission signals exist in {rid}? "
+             "Runs `gh`, reads counts only, changes nothing. [y/N] ").strip().lower() \
+            not in ("y", "yes"):
+        return
+    try:
+        ms = json.loads(subprocess.run(
+            ["gh", "api", f"repos/{rid}/milestones", "--jq",
+             "[.[] | {t:.title, o:.open_issues, c:.closed_issues}]"],
+            capture_output=True, text=True, timeout=25).stdout or "[]")
+        pj = json.loads(subprocess.run(
+            ["gh", "api", "graphql", "-f", "query=query{repository(owner:\"%s\","
+             "name:\"%s\"){projectsV2(first:10){totalCount}}}" % tuple(rid.split("/", 1)),
+             "--jq", ".data.repository.projectsV2.totalCount"],
+            capture_output=True, text=True, timeout=25).stdout.strip() or "0")
+        lb = json.loads(subprocess.run(
+            ["gh", "api", f"repos/{rid}/labels", "--jq", "length"],
+            capture_output=True, text=True, timeout=25).stdout.strip() or "0")
+    except Exception as e:
+        print(f"  lookup failed ({e}); choose from what you know.")
+        return
+
+    print()
+    if ms:
+        names = ", ".join(m["t"] for m in ms[:4])
+        live = sum(m["o"] for m in ms)
+        print(f"  milestones : {len(ms)} ({names}) -- {live} open issues carry one")
+    else:
+        print("  milestones : none  <-- option 1 cannot work here")
+    print(f"  Projects   : {pj}" + ("" if pj else "  <-- option 2 cannot work here"))
+    print(f"  labels     : {lb}" + (""    if lb else "  <-- option 3 cannot work here"))
+    print("\n  Existing is not the same as MEANING admitted. A repository can have"
+          "\n  milestones that are release buckets rather than admission. Only you"
+          "\n  know which. This just rules out the ones that cannot work.")
+
+
 def main(argv):
     if not argv:
         print(__doc__.strip().splitlines()[-1], file=sys.stderr)
@@ -138,6 +189,7 @@ def main(argv):
 
     admission = None
     if choice == "github-projects":
+        _survey(rid)
         admission = ask("What does ADMITTED mean in that repository? Detection cannot "
                         "see this, and guessing it is how a second roadmap of record "
                         "gets created (ADR-018).", GH_SIGNALS, allow_other=False)
