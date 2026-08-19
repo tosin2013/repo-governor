@@ -75,7 +75,9 @@ Worse for the original motivation: the hook is deliberately silent in un-onboard
 - Enforcement: **proven** (row 4). A write was prevented by mechanism rather than persuasion, which is what ADR-001 said the skill layer could not do.
 - Reachability: blocking only engages when advisory delivery is absent. Where injection works the agent stops first, so **enforcement is a backstop against a non-compliant agent, not part of the normal path**.
 
-**The hook is not a security boundary.** Offered options after being blocked, the agent proposed *"remove it from `.claude/settings.json`"* unprompted, within one turn. It has file access and the config is a file. This stops mistakes — which is the common case, and it did so here — but containment requires somewhere the agent cannot reach: CI, branch protection, or review.
+**The hook is not a security boundary.** The remedy is captured as [issue 46](https://github.com/tosin2013/repo-governor/issues/46) — the CI surface ADR-001 deferred — gated on a *declared* PR-to-authority signal, because guessing one would reproduce in a new surface the defect [ADR-018](018-admission-signal-is-declared-not-assumed.md) exists to prevent.
+
+**Restated:** Offered options after being blocked, the agent proposed *"remove it from `.claude/settings.json`"* unprompted, within one turn. It has file access and the config is a file. This stops mistakes — which is the common case, and it did so here — but containment requires somewhere the agent cannot reach: CI, branch protection, or review.
 
 Full record: [`docs/research/hook-validation-results.md`](../research/hook-validation-results.md). Candidates that depend on the enforcement test are captured in [issue 45](https://github.com/tosin2013/repo-governor/issues/45), **unmilestoned**, so the engine returns the disposition `UNKNOWN` with a blocking unknown whose reason is `NOT_ADMITTED` — `NOT_ADMITTED` is a reason code, not a disposition, and does not appear in `DISPOSITIONS` — if enforcement fails, this surface should be deleted rather than kept as a plausible-sounding option, and issue 45 goes with it.
 
