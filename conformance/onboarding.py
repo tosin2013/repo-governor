@@ -208,6 +208,7 @@ def main():
             # 2. the interactive tool must produce something that actually validates
             r = _sp.run([sys.executable, str(ROOT_ / "tools" / "onboard-interactive.py"), str(tgt)],
                         input="1\n1\n", capture_output=True, text=True)
+            tool_out = r.stdout      # `r` is reused for --validate below
             prop = tgt / ".repo-governor.proposed.json"
             rep.add("proposal-e2e", "onboard-interactive writes a proposal", prop.exists(), r.stderr[:120])
             if prop.exists():
@@ -259,10 +260,10 @@ def main():
                 # with no Project; --validate stayed green and every id read
                 # NOT_ON_BOARD. Only asking a real question exposes that.
                 rep.add("proposal-e2e", "the tool tells you to ask a real question",
-                        "completion.py" in r.stdout and "validation does not catch" in r.stdout,
+                        "completion.py" in tool_out and "validation does not catch" in tool_out,
                         "--validate passes on a wrong admission signal (issue 51)")
                 rep.add("proposal-e2e", "it says what a wrong signal looks like",
-                        "NOT_ON_BOARD" in r.stdout and "NOT_ADMITTED" in r.stdout,
+                        "NOT_ON_BOARD" in tool_out and "NOT_ADMITTED" in tool_out,
                         "the same reason for every id is the tell")
 
                 rep.add("proposal-e2e", "the manifest sets no env the adapter ignores",
