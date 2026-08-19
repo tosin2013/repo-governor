@@ -5,7 +5,8 @@ Three phases, deliberately separate:
 
     assess    repository condition L0–L4 -> suggested profile
     detect    candidate providers, each citing its evidence
-    propose   write .repo-governor.proposed.json for a human to accept
+    propose   write .repo-governor.proposed.json -- EVIDENCE for a human to read.
+              NOT a bindable manifest; see tools/onboard-interactive.py.
 
 The engine NEVER reads the proposal. Binding requires a human to promote it
 to .repo-governor.json and commit (INV-013, ADR-010 rule 1). That separation
@@ -279,8 +280,14 @@ def main(argv):
     if "--write" in argv:
         out = repo / PROPOSAL
         out.write_text(json.dumps(
-            {"$comment": "PROPOSAL ONLY. The engine never reads this file. To bind these "
-                         "providers, review it, rename to .repo-governor.json, and commit "
+            {"$comment": "EVIDENCE, not a manifest. The engine never reads this file, and "
+                         "RENAMING IT DOES NOT BIND -- it carries no repo_governor.version, no "
+                         "providers block and no permissions, so manifest.py rejects it with "
+                         "UNSUPPORTED_VERSION. That rename was the documented instruction until "
+                         "2026-08-19 and had never been run end to end. For a manifest-shaped "
+                         "proposal, run tools/onboard-interactive.py: it asks the two things "
+                         "detection cannot see -- which provider is the roadmap authority, and "
+                         "what admission means there (ADR-018). Binding stays a human act "
                          "(ADR-010 rule 1).", **result}, indent=2) + "\n")
         print(f"wrote {out}")
 

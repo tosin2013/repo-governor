@@ -218,3 +218,31 @@ export RG_HOOK_PLAINTEXT=1
 For `UserPromptSubmit` and `SessionStart`, plain non-JSON stdout on exit 0 is added to context directly. This bypasses whatever discards `additionalContext`, at the cost of `systemMessage` — so there is no operator-visible token, and delivery is verified by asking the model to quote the `GOVERNANCE:` block instead. It stays silent in ungoverned repositories either way.
 
 **The failure this guards against is specific: a hook that runs, reports success, and delivers nothing.** Without the token, the transcript looks identical to a working one.
+
+## Onboarding a repository
+
+`engine/onboard.py <repo> --write` surveys the filesystem and writes `.repo-governor.proposed.json`. That file is **evidence, not a manifest** — renaming it yields `UNSUPPORTED_VERSION: manifest version None`. That rename was the documented instruction until 2026-08-19 and had never been run end to end.
+
+For a proposal that actually binds:
+
+```bash
+python3 tools/onboard-interactive.py /path/to/repo
+```
+
+It runs detection, shows the evidence, then asks the two things no amount of file-reading can answer:
+
+- **which system is the roadmap authority** — GitHub, Linear, a file, or something else
+- **what ADMITTED means there** — milestone, project column, label, or nothing
+
+The second is [ADR-018](adrs/018-admission-signal-is-declared-not-assumed.md): the admission signal is *declared*, never assumed. Whether admission means a milestone or a label is a fact about how a team works, not about the repository. Guessing it produces an engine that governs confidently against the wrong roadmap — which has happened twice here ([ADR-022](adrs/022-repo-governor-does-not-own-roadmap-state.md), and [ADR-028](adrs/028-provider-identity-is-never-defaulted.md) where adapters defaulted to the author's repository).
+
+Output is deny-by-default ([ADR-005](adrs/005-deny-by-default-authority-resolution.md)): every bound role gets read, nothing gets write. Verify before binding:
+
+```bash
+mv .repo-governor.proposed.json .repo-governor.json
+python3 <skill>/engine/manifest.py --validate      # want: READY_FOR_GOVERNANCE
+```
+
+If it fails, rename it back. Nothing governs until it passes.
+
+**If your tracker is not one we support**, pick *"Something else"* — the tool prints a `gh issue create` line for an adapter request and points at `adapters/_protocol.py`, which is the whole contract. Every shipped adapter is a single file, and the engine never changes to accommodate one ([ADR-003](adrs/003-seven-provider-roles-with-normalized-contracts.md)).

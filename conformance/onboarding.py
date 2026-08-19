@@ -128,6 +128,88 @@ def main():
         rep.add("gate-4", "binding requires promotion by a human",
                 O.PROPOSAL != ".repo-governor.json", "")
 
+        # --- the proposal path is run end to end, because it never had been -------
+        # Until 2026-08-19 both onboard.py's docstring and its emitted $comment said
+        # "rename to .repo-governor.json and commit". Doing that yields
+        # UNSUPPORTED_VERSION: the proposal is a candidates document with no version,
+        # no providers block and no permissions. A whole documented workflow, wrong
+        # at the last step, because nothing had ever executed it.
+        import subprocess as _sp, tempfile as _tf, pathlib as _pl
+        ROOT_ = Path(__file__).resolve().parent.parent
+        with _tf.TemporaryDirectory() as td:
+            tgt = _pl.Path(td) / "r"
+            tgt.mkdir()
+            _sp.run(["git", "init", "-q", str(tgt)], capture_output=True)
+            _sp.run(["git", "-C", str(tgt), "remote", "add", "origin",
+                     "https://github.com/acme/widget.git"], capture_output=True)
+            _sp.run(["git", "-C", str(tgt), "-c", "user.email=t@t", "-c", "user.name=t",
+                     "commit", "-q", "--allow-empty", "-m", "i"], capture_output=True)
+
+            # 1. detection's own proposal must NOT masquerade as bindable
+            _sp.run([sys.executable, str(ROOT_ / "engine" / "onboard.py"), str(tgt), "--write"],
+                    capture_output=True)
+            prop = tgt / ".repo-governor.proposed.json"
+            rep.add("proposal-e2e", "detection writes a proposal", prop.exists())
+            if prop.exists():
+                body = prop.read_text()
+                rep.add("proposal-e2e", "the proposal says renaming it does not bind",
+                               "DOES NOT BIND" in body.upper(),
+                               "it told people to rename it, and that produced an invalid manifest")
+                prop.rename(tgt / ".repo-governor.json")
+                r = _sp.run([sys.executable, str(ROOT_ / "engine" / "manifest.py"), "--validate"],
+                            capture_output=True, text=True, cwd=str(tgt))
+                rep.add("proposal-e2e", "a renamed detection proposal is correctly REJECTED",
+                               "INVALID" in r.stdout, "it is evidence, not a manifest")
+                (tgt / ".repo-governor.json").unlink()
+
+            # 2. the interactive tool must produce something that actually validates
+            r = _sp.run([sys.executable, str(ROOT_ / "tools" / "onboard-interactive.py"), str(tgt)],
+                        input="1\n1\n", capture_output=True, text=True)
+            prop = tgt / ".repo-governor.proposed.json"
+            rep.add("proposal-e2e", "onboard-interactive writes a proposal", prop.exists(), r.stderr[:120])
+            if prop.exists():
+                prop.rename(tgt / ".repo-governor.json")
+                r = _sp.run([sys.executable, str(ROOT_ / "engine" / "manifest.py"), "--validate"],
+                            capture_output=True, text=True, cwd=str(tgt))
+                rep.add("proposal-e2e", "its output VALIDATES as a manifest",
+                               "READY_FOR_GOVERNANCE" in r.stdout,
+                               r.stdout.strip()[:160])
+                m = json.loads((tgt / ".repo-governor.json").read_text())
+                rep.add("proposal-e2e", "it declares an admission signal (ADR-018)",
+                               bool(m["providers"]["roadmap_authority"].get("admission", {}).get("signal")))
+                perms = m.get("permissions") or {}
+                rep.add("proposal-e2e", "it declares a permissions block at all",
+                               bool(perms),
+                               "manifest.py rejects a manifest without one")
+                rep.add("proposal-e2e", "it grants no write anywhere (ADR-005 deny by default)",
+                               not any(v.get("write") for v in perms.values()
+                                       if isinstance(v, dict)))
+                rep.add("proposal-e2e", "it reads the repository id from the remote",
+                               m["repository"]["id"] == "acme/widget",
+                               f"got {m['repository']['id']!r}")
+                (tgt / ".repo-governor.json").unlink()
+
+            # ADR-028 is only exercised where there IS no remote. The first
+            # version of this check asserted the id on a repo that had one, so a
+            # hardcoded fallback sailed straight through -- the default it
+            # existed to forbid sat on a path the fixture never reached.
+            bare = _pl.Path(td) / "bare"
+            bare.mkdir()
+            _sp.run(["git", "init", "-q", str(bare)], capture_output=True)
+            # Feed VALID answers. With no remote the tool must ASK, so the first
+            # answer is consumed as the id. A hardcoded fallback would skip the
+            # question and stamp its own value instead -- which is precisely the
+            # defect ADR-028 exists for, and precisely what an earlier version of
+            # this check missed by asserting on a repo that had a remote.
+            r = _sp.run([sys.executable, str(ROOT_ / "tools" / "onboard-interactive.py"),
+                         str(bare)], input="me/mine\n1\n1\n", capture_output=True, text=True)
+            bp = bare / ".repo-governor.proposed.json"
+            got = json.loads(bp.read_text())["repository"]["id"] if bp.exists() else None
+            rep.add("proposal-e2e", "no remote: it asks rather than defaulting (ADR-028)",
+                    got == "me/mine",
+                    f"got {got!r} -- a value it was never told is a defaulted identity")
+
+
     cur = None
     for fx, check, ok, detail in rep.rows:
         if fx != cur:

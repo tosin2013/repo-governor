@@ -141,7 +141,7 @@ if [ "$HOST_IS_CLAUDE" = "1" ] && [ "$HOOKS_OPT" != "no" ]; then
     # onboard.py's own docstring: the engine never reads the proposal, which
     # is why silent binding is unimplementable rather than merely forbidden.
     if [ "$HOOKS_OPT" = "yes" ] || { [ "$HOOKS_OPT" = "ask" ] && [ -t 0 ]; }; then
-      echo "Onboarding detection can propose a manifest for you. It reads the"
+      echo "Onboarding detection can survey this repository for you. It reads the"
       echo "filesystem only, contacts nothing, and writes .repo-governor.proposed.json"
       echo "-- a PROPOSAL. You review it, declare the admission signal, and rename it."
       echo
@@ -155,9 +155,10 @@ if [ "$HOST_IS_CLAUDE" = "1" ] && [ "$HOOKS_OPT" != "no" ]; then
         [yY]*)
           python3 "$DEST/engine/onboard.py" "$TARGET" --write || true
           echo
-          echo "  Review .repo-governor.proposed.json, set the admission signal, then:"
-          echo "    mv $TARGET/.repo-governor.proposed.json $TARGET/.repo-governor.json"
-          echo "  Nothing governs until you do -- the engine never reads the proposal."
+          echo "  That file is EVIDENCE, not a manifest -- renaming it does not bind."
+          echo "  For a manifest-shaped proposal, which asks the two things detection"
+          echo "  cannot see (roadmap authority, and what admission means there):"
+          echo "    python3 $DEST/tools/onboard-interactive.py $TARGET"
           ;;
         *) echo "  Skipped. Run it later: python3 $DEST/engine/onboard.py $TARGET --write" ;;
       esac
