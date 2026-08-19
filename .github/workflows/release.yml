@@ -109,14 +109,25 @@ jobs:
         run: |
           set -euo pipefail
           t="repo-governor-${{ steps.t.outputs.tag }}.tar.gz"
-          tar -tzf "$t" | grep -qx 'repo-governor/SKILL.md' \
-            || { echo "::error::no SKILL.md in the artifact"; exit 1; }
+          # List ONCE to a file and grep the file. `tar ... | grep -q` looks
+          # obvious and is wrong: grep -q exits at the first match, closes the
+          # pipe, tar takes SIGPIPE, and pipefail turns a SUCCESSFUL match into
+          # a failed pipeline. That reported "no SKILL.md in the artifact" for
+          # an artifact that contained it -- the same SIGPIPE class as the
+          # `find | head -1` in the dolt step, fixed there and left here.
+          listing="$RUNNER_TEMP/listing.txt"
+          tar -tzf "$t" > "$listing"
+          grep -qx 'repo-governor/SKILL.md' "$listing" \
+            || { echo "::error::no SKILL.md in the artifact"; head -20 "$listing"; exit 1; }
           # The prune is the whole reason install-skill.sh exists. A pruned path
           # surviving into a published artifact would ship this repository's own
           # manifest to everyone who downloads it (ADR-027).
-          if tar -tzf "$t" | grep -Eq '^repo-governor/(AGENTS\.md|CLAUDE\.md|\.claude/|\.repo-governor)'; then
-            echo "::error::a pruned path survived into the release artifact"; exit 1
+          if grep -Eq '^repo-governor/(AGENTS\.md|CLAUDE\.md|\.claude/|\.repo-governor)' "$listing"; then
+            echo "::error::a pruned path survived into the release artifact"
+            grep -E '^repo-governor/(AGENTS\.md|CLAUDE\.md|\.claude/|\.repo-governor)' "$listing"
+            exit 1
           fi
+          echo "artifact contains $(wc -l < "$listing") paths, SKILL.md present, prune verified"
 
       - name: Publish
         env:
