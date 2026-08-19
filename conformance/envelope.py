@@ -17,10 +17,15 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "engine"))
 import envelope as E  # noqa: E402
 import vocabulary as V  # noqa: E402
+
+import _count as _CNT  # noqa: E402 -- alias avoids `C`, already bound to
+# `completion` in two suites, where the collision silently rebound it (issue 67).
+_CNT.watch("envelope")
 
 # A rich envelope. Real trackers rarely supply this much -- which is issue #2,
 # measured by `thinness` rather than assumed away.

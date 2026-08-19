@@ -23,9 +23,14 @@ import sys
 import tempfile
 from pathlib import Path
 
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "engine"))
 import onboard as O  # noqa: E402
+
+import _count as _CNT  # noqa: E402 -- alias avoids `C`, already bound to
+# `completion` in two suites, where the collision silently rebound it (issue 67).
+_CNT.watch("onboarding")
 
 SPEC = json.loads((ROOT / "conformance" / "fixtures" / "onboarding.json").read_text())
 
@@ -48,7 +53,7 @@ class R:
         self.rows = []
 
     def add(self, fx, check, ok, detail=""):
-        self.rows.append((fx, check, ok, detail))
+            self.rows.append((fx, check, ok, detail))
 
     def fails(self):
         return [r for r in self.rows if not r[2]]

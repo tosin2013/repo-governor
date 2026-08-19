@@ -23,6 +23,11 @@ import sys
 import tempfile
 from pathlib import Path
 
+import _count as _CNT  # noqa: E402 -- alias avoids `C`, already bound to
+# `completion` in two suites, where the collision silently rebound it (issue 67).
+_CNT.watch("status")
+
+
 ROOT = Path(__file__).resolve().parent.parent
 STATUS = ROOT / "engine" / "status.py"
 SCHEMA = ROOT / "schemas" / "manifest-v1.json"

@@ -29,10 +29,15 @@ import sys
 import tempfile
 from pathlib import Path
 
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "engine"))
 import completion as C  # noqa: E402
 import manifest as MF  # noqa: E402
+
+import _count as _CNT  # noqa: E402 -- alias avoids `C`, already bound to
+# `completion` in two suites, where the collision silently rebound it (issue 67).
+_CNT.watch("acceptance")
 
 ACC = ROOT / "adapters" / "acceptance-file"
 TOOL = ROOT / "engine" / "acceptance.py"

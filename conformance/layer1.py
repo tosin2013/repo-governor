@@ -28,9 +28,14 @@ import tempfile
 import sys
 from pathlib import Path
 
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _preflight  # noqa: E402
+
+import _count as _CNT  # noqa: E402 -- alias avoids `C`, already bound to
+# `completion` in two suites, where the collision silently rebound it (issue 67).
+_CNT.watch("layer1")
 
 # adapter -> (role, probe args, capability->function map, env that breaks the backend)
 SUITE = {
@@ -237,7 +242,7 @@ class Report:
         self.rows = []
 
     def add(self, adapter, check, ok, detail=""):
-        self.rows.append((adapter, check, ok, detail))
+            self.rows.append((adapter, check, ok, detail))
 
     def failures(self):
         return [r for r in self.rows if not r[2]]

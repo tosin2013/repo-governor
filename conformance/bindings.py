@@ -20,12 +20,17 @@ import sys
 import tempfile
 from pathlib import Path
 
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _preflight  # noqa: E402
 sys.path.insert(0, str(ROOT / "engine"))
 import bindings as B  # noqa: E402
 import manifest as MF  # noqa: E402
+
+import _count as _CNT  # noqa: E402 -- alias avoids `C`, already bound to
+# `completion` in two suites, where the collision silently rebound it (issue 67).
+_CNT.watch("bindings")
 
 BASE = json.loads((ROOT / ".repo-governor.json").read_text())
 

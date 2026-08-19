@@ -47,7 +47,7 @@ unset REPO_GOVERNOR_TARGET REPO_GOVERNOR_SUBJECT REPO_GOVERNOR_BINDING
 # depends on issue 36's current milestone and assignee. Someone moving a card
 # on the board would turn it red with no code change, which is why --hermetic
 # exists and why CI runs it as a non-blocking job.
-HERMETIC=(layer1 layer2 transport manifest onboarding vocabulary bindings skill envelope execution imports status acceptance)
+HERMETIC=(layer1 layer2 transport manifest onboarding vocabulary bindings skill envelope execution imports status acceptance coverage)
 LIVE=(hooks)
 
 case "${1:-}" in
@@ -74,8 +74,28 @@ for s in "${SUITES[@]}"; do
   # `>/dev/null 2>&1` is what made the old loop useless to debug -- you learned
   # that something failed and nothing about what.
   out="$(python3 "conformance/$s.py" 2>&1)"; rc=$?
+  # Every suite ends with a declared line saying how many assertions it
+  # actually executed (issue 67). Read that marker rather than counting
+  # [PASS] lines: a suite that changes its output format would silently
+  # leave coverage, and the first attempt at this was contaminated within
+  # one command by a line whose LABEL quoted "14/14 pass".
+  count_line="$(printf '%s\n' "$out" | grep "^CONFORMANCE-COUNT" | tail -1)"
+  executed="$(printf '%s' "$count_line" | sed -n 's/.*executed=\([0-9]*\).*/\1/p')"
+  if [ -z "$count_line" ]; then
+    echo "FAIL (no CONFORMANCE-COUNT line)"
+    failed+=("$s")
+    echo "  | the suite does not report how much it did; silence is"
+    echo "  | indistinguishable from having nothing to report"
+    continue
+  fi
+  if [ "${executed:-0}" -eq 0 ]; then
+    echo "FAIL (executed 0 assertions)"
+    failed+=("$s")
+    echo "  | a suite asserting nothing is broken or lying; both need a human"
+    continue
+  fi
   if [ "$rc" -eq 0 ]; then
-    echo "PASS"
+    echo "PASS  ($executed assertions)"
   else
     echo "FAIL (exit $rc)"
     failed+=("$s")

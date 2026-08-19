@@ -30,6 +30,11 @@ import sys
 import tempfile
 from pathlib import Path
 
+import _count as _CNT  # noqa: E402 -- alias avoids `C`, already bound to
+# `completion` in two suites, where the collision silently rebound it (issue 67).
+_CNT.watch("skill")
+
+
 ROOT = Path(__file__).resolve().parent.parent
 SKILL = ROOT / "SKILL.md"
 AGENTS = ROOT / "AGENTS.md"

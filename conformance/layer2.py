@@ -23,6 +23,10 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _preflight  # noqa: E402
 
+import _count as _CNT  # noqa: E402 -- alias avoids `C`, already bound to
+# `completion` in two suites, where the collision silently rebound it (issue 67).
+_CNT.watch("layer2")
+
 PROVIDERS = {
     "file-roadmap": {
         "adapter": "adapters/file-roadmap",
@@ -283,6 +287,15 @@ def main():
         for p, o in obs.items():
             extra = f"   (reason: {o['reason']})" if "reason" in o else ""
             print(f"    {p:<16} {json.dumps(projection(o), sort_keys=True)}{extra}")
+        # Scored here rather than by the print wrapper: this suite's verdicts
+        # are AGREE / DIVERGENCE / WRONG, and its only [PASS] lines come from a
+        # subprocess whose stdout never passes through the wrapper (issue 67).
+        # Scenarios that hit the CAPABILITY GAP branch above `continue` before
+        # reaching here and are deliberately NOT counted: an advertised gap is
+        # not an equivalence assertion. That is why executed trails `tested` by
+        # exactly the number of gaps reported, and it reconciles rather than
+        # drifts.
+        _CNT.record(bool(agree and correct))
         if agree and correct:
             print("    AGREE + CORRECT\n")
         elif not agree:

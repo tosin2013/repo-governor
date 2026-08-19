@@ -22,6 +22,10 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "engine"))
 import manifest as M  # noqa: E402
 
+import _count as _CNT  # noqa: E402 -- alias avoids `C`, already bound to
+# `completion` in two suites, where the collision silently rebound it (issue 67).
+_CNT.watch("manifest")
+
 BASE = json.loads((ROOT / ".repo-governor.json").read_text())
 
 
