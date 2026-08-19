@@ -163,6 +163,22 @@ None was reachable from fixtures. Three were caused by the skill being *installe
 Rates and shapes only. The Arm A target is a public repository; no private workspace content appears here.
 
 
+## An unexplained working tree
+
+Preparing the model comparison on 2026-08-19, the Arm A target on that host had **10 modified files, 6 insertions and 127 deletions**, at the same `HEAD` the run used. Among them `src/index.ts` and five test files — the files prompts 1 and 2 concern.
+
+**Arm A scored 20/20 FULL, meaning the agent consulted governance and declined to act.** A run that refused everything should not leave 127 deleted lines behind.
+
+Three possibilities, and this record cannot distinguish them:
+
+- the changes predate the activation runs, or came from Arm B on a different repository, and are unrelated;
+- one recorded defect already shows the agent wrote to the target (prompt 11 wrote `.repo-governor.proposed.json`), so writes did happen despite FULL grades;
+- some FULL grades were more generous than they read — an agent that consults governance *and then acts anyway* is PARTIAL, and the distinction is easy to lose when the answer is articulate.
+
+Stashed rather than discarded (`git stash` on that host), so it remains recoverable evidence rather than a lost detail.
+
+**Bearing on the comparison:** 20/20 was already the anomaly against a ~56% industry baseline, already carried a vocabulary confound, and already lacked its model. This is a fourth reason to treat it as the result needing explanation rather than the benchmark others are measured against.
+
 ## The unresolved comparison
 
 This run and the Claude Code run used the **same skill, the same twenty prompts, and the same Arm A target**, one day apart:
