@@ -310,6 +310,34 @@ def main():
                        (stale.group(0)[:80] if stale else "") +
                        " -- call tools/run-conformance.sh instead")
 
+    # Adapters drift exactly the same way, and did: adding one made three
+    # README claims stale at once (12 adapters, 12 provider adapters, 136
+    # checks) and nothing noticed. Same derivation shape as above -- recount
+    # ground truth, then check every prose claim against it -- deliberately
+    # sharing this section rather than adding a second implementation, since
+    # two of "recount, then compare" would themselves eventually disagree.
+    adapters = {p.name for p in (ROOT / "adapters").iterdir()
+                if p.is_file() and not p.name.startswith("_")
+                and not p.name.endswith(".pyc")}
+    fails += check(f"the adapter set was actually derived ({len(adapters)} found)",
+                   len(adapters) >= 8 and "git" in adapters,
+                   f"{sorted(adapters)} -- a broken glob reads as a clean repository")
+
+    ADAPTER_CLAIM = re.compile(r"(\d+)\s+(?:provider\s+)?adapters?\b", re.I)
+    adapter_claims = 0
+    for doc in ("README.md", "AGENTS.md", "CONTRIBUTING.md", "docs/installation.md"):
+        f = ROOT / doc
+        if not f.is_file():
+            continue
+        for m in ADAPTER_CLAIM.finditer(f.read_text(encoding="utf-8")):
+            adapter_claims += 1
+            fails += check(f"{doc}: '{m.group(0).strip()}' matches the {len(adapters)} on disk",
+                           int(m.group(1)) == len(adapters),
+                           f"disk has {len(adapters)}")
+    fails += check("at least one document states an adapter count",
+                   adapter_claims > 0,
+                   "found 0 -- either every count was removed or the pattern went blind")
+
     # Counts, anchored on the word so that "ADR-011" is not read as an 11.
     WORDS = {"seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11,
              "twelve": 12, "thirteen": 13}
