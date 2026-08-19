@@ -84,9 +84,15 @@ jobs:
           # NOT `curl ... | sudo bash`. That is unpinned, unverified and runs as
           # root, in a repository whose product claim is auditability.
           url="https://github.com/dolthub/dolt/releases/download/v${DOLT_VERSION}/dolt-linux-amd64.tar.gz"
-          curl -fsSL --retry 3 "$url" -o /tmp/dolt.tgz
-          tar -xzf /tmp/dolt.tgz -C /tmp
-          bin="$(find /tmp -type f -name dolt -perm -u+x | head -1)"
+          # Extract into a directory of our own and search ONLY that. Searching
+          # /tmp walks systemd-private-* directories the runner cannot read,
+          # find exits non-zero on those permission errors, and `set -e` kills
+          # the step even though the download succeeded. `-print -quit` also
+          # avoids the SIGPIPE that `| head -1` can produce under pipefail.
+          work="$(mktemp -d)"
+          curl -fsSL --retry 3 "$url" -o "$work/dolt.tgz"
+          tar -xzf "$work/dolt.tgz" -C "$work"
+          bin="$(find "$work" -type f -name dolt -perm -u+x -print -quit)"
           [ -n "$bin" ] || { echo "::error::no dolt binary in the tarball"; exit 1; }
           mkdir -p "$HOME/.local/bin"
           install -m 0755 "$bin" "$HOME/.local/bin/dolt"

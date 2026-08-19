@@ -69,9 +69,13 @@ jobs:
         run: |
           set -euo pipefail
           url="https://github.com/dolthub/dolt/releases/download/v${DOLT_VERSION}/dolt-linux-amd64.tar.gz"
-          curl -fsSL --retry 3 "$url" -o /tmp/dolt.tgz
-          tar -xzf /tmp/dolt.tgz -C /tmp
-          sudo install -m 0755 "$(find /tmp -type f -name dolt -perm -u+x | head -1)" /usr/local/bin/dolt
+          # Own directory, not /tmp -- see the note in conformance.yml.
+          work="$(mktemp -d)"
+          curl -fsSL --retry 3 "$url" -o "$work/dolt.tgz"
+          tar -xzf "$work/dolt.tgz" -C "$work"
+          bin="$(find "$work" -type f -name dolt -perm -u+x -print -quit)"
+          [ -n "$bin" ] || { echo "::error::no dolt binary in the tarball"; exit 1; }
+          sudo install -m 0755 "$bin" /usr/local/bin/dolt
           dolt version
 
       - run: ./tools/bootstrap-decisions.sh
