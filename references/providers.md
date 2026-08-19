@@ -1,5 +1,7 @@
 # Providers — operational reference
 
+**Writing one?** [`integrations.md`](integrations.md) is the contract an integration must satisfy, how it is checked, and the rule that shapes the rest: an integration carries governance through rather than reinventing it.
+
 Eight roles, each answering a different governance question. Normative contracts and
 conformance minimums: [`docs/reference/provider-roles.md`](../docs/reference/provider-roles.md).
 
