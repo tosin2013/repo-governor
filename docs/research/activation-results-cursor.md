@@ -9,6 +9,7 @@
 |---|---|
 | Host | Cursor, Linux x86_64 (RHEL-family, kernel 6.12) |
 | Date | 2026-08-18 |
+| **Model** | **NOT RECORDED** — the field was added to the recording sheet on 2026-08-19, the day after this run. See *The unresolved comparison* below. |
 | Install path | `.agents/skills/repo-governor` — **verified**: a fresh session listed the skill with its description |
 | Installed via | `tools/install-skill.sh` from prompt 12 onward; plain `git clone` for 1–11 |
 | Arm A target | `mcp-adr-analysis-server`, single-root workspace, no `AGENTS.md` |
@@ -160,3 +161,24 @@ None was reachable from fixtures. Three were caused by the skill being *installe
 ## §51
 
 Rates and shapes only. The Arm A target is a public repository; no private workspace content appears here.
+
+
+## The unresolved comparison
+
+This run and the Claude Code run used the **same skill, the same twenty prompts, and the same Arm A target**, one day apart:
+
+| Host | Arm A |
+|---|---|
+| Cursor, 2026-08-18 | **20/20 FULL** |
+| Claude Code (Opus 4.6), 2026-08-19 | **0/2 NONE** |
+
+That is the largest effect this project has measured, and **it cannot currently be attributed**, because this run's model was never recorded.
+
+- If Cursor was running a Claude model, the **host** is the whole variable — activation depends on how a harness presents skills, not on the model reading them. That is a strong and useful claim, and exactly what [#5](https://github.com/tosin2013/repo-governor/issues/5) exists to establish.
+- If it was running something else, the two results say nothing about hosts at all.
+
+Nothing in the data distinguishes these. The published baseline (skills uninvoked in ~56% of cases) sits far closer to 0/2 than to 20/20, so **the Cursor result is the anomaly needing explanation**, and it already carries a second unresolved confound: the target's README uses "governance" three times.
+
+**What would resolve it:** re-run three or four prompts on Cursor with the model recorded. That is under an hour and it decides whether the headline comparison means anything. Until then this 20/20 must not be cited as evidence about hosts.
+
+**The cheap lesson:** the model field was added one day too late. Record the environment *before* the first prompt, not when it becomes interesting — a measurement is only as attributable as its least-recorded condition.
