@@ -1,0 +1,26 @@
+{
+  "$comment": "Acceptance criteria for issue 44 (validate the hook surface on a real host). Written to be un-satisfiable by the work already done: 2a6d001 already makes conformance/hooks.py green, so a criterion that only checked the suite would report complete on the day the issue was filed. What is missing is evidence from a HOST, so every check below targets a results file that does not exist yet and must carry a verdict on prompt 1 -- the failing case the hook was built for. The 'not yet' guard is the fix from 227106e, where grep -q matched a sentence saying the work was unfinished.",
+  "authority_id": "44",
+  "criteria": [
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/hooks.py"
+    },
+    {
+      "check": "file_exists",
+      "target": "docs/research/hook-validation-results.md"
+    },
+    {
+      "check": "command_exit",
+      "target": "grep -qiE 'prompt 1[^\\n]*(FULL|PARTIAL|NONE)' docs/research/hook-validation-results.md"
+    },
+    {
+      "check": "command_exit",
+      "target": "grep -qiE 'host:' docs/research/hook-validation-results.md"
+    },
+    {
+      "check": "command_exit",
+      "target": "! grep -qiE 'not yet run|not run yet|to be run|pending' docs/research/hook-validation-results.md"
+    }
+  ]
+}
