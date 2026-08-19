@@ -140,6 +140,44 @@ def main():
         fails += check("an unreadable manifest exits non-zero rather than reporting from it",
                        rc != 0, f"rc={rc}")
 
+    print("\nObligation facts are reported, and gate nothing\n")
+
+    with tempfile.TemporaryDirectory() as td:
+        r = bare_repo(td, manifest=MINIMAL)          # no LICENSE, no README
+        rc, out = run(r)
+        fails += check("a repository with no licence is told so", "licence" in out
+                       and "ABSENT" in out,
+                       "all-rights-reserved by default is a fact its owner should know")
+        fails += check("and told what that actually means", "grant" in out.lower(),
+                       "'no licence' without the consequence is trivia")
+        fails += check("and told it is not a blocker", "does not block" in out,
+                       "an obligation note that reads like a refusal is over-escalation (section 54)")
+        fails += check("the report still succeeds", rc == 0,
+                       "a missing licence must not turn the report itself into a failure")
+
+        # The load-bearing one: it must not gate. A repository with no licence
+        # still gets verdicts.
+        env = dict(os.environ); env["REPO_GOVERNOR_TARGET"] = str(r)
+        pr = subprocess.run([sys.executable, str(ROOT / "engine" / "completion.py"), "W-1"],
+                            capture_output=True, text=True, cwd=str(r), env=env, timeout=300)
+        try:
+            got = json.loads(pr.stdout)
+        except Exception:
+            got = {}
+        fails += check("a licence-less repository still receives a verdict",
+                       got.get("decision") is not None,
+                       f"{pr.stdout[:150]} -- section 54: it must not block routine work")
+        fails += check("and the verdict names no licence reason",
+                       "licen" not in json.dumps(got).lower(),
+                       "an obligation indicator must not leak into a governance disposition")
+
+        r2 = bare_repo(td + "/withlic", manifest=MINIMAL)
+        (r2 / "LICENSE").write_text("Apache License\n")
+        rc2, out2 = run(r2)
+        fails += check("positive control: a licensed repository reads present",
+                       "licence   present" in out2,
+                       "otherwise the ABSENT check passes because it always says ABSENT")
+
     print("\nIt does not claim what no provider can supply\n")
     rc, out = run(ROOT)
     fails += check("it says admitted-work-without-criteria is NOT COMPUTABLE",
