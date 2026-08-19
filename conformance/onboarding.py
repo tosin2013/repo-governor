@@ -209,6 +209,18 @@ def main():
             r = _sp.run([sys.executable, str(ROOT_ / "tools" / "onboard-interactive.py"), str(tgt)],
                         input="1\nn\n1\n\n", capture_output=True, text=True)
             tool_out = r.stdout      # `r` is reused for --validate below
+            # Withholding, not warning. The survey printed "option 2 cannot
+            # work here" directly above the question and it was chosen anyway,
+            # five times running. A warning the reader must notice is not a
+            # control. The withholding path itself needs `gh`; what is checked
+            # here is that it exists, and that declining the lookup does not
+            # trigger it -- with no lookup we do not know which signals exist,
+            # so withholding one would be the guess ADR-018 forbids.
+            src_t2 = (ROOT_ / "tools" / "onboard-interactive.py").read_text()
+            rep.add("proposal-e2e", "impossible signals are withheld, not just warned",
+                    "Not offered, because none exist here" in src_t2)
+            rep.add("proposal-e2e", "declining the survey withholds nothing",
+                    "Not offered" not in tool_out)
             prop = tgt / ".repo-governor.proposed.json"
             rep.add("proposal-e2e", "onboard-interactive writes a proposal", prop.exists(), r.stderr[:120])
             if prop.exists():

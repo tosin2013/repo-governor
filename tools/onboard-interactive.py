@@ -117,7 +117,7 @@ def _survey(rid):
     if input(f"\nLook up which admission signals exist in {rid}? "
              "Runs `gh`, reads counts only, changes nothing. [y/N] ").strip().lower() \
             not in ("y", "yes"):
-        return
+        return None
     try:
         ms = json.loads(subprocess.run(
             ["gh", "api", f"repos/{rid}/milestones", "--jq",
@@ -133,7 +133,7 @@ def _survey(rid):
             capture_output=True, text=True, timeout=25).stdout.strip() or "0")
     except Exception as e:
         print(f"  lookup failed ({e}); choose from what you know.")
-        return
+        return None
 
     print()
     if ms:
@@ -147,6 +147,7 @@ def _survey(rid):
     print("\n  Existing is not the same as MEANING admitted. A repository can have"
           "\n  milestones that are release buckets rather than admission. Only you"
           "\n  know which. This just rules out the ones that cannot work.")
+    return {"milestone": len(ms), "project_status": int(pj), "label": int(lb)}
 
 
 
@@ -257,10 +258,22 @@ def main(argv):
 
     admission = None
     if choice == "github-projects":
-        _survey(rid)
+        counts = _survey(rid)
+        # Do NOT offer a signal that provably cannot work. The survey printed
+        # "Projects: 0 <-- option 2 cannot work here" directly above this
+        # question and the option was chosen anyway, five times running. A
+        # warning the reader must notice is not a control -- which is this
+        # project's own thesis, applied to its own tooling.
+        opts = GH_SIGNALS
+        if counts:
+            opts = [(v, f"{d}   [{counts[v]} exist]" if counts.get(v) else d)
+                    for v, d in GH_SIGNALS if v == "none" or counts.get(v)]
+            gone = [v for v, _ in GH_SIGNALS if v != "none" and not counts.get(v)]
+            if gone:
+                print(f"\n  Not offered, because none exist here: {', '.join(gone)}")
         admission = ask("What does ADMITTED mean in that repository? Detection cannot "
                         "see this, and guessing it is how a second roadmap of record "
-                        "gets created (ADR-018).", GH_SIGNALS, allow_other=False)
+                        "gets created (ADR-018).", opts, allow_other=False)
 
     # Take the ASSESSED condition, never a default. This wrote "L1" /
     # GOVERNOR_LITE unconditionally, with a comment telling the reader to fix it
