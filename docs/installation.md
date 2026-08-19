@@ -110,9 +110,20 @@ Installing the skill into a target's `.agents/skills/` puts a full clone of this
 
 ## Hooks — deterministic delivery (optional, [ADR-029](adrs/029-hooks-as-deterministic-delivery-surface.md))
 
-The skill is *pulled*: the host decides whether the description matches the task. Measured on 2026-08-19, it did not — [#36](https://github.com/tosin2013/repo-governor/issues/36) Arm A prompt 1 went straight to writing code, and the field baseline is roughly **half** of skill invocations never firing. A hook is *pushed*: it runs whether or not the model thinks it is relevant.
+**Optional, and most repositories should not install it.** Everything below is recorded in [`hook-validation-results.md`](research/hook-validation-results.md); read that before deciding.
 
-Install it when a missed activation matters more than the extra moving part. The skill works without it.
+The hook was built to fix an activation miss ([#36](https://github.com/tosin2013/repo-governor/issues/36) Arm A prompt 1 went straight to writing code, and the industry baseline is roughly **half** of skill invocations never firing). **Validation refuted that purpose.** Same repository, same prompt, hook on and hook off — both graded FULL, and the agent named `AGENTS.md` as its source every time.
+
+| You have | Install the hook? |
+|---|---|
+| `AGENTS.md` (or `CLAUDE.md` pointing at it) | **No.** Proven sufficient on its own; the hook adds nothing to activation. |
+| A governed repository with no always-on file | Adding `AGENTS.md` is simpler and does the same job. |
+| An un-onboarded repository | **It cannot help.** The hook is silent without a manifest, by design. |
+| A need to *stop* a write, not advise against one | **This is the only reason.** See *Blocking mode* — and note it is untested. |
+
+`AGENTS.md` is prose: it cannot stop anything. `PreToolUse` with exit 2 can. That is the hook's one unrefuted justification, and it is why ADR-029 is still `Proposed`.
+
+**If you want governance to activate reliably, write an `AGENTS.md`. That is the finding.**
 
 | Host | Config file | Verified |
 |---|---|---|

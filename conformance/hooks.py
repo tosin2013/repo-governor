@@ -256,6 +256,20 @@ def main():
             except json.JSONDecodeError as e:
                 fails += check(f"{host} template is valid JSON", False, str(e))
 
+    # --- the docs must not outlive the evidence -----------------------------
+    # installation.md said "install it when a missed activation matters" until
+    # the control refuted exactly that. A section that recommends a surface
+    # must keep the counter-evidence one click away, or the next reader gets
+    # the claim without the refutation.
+    inst = (ROOT / "docs" / "installation.md").read_text()
+    hook_sec = inst[inst.index("## Hooks"):] if "## Hooks" in inst else ""
+    fails += check("installation.md has a hook section", bool(hook_sec))
+    fails += check("the hook section links to its validation results",
+                   "hook-validation-results.md" in hook_sec,
+                   "the section that recommends the surface must cite what testing it showed")
+    fails += check("the hook section calls the surface optional",
+                   "optional" in hook_sec.lower())
+
     # --- stdlib only (ADR-011) ----------------------------------------------
     # Tested against sys.stdlib_module_names, not a hand-maintained allowlist.
     # The first version was an allowlist and failed on `hashlib` -- which is
