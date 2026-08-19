@@ -217,10 +217,25 @@ def main():
             # trigger it -- with no lookup we do not know which signals exist,
             # so withholding one would be the guess ADR-018 forbids.
             src_t2 = (ROOT_ / "tools" / "onboard-interactive.py").read_text()
-            rep.add("proposal-e2e", "impossible signals are withheld, not just warned",
-                    "Not offered, because none exist here" in src_t2)
-            rep.add("proposal-e2e", "declining the survey withholds nothing",
-                    "Not offered" not in tool_out)
+            rep.add("proposal-e2e", "an unavailable signal is refused, not removed",
+                    "UNAVAILABLE" in src_t2 and "Pick another" in src_t2,
+                    "removing it renumbers the list, and the same keystroke then "
+                    "selects a DIFFERENT signal -- observed on the very next run")
+            rep.add("proposal-e2e", "the option list is never rebuilt from counts",
+                    "for v, d in GH_SIGNALS]" in src_t2,
+                    "options must keep their positions whatever the counts are")
+            rep.add("proposal-e2e", "declining the survey marks nothing unavailable",
+                    "UNAVAILABLE" not in tool_out,
+                    "with no lookup we do not know which exist")
+            # Compared against the CALL site, not the def. _confirm_condition is
+            # defined near the top of the file, so comparing against `def`
+            # measured source order rather than the order a user experiences --
+            # and failed on correct code.
+            rep.add("proposal-e2e", "the label is asked when the label is chosen",
+                    src_t2.index("Which label means admitted")
+                    < src_t2.index("= _confirm_condition("),   # the CALL, not the def
+                    "it was asked after the condition question, reading as a "
+                    "continuation of something else")
             prop = tgt / ".repo-governor.proposed.json"
             rep.add("proposal-e2e", "onboard-interactive writes a proposal", prop.exists(), r.stderr[:120])
             if prop.exists():

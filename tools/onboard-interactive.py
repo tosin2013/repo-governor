@@ -48,11 +48,20 @@ GH_SIGNALS = [
 ]
 
 
-def ask(prompt, options, allow_other=True):
-    """options: list of (value, description). Returns a value or None for other."""
+def ask(prompt, options, allow_other=True, unavailable=None):
+    """options: list of (value, description). Returns a value, or None for other.
+
+    `unavailable` maps value -> why. Those options KEEP THEIR POSITION and are
+    refused if chosen. Removing them renumbers the list, and renumbering turned
+    "picked an impossible option" into "picked a different option" on the very
+    next run -- the same keystroke, a different meaning, and a manifest bound to
+    the wrong signal without anyone noticing.
+    """
+    unavailable = unavailable or {}
     print(f"\n{prompt}")
-    for i, (_, desc) in enumerate(options, 1):
-        print(f"  {i}. {desc}")
+    for i, (val, desc) in enumerate(options, 1):
+        mark = f"   -- UNAVAILABLE: {unavailable[val]}" if val in unavailable else ""
+        print(f"  {i}. {desc}{mark}")
     if allow_other:
         print(f"  {len(options) + 1}. Something else / not listed")
     while True:
@@ -60,7 +69,12 @@ def ask(prompt, options, allow_other=True):
         if raw.isdigit():
             n = int(raw)
             if 1 <= n <= len(options):
-                return options[n - 1][0]
+                val = options[n - 1][0]
+                if val in unavailable:
+                    print(f"  {val} cannot work here: {unavailable[val]}.")
+                    print("  Nothing would ever be admitted under it. Pick another.")
+                    continue
+                return val
             if allow_other and n == len(options) + 1:
                 return None
         print("Pick a number.")
@@ -264,16 +278,22 @@ def main(argv):
         # question and the option was chosen anyway, five times running. A
         # warning the reader must notice is not a control -- which is this
         # project's own thesis, applied to its own tooling.
-        opts = GH_SIGNALS
+        opts, unavail = GH_SIGNALS, {}
         if counts:
             opts = [(v, f"{d}   [{counts[v]} exist]" if counts.get(v) else d)
-                    for v, d in GH_SIGNALS if v == "none" or counts.get(v)]
-            gone = [v for v, _ in GH_SIGNALS if v != "none" and not counts.get(v)]
-            if gone:
-                print(f"\n  Not offered, because none exist here: {', '.join(gone)}")
+                    for v, d in GH_SIGNALS]
+            unavail = {v: "none exist in this repository"
+                       for v, _ in GH_SIGNALS if v != "none" and not counts.get(v)}
         admission = ask("What does ADMITTED mean in that repository? Detection cannot "
                         "see this, and guessing it is how a second roadmap of record "
-                        "gets created (ADR-018).", opts, allow_other=False)
+                        "gets created (ADR-018).", opts, allow_other=False,
+                        unavailable=unavail)
+        # Asked HERE, while the choice is on screen. It used to be asked after
+        # the condition question, three screens later, where it read as a
+        # continuation of something else.
+        label = ""
+        if admission == "label":
+            label = input("  Which label means admitted? ").strip()
 
     # Take the ASSESSED condition, never a default. This wrote "L1" /
     # GOVERNOR_LITE unconditionally, with a comment telling the reader to fix it
@@ -303,7 +323,6 @@ def main(argv):
         if admission:
             env["REPO_GOVERNOR_GH_ADMISSION"] = admission
         if admission == "label":
-            label = input("Which label means admitted? ").strip()
             if not label:
                 print("A label signal needs the label named; it is never assumed "
                       "(ADR-018).", file=sys.stderr)
