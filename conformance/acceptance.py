@@ -29,6 +29,10 @@ import sys
 import tempfile
 from pathlib import Path
 
+import _count as _CNT  # noqa: E402 -- uniform counting; alias is deliberate,
+# `C` is already taken by `completion` in two suites and the collision silently
+# rebound it (issue 67).
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "engine"))
 import completion as C  # noqa: E402
@@ -39,6 +43,7 @@ TOOL = ROOT / "engine" / "acceptance.py"
 
 
 def check(label, ok, detail=""):
+    _CNT.tally(ok)
     print(f"  [{'PASS' if ok else 'FAIL'}] {label}" + (f"\n         {detail}" if detail and not ok else ""))
     return 0 if ok else 1
 
@@ -188,6 +193,7 @@ def main():
                        "replacing a bar somebody set is editing the bar to fit the work")
 
     print(f"\n{'ACCEPTANCE: CONFORMANT' if not fails else f'ACCEPTANCE: NON-CONFORMANT ({fails})'}")
+    print(_CNT.line("acceptance"))
     return 0 if not fails else 1
 
 

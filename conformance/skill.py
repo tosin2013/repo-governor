@@ -30,6 +30,10 @@ import sys
 import tempfile
 from pathlib import Path
 
+import _count as _CNT  # noqa: E402 -- uniform counting; alias is deliberate,
+# `C` is already taken by `completion` in two suites and the collision silently
+# rebound it (issue 67).
+
 ROOT = Path(__file__).resolve().parent.parent
 SKILL = ROOT / "SKILL.md"
 AGENTS = ROOT / "AGENTS.md"
@@ -40,6 +44,7 @@ ENTRY_RE = re.compile(r"engine/([a-z_]+)\.py")
 
 
 def check(label, ok, detail=""):
+    _CNT.tally(ok)
     print(f"  [{'PASS' if ok else 'FAIL'}] {label}" + (f"    {detail}" if detail and not ok else ""))
     return 0 if ok else 1
 
@@ -368,6 +373,7 @@ def main():
                    "blind; a check that matches nothing is not a passing check")
 
     print(f"\n{'AGENT SURFACE: CONFORMANT' if not fails else f'AGENT SURFACE: NON-CONFORMANT ({fails})'}")
+    print(_CNT.line("skill"))
     return 0 if not fails else 1
 
 

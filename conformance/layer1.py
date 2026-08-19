@@ -28,6 +28,10 @@ import tempfile
 import sys
 from pathlib import Path
 
+import _count as _CNT  # noqa: E402 -- uniform counting; alias is deliberate,
+# `C` is already taken by `completion` in two suites and the collision silently
+# rebound it (issue 67).
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _preflight  # noqa: E402
@@ -237,6 +241,7 @@ class Report:
         self.rows = []
 
     def add(self, adapter, check, ok, detail=""):
+        _CNT.tally(ok)
         self.rows.append((adapter, check, ok, detail))
 
     def failures(self):
@@ -429,6 +434,7 @@ def main(argv):
     print("LAYER 1: " + ("CONFORMANT" if not fails else f"NON-CONFORMANT ({len(fails)} failures)"))
     if fails:
         _preflight.attribute(absent)
+    print(_CNT.line("layer1"))
     return 0 if not fails else 1
 
 

@@ -23,12 +23,17 @@ import sys
 import tempfile
 from pathlib import Path
 
+import _count as _CNT  # noqa: E402 -- uniform counting; alias is deliberate,
+# `C` is already taken by `completion` in two suites and the collision silently
+# rebound it (issue 67).
+
 ROOT = Path(__file__).resolve().parent.parent
 STATUS = ROOT / "engine" / "status.py"
 SCHEMA = ROOT / "schemas" / "manifest-v1.json"
 
 
 def check(label, ok, detail=""):
+    _CNT.tally(ok)
     print(f"  [{'PASS' if ok else 'FAIL'}] {label}" + (f"\n         {detail}" if detail and not ok else ""))
     return 0 if ok else 1
 
@@ -186,6 +191,7 @@ def main():
                    "printing nothing, would both misrepresent that")
 
     print(f"\n{'STATUS: CONFORMANT' if not fails else f'STATUS: NON-CONFORMANT ({fails})'}")
+    print(_CNT.line("status"))
     return 0 if not fails else 1
 
 
