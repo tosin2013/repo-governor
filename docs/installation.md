@@ -177,3 +177,19 @@ In verbose mode the hook emits a token derived from the session id to **both** c
 > **Do not ask the model to "quote any text prepended to this message".** Tried 2026-08-19; the answer was "none" while the hook had demonstrably run. `additionalContext` arrives as a separate context block rather than as part of the user message, so "none" is a truthful answer to that question and tells you nothing. The token avoids the ambiguity by asking for a value instead of a description.
 
 `RG_HOOK_VERBOSE` is off by default and stays silent in ungoverned repositories, verbose or not.
+
+### If the model never receives the context
+
+Observed 2026-08-19, Claude Code v2.1.235 / Opus 4.6: the operator saw `delivery token ad330c53` and the model, asked the same session, answered *"there is no governance delivery token in my context."* The hook ran; `systemMessage` arrived; `additionalContext` did not.
+
+The hook now emits the context **twice** — top-level and nested inside `hookSpecificOutput` — because the two are documented differently and a live host disagreed with the summary we checked. Hosts ignore keys they do not recognise, so emitting both costs nothing and removes the guess.
+
+If a token still does not reach the model, fall back to plain text:
+
+```bash
+export RG_HOOK_PLAINTEXT=1
+```
+
+For `UserPromptSubmit` and `SessionStart`, plain non-JSON stdout on exit 0 is added to context directly. This bypasses whatever discards `additionalContext`, at the cost of `systemMessage` — so there is no operator-visible token, and delivery is verified by asking the model to quote the `GOVERNANCE:` block instead. It stays silent in ungoverned repositories either way.
+
+**The failure this guards against is specific: a hook that runs, reports success, and delivers nothing.** Without the token, the transcript looks identical to a working one.

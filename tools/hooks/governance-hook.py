@@ -109,19 +109,35 @@ def _session_file(repo, pl):
 # host reads the one it knows and ignores the other.
 
 def _emit(context=None, deny_reason=None, user_msg=None, exit2=False, event=None):
+    # RG_HOOK_PLAINTEXT=1 abandons JSON entirely for context injection. For
+    # UserPromptSubmit and SessionStart the documented fallback is that plain
+    # non-JSON stdout on exit 0 becomes context. It costs systemMessage (so no
+    # operator-visible token) but bypasses whatever discards additionalContext.
+    if context and os.environ.get("RG_HOOK_PLAINTEXT") == "1" and not deny_reason:
+        print(context)
+        return 0
     out = {}
     if context:
+        # BOTH shapes, because a fetched doc summary said top-level and a live
+        # host proved that alone does not reach the model: on 2026-08-19 the
+        # operator saw the delivery token and the model reported none. Hosts
+        # ignore keys they do not know, so emitting both costs nothing and
+        # removes the guess.
         out["additionalContext"] = context
+        out.setdefault("hookSpecificOutput", {}).update({
+            "hookEventName": event or "UserPromptSubmit",
+            "additionalContext": context,
+        })
     if user_msg:
         out["systemMessage"] = user_msg
     if deny_reason:
-        out["hookSpecificOutput"] = {
+        out.setdefault("hookSpecificOutput", {}).update({
             # Claude Code requires hookEventName inside this object or the
             # decision is not honored; Cursor ignores the extra key.
             "hookEventName": event or "PreToolUse",
             "permissionDecision": "deny",
             "permissionDecisionReason": deny_reason,
-        }
+        })
         out["permission"] = "deny"          # Cursor's spelling
     if out:
         print(json.dumps(out))

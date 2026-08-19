@@ -24,6 +24,7 @@ Usage:  python3 conformance/hooks.py
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -124,6 +125,35 @@ def main():
                          env={"RG_HOOK_VERBOSE": "1"})
         fails += check("verbose mode still says nothing in an ungoverned repository",
                        out == {}, f"got {out}")
+
+    # --- both context shapes, because one alone did not reach the model ----
+    rc, out, _ = run("prompt", {"session_id": "t", "cwd": str(ROOT),
+                                "hook_event_name": "UserPromptSubmit"})
+    hso = out.get("hookSpecificOutput") or {}
+    fails += check("context is emitted at top level", bool(out.get("additionalContext")))
+    fails += check("context is ALSO emitted inside hookSpecificOutput",
+                   bool(hso.get("additionalContext")),
+                   "top-level alone reached the operator but not the model, 2026-08-19")
+    fails += check("nested block carries the event name it belongs to",
+                   hso.get("hookEventName") == "UserPromptSubmit")
+    fails += check("both copies are identical",
+                   out.get("additionalContext") == hso.get("additionalContext"))
+
+    # --- plaintext fallback -------------------------------------------------
+    p = subprocess.run([sys.executable, str(HOOK), "prompt"],
+                       input=json.dumps({"session_id": "t", "cwd": str(ROOT)}),
+                       capture_output=True, text=True, cwd=str(ROOT),
+                       env={**os.environ, "RG_HOOK_PLAINTEXT": "1"})
+    fails += check("RG_HOOK_PLAINTEXT=1 emits bare text, not JSON",
+                   p.returncode == 0 and p.stdout.strip().startswith("GOVERNANCE:")
+                   and not p.stdout.strip().startswith("{"), repr(p.stdout[:60]))
+    with tempfile.TemporaryDirectory() as td:
+        p = subprocess.run([sys.executable, str(HOOK), "prompt"],
+                           input=json.dumps({"session_id": "t", "cwd": td}),
+                           capture_output=True, text=True, cwd=td,
+                           env={**os.environ, "RG_HOOK_PLAINTEXT": "1"})
+        fails += check("plaintext mode still silent in an ungoverned repository",
+                       not p.stdout.strip(), repr(p.stdout[:60]))
 
     # --- capture: the escaped-quote defect ---------------------------------
     sess = ROOT / ".repo-governor" / "sessions"
