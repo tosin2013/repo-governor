@@ -34,7 +34,7 @@ import manifest as MF  # noqa: E402
 import bindings as B  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
-ENGINE_VERSION = "0.1.0"
+from version import ENGINE_VERSION  # noqa: E402  -- one source, see engine/version.py
 try:
     MF_HASH = hashlib.sha256((ROOT / ".repo-governor.json").read_bytes()).hexdigest()[:16]
 except OSError:

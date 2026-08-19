@@ -81,9 +81,11 @@ Governance depth scales with repository condition (L0 greenfield → L4 mature/h
 ## Install
 
 ```bash
-git clone https://github.com/tosin2013/repo-governor /tmp/rg
+git clone --branch v0.1.0 https://github.com/tosin2013/repo-governor /tmp/rg
 /tmp/rg/tools/install-skill.sh /path/to/your/repo .claude/skills
 ```
+
+**Name a tag.** `install-skill.sh` clones the checkout it is run from, so the version you get is decided by the clone above, not by the installer. Without `--branch` you install whatever `main` is at that moment, which is why the [activation-result form](https://github.com/tosin2013/repo-governor/issues/new?template=activation-result.yml) has to ask for a commit SHA. The release job builds its published tarball by running this same script at the tag, so a `--branch` install and the release artifact are the same bytes by construction.
 
 **Use the script rather than cloning into a skills directory directly.** A plain clone brings this repository's own `AGENTS.md`, `CLAUDE.md` and `.repo-governor.json` along with it — and that last one makes the engine resolve the *install directory* as the repository under governance, so it answers confidently about the wrong project ([ADR-027](docs/adrs/027-the-governed-repository-is-not-the-install-directory.md)). The script clones and then prunes. It also offers to configure a hook, and refuses to in a repository that has no manifest, where the hook would be silent anyway.
 

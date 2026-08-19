@@ -33,6 +33,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import bindings as B  # noqa: E402
 import manifest as MF  # noqa: E402
 import vocabulary as V  # noqa: E402
+from version import ENGINE_VERSION  # noqa: E402
 
 # §32's closed set. A discovery outside it is BAD_REQUEST, never guessed into
 # the nearest neighbour -- the vocabulary is closed for the same reason the
@@ -210,7 +211,7 @@ def record_discovery(result, manifest=None):
           # not a rejection -- nobody decided against it (INV-005).
           "disposition": "DEFERRED",
           "reason": f"discovery {result.get('discovery_type')} -> {result.get('disposition')}",
-          "engine_version": "0.1.0", "manifest_hash": "",
+          "engine_version": ENGINE_VERSION, "manifest_hash": "",
           "snapshot_sha256": hashlib.sha256(body.encode()).hexdigest(),
           "typed_facts": json.dumps(facts, sort_keys=True),
           "redacted": "true", "fields_redacted": json.dumps(["target"])}
