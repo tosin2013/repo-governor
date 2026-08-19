@@ -118,11 +118,14 @@ def _emit(context=None, deny_reason=None, user_msg=None, exit2=False, event=None
         return 0
     out = {}
     if context:
-        # BOTH shapes, because a fetched doc summary said top-level and a live
-        # host proved that alone does not reach the model: on 2026-08-19 the
-        # operator saw the delivery token and the model reported none. Hosts
-        # ignore keys they do not know, so emitting both costs nothing and
-        # removes the guess.
+        # BOTH shapes. VERIFIED on Claude Code v2.1.235 / Opus 4.6, 2026-08-19:
+        # top-level `additionalContext` ALONE does not reach the model. The
+        # operator saw delivery token ad330c53 and the model, asked in that same
+        # session, reported no token. Adding the nested copy fixed it -- token
+        # 85f9b08b matched on both sides. A fetched doc summary had said
+        # top-level was sufficient and no hookEventName was needed; the host
+        # disagreed. Top-level is kept for Cursor, which is unverified here.
+        # Hosts ignore keys they do not recognise, so both is free.
         out["additionalContext"] = context
         out.setdefault("hookSpecificOutput", {}).update({
             "hookEventName": event or "UserPromptSubmit",
