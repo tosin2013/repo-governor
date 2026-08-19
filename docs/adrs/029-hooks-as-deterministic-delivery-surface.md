@@ -1,6 +1,6 @@
 # 29. Hooks as a Deterministic Delivery Surface
 
-**Status**: Proposed
+**Status**: Proposed — **narrowed 2026-08-19 by its own validation**. The activation claim was refuted; see *Measured consequences*. The enforcement claim stands untested.
 **Date**: 2026-08-19
 **Domain**: Distribution & agent integration
 **Amends**: [ADR-001](001-agent-skill-as-primary-delivery-surface.md) — promotes "coding-agent hooks" from a deferred §65 candidate to a secondary delivery surface. The Agent Skill remains primary.
@@ -47,6 +47,24 @@ The hook occupies three moments:
 **3. Enforcement is opt-in per repository, via `repo_governor.enforcement: "blocking"`.** Default is `advisory`. An un-onboarded repository is not a governed one; blocking there would stop all editing everywhere the manifest is absent.
 
 **4. Silence in ungoverned repositories.** No manifest, no output. A governance tool that narrates in repositories it has no authority over is a nuisance that gets uninstalled.
+
+## Measured consequences (2026-08-19, added after validation)
+
+This ADR was written to fix an activation miss. **Validation refuted that.**
+
+| Test | Result |
+|---|---|
+| Does the hook fire and reach the model? | **yes** — token matched operator and model, but only after nesting `additionalContext` inside `hookSpecificOutput`. Top-level alone runs, reports success, and delivers nothing. |
+| Prompt-1 shape, hook **on**, in `repo-governor` | FULL |
+| Prompt-1 shape, hook **off**, same repo, same prompt | **FULL** |
+
+`AGENTS.md` was doing the work. The agent named it as its source in every session. **In a repository that already announces itself, the hook adds nothing to activation.**
+
+Worse for the original motivation: the hook is deliberately silent in un-onboarded repositories, and prompt 1 failed in an un-onboarded repository. **The surface could never have spoken in the case that prompted it.** The only row where it improves activation is a governed repository with no `AGENTS.md` — which one file would also fix.
+
+**What survives is enforcement, and only that.** `AGENTS.md` is prose and cannot stop a write; `PreToolUse` with exit 2 can. ADR-001's second named weakness — *"A skill advises; it cannot block"* — is untouched by prose and remains the hook's sole unrefuted justification. It has not been tested. Until it is, this ADR stays `Proposed`, and the activation argument in its Context above should be read as **the reason it was written, not as a finding it established**.
+
+Full record: [`docs/research/hook-validation-results.md`](../research/hook-validation-results.md).
 
 ## Consequences
 
