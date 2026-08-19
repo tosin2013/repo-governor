@@ -1,0 +1,9 @@
+{
+  "$comment": "Acceptance criteria for issue 54. WHAT THESE CANNOT EXPRESS: that no other engine input leaks the same way. The fix is specific -- the engine stops re-exporting REPO_GOVERNOR_TARGET -- and the conformance check asserts that one variable is absent from an adapter's environment. A future input added to _env_for would need its own reasoning about whether adapters consume it.",
+  "authority_id": "54",
+  "criteria": [
+    {"check": "command_exit", "target": "./tools/run-conformance.sh bindings"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh hooks"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh onboarding"}
+  ]
+}
