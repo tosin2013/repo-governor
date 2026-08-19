@@ -27,6 +27,8 @@ SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TARGET="${1:-}"
 SKILLS_DIR="${2:-.agents/skills}"
 HOOKS_OPT="${3:-ask}"     # ask | yes | no -- see the hook block at the end
+HOST_OPT="${4:-}"         # claude | cursor | codex | gemini | vscode -- DECLARED,
+                          # never inferred. See the host block below.
 
 if [ -z "$TARGET" ]; then
   echo "usage: tools/install-skill.sh <target-repo> [skills-dir]" >&2
@@ -155,22 +157,58 @@ fi
 # Consent-gated, never default-on. Writing hook config into a settings.json the
 # user owns is fine when they said yes and wrong when they did not; the rule is
 # no SILENT write, not no write. Same shape as SKILL.md's --write.
-# Which host, and therefore which config file. `.agents/skills` is the
-# cross-vendor path and names no host, so fall back to whatever host directory
-# the target already has rather than guessing.
-case "$SKILLS_DIR" in
-  *.claude*) HOST=claude ;;
-  *.cursor*) HOST=cursor ;;
-  *.codex*)  HOST=codex ;;
-  *.gemini*) HOST=gemini ;;
-  *vscode*|*.github*) HOST=vscode ;;
-  *)
-    if   [ -d "$TARGET/.cursor" ]; then HOST=cursor
-    elif [ -d "$TARGET/.claude" ]; then HOST=claude
-    elif [ -d "$TARGET/.codex"  ]; then HOST=codex
-    elif [ -d "$TARGET/.gemini" ]; then HOST=gemini
-    else HOST=unknown; fi ;;
+# Which host, and therefore which config file. The host is DECLARED, never
+# inferred.
+#
+# An earlier version fell back to sniffing the target for a `.cursor/` or
+# `.claude/` directory. That is the defect ADR-028 exists for -- an identity
+# guessed from incidental filesystem evidence -- and the consequence here is
+# nastier than usual: a repository someone once opened in Cursor, whose owner
+# actually runs Codex, would get `.cursor/hooks.json`. Codex would never read
+# it, and the result is indistinguishable from a hook that does not work, which
+# is the exact confusion this whole surface is built to avoid.
+#
+# Typing `.claude/skills` IS a declaration -- the user named the host. The
+# cross-vendor `.agents/skills` names none, so we ask, or refuse.
+HOST=""
+if [ -n "$HOST_OPT" ]; then
+  HOST="$HOST_OPT"                       # explicit, wins over everything
+else
+  case "$SKILLS_DIR" in
+    *.claude*) HOST=claude ;;
+    *.cursor*) HOST=cursor ;;
+    *.codex*)  HOST=codex ;;
+    *.gemini*) HOST=gemini ;;
+    *vscode*|*.github*) HOST=vscode ;;
+  esac
+fi
+case "$HOST" in
+  claude|cursor|codex|gemini|vscode) ;;
+  "") ;;                                  # undeclared; handled below
+  *) echo "unknown host: '$HOST' (claude|cursor|codex|gemini|vscode)" >&2; exit 2 ;;
 esac
+# `.agents/skills` is the cross-vendor path and declares nothing. Ask if there
+# is a terminal; otherwise say what is missing and install the skill anyway --
+# the skill works on every host, only the hook config is host-specific.
+if [ -z "$HOST" ] && [ "$HOOKS_OPT" != "no" ] && [ -f "$TARGET/.repo-governor.json" ]; then
+  if [ -t 0 ]; then
+    echo
+    echo "'$SKILLS_DIR' is the cross-vendor path and names no host, so which agent"
+    echo "reads hooks here cannot be known. Guessing it from a stray .cursor/ or"
+    echo "\.claude/ directory is how you write a config the host never reads --"
+    echo "indistinguishable from a hook that does not work."
+    printf "Which harness? [claude|cursor|codex|gemini|vscode|skip] "
+    read -r HOST || HOST=""
+    [ "$HOST" = "skip" ] && HOST=""
+  else
+    echo
+    echo "NOTE: no hook offered -- '$SKILLS_DIR' names no host and this is not a"
+    echo "      terminal. Declare it to install one:"
+    echo "        $SRC/tools/install-skill.sh $TARGET $SKILLS_DIR ask <harness>"
+    echo "      harness: claude | cursor | codex | gemini | vscode"
+  fi
+fi
+
 case "$HOST" in
   claude) HOST_CFG=".claude/settings.json" ;;
   cursor) HOST_CFG=".cursor/hooks.json" ;;

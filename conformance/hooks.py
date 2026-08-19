@@ -427,6 +427,40 @@ def main():
                                "a hook that runs and delivers nothing looks exactly like "
                                "a model ignoring governance")
 
+    # The host is DECLARED, never inferred. An earlier version sniffed the
+    # target for a .cursor/ or .claude/ directory -- ADR-028's defect, an
+    # identity guessed from incidental evidence. The consequence is worse than
+    # usual here: a repo someone opened in Cursor once, whose owner runs Codex,
+    # gets .cursor/hooks.json that Codex never reads, which is indistinguishable
+    # from a hook that does not work.
+    with tempfile.TemporaryDirectory() as td:
+        tgt = pathlib.Path(td) / "trap"
+        (tgt / ".cursor").mkdir(parents=True)
+        subprocess.run(["git", "init", "-q", str(tgt)], capture_output=True)
+        (tgt / ".repo-governor.json").write_text(
+            (ROOT / ".repo-governor.json").read_text(), encoding="utf-8")
+        r = subprocess.run(["bash", str(ROOT / "tools" / "install-skill.sh"),
+                            str(tgt), ".agents/skills", "yes"],
+                           capture_output=True, text=True, stdin=subprocess.DEVNULL)
+        fails += check("a stray .cursor/ does NOT imply the cursor host",
+                       not (tgt / ".cursor" / "hooks.json").exists(),
+                       "writing a config the host never reads looks exactly like "
+                       "a hook that does not work")
+        fails += check("undeclared host says how to declare it",
+                       "harness" in r.stdout and "names no host" in r.stdout)
+
+    with tempfile.TemporaryDirectory() as td:
+        tgt = pathlib.Path(td) / "declared"
+        (tgt / ".cursor").mkdir(parents=True)
+        subprocess.run(["git", "init", "-q", str(tgt)], capture_output=True)
+        (tgt / ".repo-governor.json").write_text(
+            (ROOT / ".repo-governor.json").read_text(), encoding="utf-8")
+        subprocess.run(["bash", str(ROOT / "tools" / "install-skill.sh"),
+                        str(tgt), ".agents/skills", "yes", "cursor"],
+                       capture_output=True, text=True, stdin=subprocess.DEVNULL)
+        fails += check("an explicitly declared host installs",
+                       (tgt / ".cursor" / "hooks.json").exists())
+
     # Onboarding advice must reach a target with NO recognisable host directory
     # and NO terminal. It was nested inside the host block and gated on a TTY,
     # so a plain repo installed non-interactively got no guidance at all -- and

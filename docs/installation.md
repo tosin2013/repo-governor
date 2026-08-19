@@ -142,12 +142,16 @@ Codex documents **no prompt-submit event at all**, so only the write check insta
 The installer offers it when the host is Claude Code and the target is **governed**:
 
 ```bash
-tools/install-skill.sh <target> .claude/skills yes      # -> .claude/settings.json
-tools/install-skill.sh <target> .cursor/skills yes      # -> .cursor/hooks.json
-tools/install-skill.sh <target> .codex/skills  yes      # -> .codex/hooks.json
-tools/install-skill.sh <target> .agents/skills          # cross-vendor path: host
-                                                        # inferred from what exists
+tools/install-skill.sh <target> .claude/skills yes            # -> .claude/settings.json
+tools/install-skill.sh <target> .cursor/skills yes            # -> .cursor/hooks.json
+tools/install-skill.sh <target> .codex/skills  yes            # -> .codex/hooks.json
+tools/install-skill.sh <target> .agents/skills yes cursor     # cross-vendor path:
+                                                              # declare the harness
 ```
+
+**The harness is declared, never inferred.** Naming `.claude/skills` declares it; the cross-vendor `.agents/skills` declares nothing, so the script asks — or, with no terminal, tells you how to declare it and installs the skill without a hook.
+
+An earlier version guessed from whichever host directory the target happened to contain. A repository someone once opened in Cursor, whose owner runs Codex, would have received `.cursor/hooks.json` that Codex never reads — **indistinguishable from a hook that does not work**, which is the one failure this surface exists to make impossible. It is also the defect [ADR-028](adrs/028-provider-identity-is-never-defaulted.md) exists for: an identity guessed from incidental evidence.
 
 Omit the third argument to be prompted; pass `no` to never ask. The host decides which config file is written, and the script uses the same template documented above rather than a second copy — a config the installer writes and one the docs describe must not be able to drift.
 
