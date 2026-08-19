@@ -143,7 +143,14 @@ def moment_prompt(pl, repo, mf, enforcing):
     if mf is None:
         return 0                                    # ungoverned repo: say nothing
     rid = (mf.get("repository") or {}).get("id", "this repository")
-    return _emit(context=(
+    # Proof of delivery that does not depend on asking the model. `systemMessage`
+    # is rendered by the host to the OPERATOR, so it is visible whether or not
+    # the injected context ever reaches the model -- and an agent that has
+    # merely READ .claude/settings.json cannot produce it. Test 1 of the hook
+    # validation could not tell those apart, which is why this exists.
+    verbose = os.environ.get("RG_HOOK_VERBOSE") == "1"
+    return _emit(user_msg=(f"repo-governor: governance injected for {rid}"
+                           if verbose else None), context=(
         f"GOVERNANCE: {rid} is governed by Repo Governor.\n"
         "Do not decide authorization yourself. Before creating, changing, "
         "upgrading, deleting or completing anything, identify the authority id "

@@ -42,10 +42,14 @@ def check(label, ok, detail=""):
     return 0 if ok else 1
 
 
-def run(moment, payload, *flags, cwd=None):
+def run(moment, payload, *flags, cwd=None, env=None):
+    e = None
+    if env:
+        import os
+        e = {**os.environ, **env}
     p = subprocess.run([sys.executable, str(HOOK), moment, *flags],
                        input=json.dumps(payload), capture_output=True,
-                       text=True, cwd=cwd or str(ROOT))
+                       text=True, cwd=cwd or str(ROOT), env=e)
     try:
         out = json.loads(p.stdout) if p.stdout.strip() else {}
     except json.JSONDecodeError:
@@ -82,6 +86,23 @@ def main():
                    "INV-002" in ctx)
     fails += check("prompt moment never blocks, whatever it says",
                    rc == 0 and "permissionDecision" not in json.dumps(out))
+
+    # --- operator-visible delivery proof -----------------------------------
+    # An agent that has merely READ .claude/settings.json can describe the
+    # hooks convincingly. systemMessage is rendered by the host to the
+    # operator, so it distinguishes "the hook ran" from "the model inferred it".
+    rc, out, _ = run("prompt", {"session_id": "t", "cwd": str(ROOT)})
+    fails += check("delivery proof is off by default", "systemMessage" not in out)
+    rc, out, _ = run("prompt", {"session_id": "t", "cwd": str(ROOT)},
+                     env={"RG_HOOK_VERBOSE": "1"})
+    fails += check("RG_HOOK_VERBOSE=1 emits an operator-visible systemMessage",
+                   "systemMessage" in out and "governance injected" in out.get("systemMessage", ""),
+                   f"got {out.get('systemMessage')!r}")
+    with tempfile.TemporaryDirectory() as td:
+        rc, out, _ = run("prompt", {"session_id": "t", "cwd": td}, cwd=td,
+                         env={"RG_HOOK_VERBOSE": "1"})
+        fails += check("verbose mode still says nothing in an ungoverned repository",
+                       out == {}, f"got {out}")
 
     # --- capture: the escaped-quote defect ---------------------------------
     sess = ROOT / ".repo-governor" / "sessions"

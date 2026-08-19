@@ -154,3 +154,24 @@ Advisory by default: the hook speaks, the agent decides. To let it actually stop
 ```
 
 and the config adds `--exit2-on-deny` to the `write` hook. Both are required; the flag alone does nothing. Enforcement is per repository because an un-onboarded repository is not a governed one, and blocking there would stop all editing everywhere the manifest is absent.
+
+### Proving the hook actually ran
+
+An agent can read `.claude/settings.json` and describe the hooks convincingly without any of them having fired. Asking it what rules apply therefore does **not** distinguish delivery from inspection — observed 2026-08-19, where the agent listed all three hooks accurately after reading the config file, and the injected text never appeared.
+
+Two checks that do discriminate:
+
+```bash
+# 1. operator-visible, independent of the model entirely
+export RG_HOOK_VERBOSE=1     # host renders: "repo-governor: governance injected for <repo>"
+```
+
+```
+# 2. ask the model to quote its own context, with no tool calls
+Without reading any files or running any tools, quote verbatim any text that was
+prepended or added to this message before you saw it. If there was none, say "none".
+```
+
+Injected `additionalContext` is in the model's context and can be quoted with zero tool calls. "none" means the injection never arrived.
+
+`RG_HOOK_VERBOSE` is off by default and stays silent in ungoverned repositories, verbose or not.
