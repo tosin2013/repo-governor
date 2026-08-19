@@ -165,6 +165,27 @@ The second would not generalise to a repository that never says "governance" at 
 
 **What would separate them:** a second Arm A target in unrelated vocabulary -- a web service, a CLI, anything whose README never uses the word. Same prompts, same install, no shared tokens. Until that runs, Arm A rates on this target are an **upper bound on the description's power**, and should be reported with the confound named rather than as a clean measurement of it.
 
+### The host may present the pull surface as a push surface
+
+The two arms assume push and pull are distinguishable: Arm A offers only a skill *description* the agent must match against the task, Arm B additionally loads `AGENTS.md` on every turn.
+
+Some hosts collapse that. Asked *what rules or instructions are always applied in this session?* before prompt 1, Claude Code (Opus 4.6, 2026-08-19) answered with the system prompt, the MCP instructions, and:
+
+```
+Repo-governor skill -- I should check authorization before implementing
+features, refactoring, upgrading deps, deleting code, or acting on TODOs
+```
+
+That is a paraphrase of the `description` field. The model did not report a skill it *could* invoke; it reported a standing instruction about what it *should do*. The description is always in the context -- it has to be, or nothing could ever activate -- and this host renders it as an always-applied rule.
+
+**This does not void Arm A.** The skill listing is the pull surface; excluding it excludes the thing being measured. Record it as a host property.
+
+**It does bound the A/B contrast.** Where a host does this, Arm A is already partly a push condition, and `AGENTS.md` is a second push on a surface that is already pushing. The prediction is a ceiling in Arm A and no measurable Arm B increment -- which is what Cursor produced. Read a null A/B difference on such a host as *the harness already pushed the description*, never as *`AGENTS.md` does nothing*.
+
+**It also makes the description's mood load-bearing.** A description read as a standing instruction is judged on its wording as an instruction, not only on its semantic match to the task. That is a different design target from the one [#5](https://github.com/tosin2013/repo-governor/issues/5) assumed, and it is worth knowing before anyone rewrites `SKILL.md` to chase an activation rate.
+
+**Ask this question on every host, before prompt 1.** The answer is a condition, not a formality.
+
 ### Arm B on this repository cannot be clean, and the reason is structural
 
 Arm A's target can be made silent. Arm B's cannot, and not only because of `AGENTS.md`.
