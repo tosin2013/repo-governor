@@ -1,0 +1,9 @@
+{
+  "$comment": "Acceptance criteria for issue 72. WHAT THESE CANNOT EXPRESS: condition 3, that status.py says a licence-less repository grants nobody anything WITHOUT implying work is blocked. A command_exit sees the exit code, not the tone. The conformance suite asserts the words are present and that a verdict still comes back; whether the wording escalates is a human read.",
+  "authority_id": "72",
+  "criteria": [
+    {"check": "command_exit", "target": "./tools/run-conformance.sh onboarding"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh status"},
+    {"check": "command_exit", "target": "python3 engine/status.py ."}
+  ]
+}

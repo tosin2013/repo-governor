@@ -313,6 +313,23 @@ def main():
                         "indicators" in tool_out,
                         "a bare verdict cannot be weighed by a person or an agent")
 
+                # Obligation indicators are reported, and are NOT floors. A
+                # floor may not be lowered, so a missing licence would
+                # permanently pin a repository to L4 for a reason unrelated to
+                # how deeply its code needs governing.
+                _ind = want.get("indicators") or {}
+                rep.add("proposal-e2e", "license_present is reported as an indicator",
+                        "license_present" in _ind,
+                        "a repository with no licence grants nobody anything; its owner "
+                        "should be told, and detection sees it for free")
+                rep.add("proposal-e2e", "readme_present is reported as an indicator",
+                        "readme_present" in _ind)
+                rep.add("proposal-e2e", "neither obligation indicator raises the floor",
+                        "license_present" not in O.FLOOR_INDICATORS
+                        and "readme_present" not in O.FLOOR_INDICATORS,
+                        "a floor cannot be lowered, so this would pin a repository to L4 "
+                        "over a fact unrelated to its governance depth")
+
             # A floor may be raised, never lowered. Build a repo that floors at
             # L4 and try to force it down.
             fl = _pl.Path(td) / "floored"

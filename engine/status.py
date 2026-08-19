@@ -172,6 +172,25 @@ def main(argv):
         else:
             print(f"  {name:<24} NOT reachable — {why}")
 
+    # Obligation facts, reported and not judged. These gate nothing: a
+    # repository without a licence still gets verdicts, still reaches every
+    # disposition it otherwise would, and is told rather than stopped. Section
+    # 54 fails this product if it "blocks routine reversible implementation
+    # excessively", and a licence is not an authority question.
+    print("\nOBLIGATIONS THIS REPOSITORY CARRIES\n")
+    lic = any((target / n).is_file() for n in
+              ("LICENSE", "LICENSE.md", "LICENSE.txt", "LICENCE", "LICENCE.md", "COPYING"))
+    rdm = any((target / n).is_file() for n in
+              ("README.md", "README", "README.rst", "README.txt"))
+    if lic:
+        print("  licence   present")
+    else:
+        print("  licence   ABSENT — with no licence a repository is all-rights-reserved by")
+        print("            default: nobody has a grant to use it and no contributor has terms")
+        print("            to contribute under. That may be deliberate for an internal")
+        print("            repository. It does not block any work, and nothing here gates on it.")
+    print(f"  readme    {'present' if rdm else 'absent — a documentation gap, not an obligation'}")
+
     print("\nLOCAL EVIDENCE\n")
     print(f"  acceptance criteria present for: {', '.join(crit) if crit else '(none)'}")
     # Say what cannot be answered, and why, rather than omitting the question.

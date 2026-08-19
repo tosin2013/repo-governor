@@ -63,6 +63,29 @@ def assess(repo: Path):
     ind["ci_workflows"] = len(list((repo / ".github" / "workflows").glob("*"))) if (
         repo / ".github" / "workflows").is_dir() else 0
 
+    # Obligation presence. A repository with no licence is all-rights-reserved
+    # by default: no consumer has a grant to use it and no contributor has
+    # terms to contribute under. That is a fact about what the repository OWES
+    # people, which is the category the floor indicators below exist for.
+    #
+    # Deliberately NOT a floor, and deliberately not a gate. A floor may not be
+    # lowered, so a missing licence would permanently force L4 on a repository
+    # for a reason unrelated to how deeply its code needs governing; and
+    # refusing a verdict over it would be section 54's "blocks routine
+    # reversible implementation excessively". Absence is also not a defect --
+    # an internal repository may carry no licence on purpose. So: report it,
+    # and let a person weigh it.
+    ind["license_present"] = any((repo / n).is_file() for n in
+                                 ("LICENSE", "LICENSE.md", "LICENSE.txt",
+                                  "LICENCE", "LICENCE.md", "COPYING"))
+    # Rides along on the same mechanism. It carries LESS weight than the
+    # licence: a missing README is a documentation gap, not an obligation to
+    # anyone. It is here because it costs one line, not because it is
+    # equivalent -- and nothing should be inferred from it beyond presence
+    # (section 8 excludes a static-analysis engine by name).
+    ind["readme_present"] = any((repo / n).is_file() for n in
+                                ("README.md", "README", "README.rst", "README.txt"))
+
     # Floor indicators.
     ind["public_api_surface"] = any(
         "export " in p.read_text(errors="ignore")[:4000] or "__all__" in p.read_text(errors="ignore")[:4000]
