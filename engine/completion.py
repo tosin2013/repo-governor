@@ -162,6 +162,35 @@ def evaluate(authority_id, manifest=None):
     provenance += crit.get("provenance", [])
     criteria = crit["value"]["criteria"]
 
+    # A DECLARED BUT EMPTY BAR IS NOT A SATISFIED BAR.
+    #
+    # Without this, `criteria: []` reaches the loop below, produces zero
+    # results, and both "is anything unresolved?" and "is anything unmet?"
+    # are false -- so the else branch declares STOP_COMPLETE by vacuous
+    # quantification. Demonstrated on a live authority id: emptying the list
+    # turned CONTINUE into STOP_COMPLETE with satisfied=true, on zero
+    # evidence.
+    #
+    # Section 40 is the completion FIREWALL. A firewall that opens when handed
+    # nothing to check is not one, and this is the exact shape an unedited
+    # template would have had on first contact (issue 58).
+    if not criteria:
+        unknowns.append({
+            "dimension": "acceptance",
+            "reason": "NO_CRITERIA_DECLARED",
+            "detail": (f"The acceptance record for {authority_id} exists but declares no "
+                       "criteria. An empty bar is not a met bar; nothing has been stated "
+                       "that completion could be checked against."),
+            "resolution": "Declare at least one criterion, or accept that this work has no "
+                          "completion bar and will never read STOP_COMPLETE.",
+            "blocking": False,
+        })
+        return {"decision": "CONTINUE", "authority_id": authority_id, "authority": authority,
+                "criteria": [],
+                "stop_condition": {"acceptance_conditions_satisfied": "UNKNOWN"},
+                "unknowns": unknowns, "provenance": provenance,
+                "execution": execution_evidence(authority_id, manifest)}
+
     # 3. evaluation — is it actually done?
     results = []
     for c in criteria:

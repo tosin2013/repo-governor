@@ -16,7 +16,7 @@ These are two different claims and were previously reported as one.
 
 | | | |
 | --- | --- | --- |
-| **Implementation architecture** | **READY** | 13 adapters, a deterministic engine, 13 conformance suites. `RG-SIM-ONBOARDING-v0.1` passes; all 7 gate conditions ([§61](docs/reference/onboarding.md)) are engine-verified against live GitHub issues. |
+| **Implementation architecture** | **READY** | 13 adapters, a deterministic engine, 14 conformance suites. `RG-SIM-ONBOARDING-v0.1` passes; all 7 gate conditions ([§61](docs/reference/onboarding.md)) are engine-verified against live GitHub issues. |
 | **Core product thesis** | **UNDER VALIDATION** | Whether one governance layer can rule identically across genuinely different trackers. Not shown yet. |
 
 The thesis bar is stated in [#1](https://github.com/tosin2013/repo-governor/issues/1) and is **not met**: Layer 2 has never run against two *live* providers. `github-projects` and `linear` both run on recorded fixtures there, so what it currently proves is that the normalizers are self-consistent — not that they agree about a real system. The one genuinely live pairing is `decision_history`, a Dolt database against a GitHub fixture.
@@ -114,7 +114,7 @@ If it scores below 3/3: add an `AGENTS.md` saying the repository is governed and
 ```text
 adapters/      13 provider adapters, subprocess protocol, any language
 engine/        deterministic policy engine, Python stdlib only
-conformance/   13 suites — the evidence behind every gate claim
+conformance/   14 suites — the evidence behind every gate claim
 schemas/       manifest v1 JSON Schema
 docs/
   adrs/        27 architectural decisions (23 Accepted) + index + ratification review
@@ -137,6 +137,7 @@ docs/
 | `hooks.py` | the hook delivers a real verdict, and stays silent where it has none |
 | `imports.py` | ADR-011 rule 1 — the engine's dependency surface, including adapter code it execs |
 | `status.py` | the status view reports what it cannot answer, rather than omitting it |
+| `acceptance.py` | an empty completion bar is never a met one — two guards, each tested alone |
 
 **Start here:**
 
