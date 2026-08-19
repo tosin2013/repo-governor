@@ -314,6 +314,20 @@ def main():
                        "merging must never replace a file the user owns")
 
     with tempfile.TemporaryDirectory() as td:
+        tgt = pathlib.Path(td) / "noproposal"
+        tgt.mkdir()
+        subprocess.run(["git", "init", "-q", str(tgt)], capture_output=True)
+        r = subprocess.run(["bash", str(installer), str(tgt), ".claude/skills", "yes"],
+                           capture_output=True, text=True, stdin=subprocess.DEVNULL)
+        fails += check("installer never writes a manifest proposal unasked",
+                       not (tgt / ".repo-governor.proposed.json").exists()
+                       and not (tgt / ".repo-governor.json").exists(),
+                       "binding is a human act; even proposing is a governance signal "
+                       "in the repository root")
+        fails += check("installer warns a proposal is itself a governance signal",
+                       "governance" in r.stdout and "measurement" in r.stdout)
+
+    with tempfile.TemporaryDirectory() as td:
         tgt = pathlib.Path(td) / "ungoverned"
         tgt.mkdir()
         subprocess.run(["git", "init", "-q", str(tgt)], capture_output=True)

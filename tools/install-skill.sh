@@ -132,6 +132,36 @@ if [ "$HOST_IS_CLAUDE" = "1" ] && [ "$HOOKS_OPT" != "no" ]; then
     echo "      makes it no longer silent about governance, which ends any activation"
     echo "      measurement in progress against it (docs/research/activation-protocol.md)."
     echo "      Not offering to install it."
+    echo
+    # Detection is the tedious half of onboarding and it is safe to automate:
+    # it reads the filesystem, cites evidence, probes nothing, and produces a
+    # PROPOSAL. Binding stays a human act -- the manifest declares which
+    # provider is the roadmap authority and what signal means admission, and
+    # guessing that is how a second roadmap of record gets created (ADR-022).
+    # onboard.py's own docstring: the engine never reads the proposal, which
+    # is why silent binding is unimplementable rather than merely forbidden.
+    if [ "$HOOKS_OPT" = "yes" ] || { [ "$HOOKS_OPT" = "ask" ] && [ -t 0 ]; }; then
+      echo "Onboarding detection can propose a manifest for you. It reads the"
+      echo "filesystem only, contacts nothing, and writes .repo-governor.proposed.json"
+      echo "-- a PROPOSAL. You review it, declare the admission signal, and rename it."
+      echo
+      echo "CAUTION: that file lands in the repository root and is itself a governance"
+      echo "signal. Do not run it against a repository under activation measurement."
+      REPLY_O="n"
+      if [ "$HOOKS_OPT" = "yes" ]; then REPLY_O="n"      # never automatic; ask means ask
+      else printf "Run onboarding detection now? [y/N] "; read -r REPLY_O || REPLY_O="n"
+      fi
+      case "$REPLY_O" in
+        [yY]*)
+          python3 "$DEST/engine/onboard.py" "$TARGET" --write || true
+          echo
+          echo "  Review .repo-governor.proposed.json, set the admission signal, then:"
+          echo "    mv $TARGET/.repo-governor.proposed.json $TARGET/.repo-governor.json"
+          echo "  Nothing governs until you do -- the engine never reads the proposal."
+          ;;
+        *) echo "  Skipped. Run it later: python3 $DEST/engine/onboard.py $TARGET --write" ;;
+      esac
+    fi
   else
     REPLY_H="n"
     if [ "$HOOKS_OPT" = "yes" ]; then
