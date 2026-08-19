@@ -119,12 +119,28 @@ fi
 # Consent-gated, never default-on. Writing hook config into a settings.json the
 # user owns is fine when they said yes and wrong when they did not; the rule is
 # no SILENT write, not no write. Same shape as SKILL.md's --write.
+# Which host, and therefore which config file. `.agents/skills` is the
+# cross-vendor path and names no host, so fall back to whatever host directory
+# the target already has rather than guessing.
 case "$SKILLS_DIR" in
-  *.claude*) HOST_IS_CLAUDE=1 ;;
-  *)         HOST_IS_CLAUDE=0 ;;
+  *.claude*) HOST=claude ;;
+  *.cursor*) HOST=cursor ;;
+  *.codex*)  HOST=codex ;;
+  *)
+    if   [ -d "$TARGET/.cursor" ]; then HOST=cursor
+    elif [ -d "$TARGET/.claude" ]; then HOST=claude
+    elif [ -d "$TARGET/.codex"  ]; then HOST=codex
+    else HOST=unknown; fi ;;
 esac
+case "$HOST" in
+  claude) HOST_CFG=".claude/settings.json" ;;
+  cursor) HOST_CFG=".cursor/hooks.json" ;;
+  codex)  HOST_CFG=".codex/hooks.json" ;;
+  *)      HOST_CFG="" ;;
+esac
+[ -n "$HOST_CFG" ] && HOST_KNOWN=1 || HOST_KNOWN=0
 
-if [ "$HOST_IS_CLAUDE" = "1" ] && [ "$HOOKS_OPT" != "no" ]; then
+if [ "$HOST_KNOWN" = "1" ] && [ "$HOOKS_OPT" != "no" ]; then
   echo
   if [ ! -f "$TARGET/.repo-governor.json" ]; then
     echo "NOTE: the hook would be SILENT here -- $TARGET has no .repo-governor.json."
@@ -168,7 +184,7 @@ if [ "$HOST_IS_CLAUDE" = "1" ] && [ "$HOOKS_OPT" != "no" ]; then
     if [ "$HOOKS_OPT" = "yes" ]; then
       REPLY_H="y"
     elif [ -t 0 ]; then
-      printf "Enable the governance hook for Claude Code in %s? [y/N] " "$TARGET"
+      printf "Enable the governance hook (%s -> %s)? [y/N] " "$HOST" "$HOST_CFG"
       read -r REPLY_H || REPLY_H="n"
     else
       echo "Hook not installed (non-interactive). Re-run with 'yes' as the 3rd argument to install it."
@@ -176,27 +192,33 @@ if [ "$HOST_IS_CLAUDE" = "1" ] && [ "$HOOKS_OPT" != "no" ]; then
     case "$REPLY_H" in
       [yY]*)
         RG_ABS="$(cd "$DEST" && pwd)"
-        python3 - "$TARGET" "$RG_ABS" <<'PYHOOK'
+        python3 - "$TARGET" "$RG_ABS" "$HOST" "$HOST_CFG" <<'PYHOOK'
 import json, pathlib, sys
-target, rg = pathlib.Path(sys.argv[1]), sys.argv[2]
-h = f"{rg}/tools/hooks/governance-hook.py"
-cfg = {
-  "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "python3",
-      "args": [h, "prompt"], "timeout": 20, "statusMessage": "Checking governance..."}]}],
-  "PreToolUse": [{"matcher": "Edit|Write|NotebookEdit", "hooks": [{"type": "command",
-      "command": "python3", "args": [h, "write"], "timeout": 20}]}],
-  "PostToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "python3",
-      "args": [h, "capture"], "timeout": 20}]}],
-}
-p = target / ".claude" / "settings.json"
+target, rg, host, rel = pathlib.Path(sys.argv[1]), sys.argv[2], sys.argv[3], sys.argv[4]
+
+# Use the SHIPPED template rather than a second copy inline. A config the
+# installer writes and a config the docs describe must not be able to drift.
+tpl = json.loads((pathlib.Path(rg) / "tools" / "hooks" / f"{host}.json")
+                 .read_text(encoding="utf-8").replace("RG_SKILL_DIR", rg))
+cfg = tpl.get("hooks", {})
+
+p = target / rel
 cur = json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
 kept = [k for k in cfg if k in cur.get("hooks", {})]
 cur.setdefault("hooks", {}).update(cfg)          # merge; never replace the file
+for k, v in tpl.items():                          # carry version etc, without clobbering
+    cur.setdefault(k, v) if k != "hooks" else None
 p.parent.mkdir(parents=True, exist_ok=True)
 p.write_text(json.dumps(cur, indent=2) + "\n", encoding="utf-8")
 print(f"  hook installed -> {p}")
 if kept:
     print(f"  NOTE: replaced your existing {', '.join(kept)} entries -- check them")
+if host != "claude":
+    print(f"  WARNING: the {host} template is UNVERIFIED. Event names come from its")
+    print("  docs; the stdin field names have never been confirmed against a real")
+    print("  host. Before trusting a result from it, check the hook actually")
+    print("  reaches the model -- see 'Proving the hook actually ran' in")
+    print("  docs/installation.md.")
 print("  advisory only. Blocking needs repo_governor.enforcement='blocking' in the")
 print("  manifest AND --exit2-on-deny on the write hook; neither was added.")
 PYHOOK

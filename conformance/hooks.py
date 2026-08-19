@@ -313,6 +313,33 @@ def main():
                        "permissions" in got,
                        "merging must never replace a file the user owns")
 
+    # Every host the templates cover must be installable by the script, and the
+    # script must use the SHIPPED template rather than a second copy inline --
+    # a config the installer writes and one the docs describe must not drift.
+    for host, rel, ev in (("claude", ".claude/settings.json", "UserPromptSubmit"),
+                          ("cursor", ".cursor/hooks.json", "beforeSubmitPrompt"),
+                          ("codex",  ".codex/hooks.json",  "beforeSubmitPrompt")):
+        with tempfile.TemporaryDirectory() as td:
+            tgt = pathlib.Path(td) / "g"
+            tgt.mkdir()
+            subprocess.run(["git", "init", "-q", str(tgt)], capture_output=True)
+            (tgt / ".repo-governor.json").write_text(
+                (ROOT / ".repo-governor.json").read_text(), encoding="utf-8")
+            r = subprocess.run(["bash", str(ROOT / "tools" / "install-skill.sh"),
+                                str(tgt), f".{host}/skills", "yes"],
+                               capture_output=True, text=True, stdin=subprocess.DEVNULL)
+            cfg = tgt / rel
+            fails += check(f"{host}: installer writes {rel}", cfg.exists(), r.stdout[-160:])
+            if cfg.exists():
+                got = json.loads(cfg.read_text())
+                fails += check(f"{host}: config registers {ev}", ev in got.get("hooks", {}))
+                fails += check(f"{host}: paths are substituted, no placeholder left",
+                               "RG_SKILL_DIR" not in json.dumps(got))
+            if host != "claude":
+                fails += check(f"{host}: install warns the template is unverified",
+                               "UNVERIFIED" in r.stdout,
+                               "only the Claude payload schema has been confirmed on a host")
+
     with tempfile.TemporaryDirectory() as td:
         tgt = pathlib.Path(td) / "noproposal"
         tgt.mkdir()

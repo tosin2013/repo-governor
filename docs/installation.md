@@ -134,10 +134,14 @@ The hook was built to fix an activation miss ([#36](https://github.com/tosin2013
 The installer offers it when the host is Claude Code and the target is **governed**:
 
 ```bash
-tools/install-skill.sh <target> .claude/skills          # prompts: Enable the hook? [y/N]
-tools/install-skill.sh <target> .claude/skills yes      # non-interactive opt-in
-tools/install-skill.sh <target> .claude/skills no       # never ask
+tools/install-skill.sh <target> .claude/skills yes      # -> .claude/settings.json
+tools/install-skill.sh <target> .cursor/skills yes      # -> .cursor/hooks.json
+tools/install-skill.sh <target> .codex/skills  yes      # -> .codex/hooks.json
+tools/install-skill.sh <target> .agents/skills          # cross-vendor path: host
+                                                        # inferred from what exists
 ```
+
+Omit the third argument to be prompted; pass `no` to never ask. The host decides which config file is written, and the script uses the same template documented above rather than a second copy — a config the installer writes and one the docs describe must not be able to drift.
 
 Defaults to **no**. Non-interactive runs never write. It merges into an existing `.claude/settings.json` rather than replacing it, and reports any of its own keys it overwrote. It installs **advisory** hooks only — blocking needs `enforcement: "blocking"` in the manifest *and* `--exit2-on-deny` on the write hook, neither of which the installer adds.
 
