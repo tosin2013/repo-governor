@@ -257,6 +257,38 @@ def main():
             except json.JSONDecodeError as e:
                 fails += check(f"{host} template is valid JSON", False, str(e))
 
+    # --- all three deny spellings, and edit-only filtering -------------------
+    # Tested by EMITTING a denial and reading the keys, not by grepping source.
+    # The grep version passed after the Gemini spelling was deleted, because a
+    # COMMENT elsewhere contained the literal `"decision"`. Prose is not
+    # behaviour, and this is the third check in this file to learn it.
+    with tempfile.TemporaryDirectory() as td:
+        blk = pathlib.Path(td) / "blocking"
+        blk.mkdir()
+        subprocess.run(["git", "init", "-q", str(blk)], capture_output=True)
+        mf_ = json.loads((ROOT / ".repo-governor.json").read_text())
+        mf_["repo_governor"]["enforcement"] = "blocking"
+        (blk / ".repo-governor.json").write_text(json.dumps(mf_), encoding="utf-8")
+        sd = blk / ".repo-governor" / "sessions"
+        sd.mkdir(parents=True)
+        (sd / "d.json").write_text(json.dumps(
+            {"authority_id": "1", "disposition": "NO_EXECUTION_AUTHORITY"}))
+        rc, den, _ = run("write", {"session_id": "d", "cwd": str(blk), "tool_name": "Edit",
+                                   "tool_input": {"file_path": "x.py"}}, cwd=str(blk))
+        for key, host in (("hookSpecificOutput", "Claude/VS Code"),
+                          ("permission", "Cursor"),
+                          ("decision", "Gemini")):
+            fails += check(f"a denial carries the {host} field ({key})", key in den,
+                           f"one script serves every host only if it speaks every "
+                           f"dialect; got {sorted(den)}")
+    rc, out, _ = run("write", {"session_id": "t", "cwd": str(ROOT), "tool_name": "Bash"})
+    fails += check("a non-edit tool is ignored", rc == 0 and out == {},
+                   "VS Code parses matchers without applying them, so this fires on "
+                   "every tool there -- including reads")
+    rc, out, _ = run("write", {"session_id": "t", "cwd": str(ROOT),
+                               "toolName": "insert_edit_into_file"})
+    fails += check("a camelCase VS Code edit tool is recognised", bool(out))
+
     # --- the docs must not outlive the evidence -----------------------------
     # installation.md said "install it when a missed activation matters" until
     # the control refuted exactly that. A section that recommends a surface
@@ -316,9 +348,35 @@ def main():
     # Every host the templates cover must be installable by the script, and the
     # script must use the SHIPPED template rather than a second copy inline --
     # a config the installer writes and one the docs describe must not drift.
+    # ev is the PROMPT-time event, or None where the host documents none.
+    # Codex is None on purpose: it was shipped with Cursor's event names taken
+    # from a search summary, and its own docs describe no prompt-submit event.
+    # A template check that passes on the wrong event names is what let that
+    # ship, so the expected names are pinned here rather than merely counted.
+    # Pin the event names against the SOURCE templates. The per-host install
+    # loop below reads the config from a `git clone`, so an uncommitted edit is
+    # invisible to it -- it can only catch a wrong template AFTER it ships,
+    # which is not a guard. Reverting codex.json to Cursor's event names in the
+    # working tree left that loop entirely green.
+    EXPECTED = {
+        "claude": {"UserPromptSubmit", "PreToolUse", "PostToolUse"},
+        "cursor": {"beforeSubmitPrompt", "preToolUse", "afterShellExecution"},
+        "codex":  {"PreToolUse", "PostToolUse"},
+        "gemini": {"BeforeAgent", "BeforeTool", "AfterTool"},
+        "vscode": {"UserPromptSubmit", "PreToolUse", "PostToolUse"},
+    }
+    for host, want in EXPECTED.items():
+        t = TEMPLATES / f"{host}.json"
+        got = set(json.loads(t.read_text()).get("hooks", {})) if t.exists() else set()
+        fails += check(f"{host} template declares exactly {sorted(want)}", got == want,
+                       f"got {sorted(got)} -- the wrong Codex events shipped because "
+                       f"nothing pinned them")
+
     for host, rel, ev in (("claude", ".claude/settings.json", "UserPromptSubmit"),
                           ("cursor", ".cursor/hooks.json", "beforeSubmitPrompt"),
-                          ("codex",  ".codex/hooks.json",  "beforeSubmitPrompt")):
+                          ("codex",  ".codex/hooks.json",  None),
+                          ("gemini", ".gemini/settings.json", "BeforeAgent"),
+                          ("vscode", ".github/hooks/repo-governor.json", "UserPromptSubmit")):
         with tempfile.TemporaryDirectory() as td:
             tgt = pathlib.Path(td) / "g"
             tgt.mkdir()
@@ -332,13 +390,27 @@ def main():
             fails += check(f"{host}: installer writes {rel}", cfg.exists(), r.stdout[-160:])
             if cfg.exists():
                 got = json.loads(cfg.read_text())
-                fails += check(f"{host}: config registers {ev}", ev in got.get("hooks", {}))
+                hooks_ = got.get("hooks", {})
+                if ev:
+                    fails += check(f"{host}: config registers {ev}", ev in hooks_)
+                else:
+                    fails += check(f"{host}: registers NO prompt-submit event",
+                                   not any(k.lower().startswith(("userprompt", "beforesubmit",
+                                                                 "beforeagent")) for k in hooks_),
+                                   "this host documents none; inventing one is how the "
+                                   "wrong template shipped")
+                fails += check(f"{host}: has a pre-write event", any(
+                    k.lower() in ("pretooluse", "pretooluse", "beforetool") for k in hooks_))
                 fails += check(f"{host}: paths are substituted, no placeholder left",
                                "RG_SKILL_DIR" not in json.dumps(got))
             if host != "claude":
                 fails += check(f"{host}: install warns the template is unverified",
                                "UNVERIFIED" in r.stdout,
                                "only the Claude payload schema has been confirmed on a host")
+                fails += check(f"{host}: install prints the delivery check",
+                               "RG_HOOK_VERBOSE" in r.stdout and "delivery token" in r.stdout,
+                               "a hook that runs and delivers nothing looks exactly like "
+                               "a model ignoring governance")
 
     with tempfile.TemporaryDirectory() as td:
         tgt = pathlib.Path(td) / "noproposal"
