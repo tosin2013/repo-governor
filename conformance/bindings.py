@@ -265,6 +265,44 @@ def main():
         fails += check("an ordinary repository is left alone",
                        MF._escape_install(plain.resolve()) == plain.resolve())
 
+    print("\nThe engine does not hand adapters its own input\n")
+
+    # Behavioural, not a source grep: call _env_for and look at what an adapter
+    # would actually receive. REPO_GOVERNOR_TARGET is the engine's input; no
+    # adapter reads it, and exporting it meant every grandchild inherited it --
+    # so a hook firing inside an adapter subprocess ran the engine, which
+    # resolved the INHERITED target and announced a repository it was not in.
+    _b = m["providers"]["repository"]
+    _env = B._env_for(_b)
+    fails += check("REPO_GOVERNOR_TARGET is not exported to adapters",
+                   "REPO_GOVERNOR_TARGET" not in _env,
+                   "the engine's own input reaching a grandchild is issue 54")
+    for keep in ("REPO_GOVERNOR_SUBJECT", "REPO_GOVERNOR_BINDING"):
+        fails += check(f"{keep} IS still exported", keep in _env,
+                       "adapters/_protocol.py reads it; removing it would break targeting "
+                       "rather than fix a leak")
+
+    # End to end on the real path: a command the engine runs through an adapter
+    # must not see the variable. This is the leak as it actually occurred.
+    import tempfile as _tf, os as _os
+    with _tf.NamedTemporaryFile("w", suffix=".sh", delete=False) as fh:
+        fh.write('echo "TARGET=${REPO_GOVERNOR_TARGET:-unset}"\n')
+        _probe = fh.name
+    try:
+        r = B.call("repository", "evaluate_check",
+                   {"check": "command_exit", "target": f"sh {_probe}"}, manifest=m)
+        # The adapter reports only the exit code, so assert via a command that
+        # FAILS when the variable is set -- the observable form of the leak.
+        with open(_probe, "w") as fh:
+            fh.write('[ -z "${REPO_GOVERNOR_TARGET:-}" ]\n')
+        r2 = B.call("repository", "evaluate_check",
+                    {"check": "command_exit", "target": f"sh {_probe}"}, manifest=m)
+        got = (r2.get("value") or {}).get("satisfied")
+        fails += check("a command run through an adapter does not inherit it", got is True,
+                       "a command_exit criterion, or a hook, would resolve the wrong repository")
+    finally:
+        _os.unlink(_probe)
+
     print(f"\n{'BINDINGS: CONFORMANT' if not fails else f'BINDINGS: NON-CONFORMANT ({fails})'}")
     if fails:
         _preflight.attribute(absent)

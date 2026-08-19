@@ -112,7 +112,22 @@ def _env_for(binding):
         env[str(k)] = str(v)
     env["REPO_GOVERNOR_BINDING"] = json.dumps(binding, sort_keys=True)
     t = target()
-    env["REPO_GOVERNOR_TARGET"] = str(t)
+    # REPO_GOVERNOR_TARGET is deliberately NOT exported. It is the ENGINE's
+    # input, not adapter configuration: no adapter reads it, and they resolve
+    # the repository from `cwd` -- which _spawn sets -- and from
+    # REPO_GOVERNOR_SUBJECT below, which _protocol.py does read.
+    #
+    # Exporting it anyway meant every grandchild inherited it. An adapter that
+    # runs a command -- a command_exit acceptance criterion, or a hook firing
+    # inside an adapter subprocess -- would run the engine again, and the
+    # engine would resolve the INHERITED target rather than where it stands.
+    # The hook then announced a repository it was not in, which is ADR-027's
+    # failure through a channel ADR-027 did not consider (issue 54).
+    #
+    # A user who exports this in their own shell is still honoured. That is a
+    # declaration, and it is how ADR-027 targeting is meant to work. What is
+    # removed is the engine propagating its own input to processes that never
+    # asked for it.
     env["REPO_GOVERNOR_SUBJECT"] = _subject(t)
     return env
 

@@ -29,17 +29,15 @@ cd "$ROOT" || exit 1
 
 # Run the suites in a clean environment, whoever invoked them.
 #
-# engine/bindings.py::_env_for exports REPO_GOVERNOR_TARGET, _SUBJECT and
-# _BINDING into EVERY adapter subprocess. So when the engine evaluates a
-# `command_exit` acceptance criterion whose target is this script, the suites
-# inherit them -- and two of them correctly go red, because they assert that an
-# UNGOVERNED repository gets silence and the inherited target makes the hook
-# speak about a repository it is not standing in.
+# The engine no longer re-exports REPO_GOVERNOR_TARGET to adapters (issue 54),
+# so the leak this originally guarded is closed at its source. It stays because
+# a PERSON may have the variable exported in their own shell -- a legitimate
+# declaration -- and `hooks` and `onboarding` assert the UNGOVERNED case, which
+# any inherited target makes false.
 #
-# Those failures are real; the environment is what is wrong. A harness that
-# reports differently depending on who ran it is not a harness. Suites that
-# genuinely need targeting set it themselves, per subprocess (conformance/
-# bindings.py does exactly that), so scrubbing here hides nothing.
+# A harness that reports differently depending on who ran it is not a harness.
+# Suites that genuinely need targeting set it themselves, per subprocess
+# (conformance/bindings.py does exactly that), so scrubbing here hides nothing.
 unset REPO_GOVERNOR_TARGET REPO_GOVERNOR_SUBJECT REPO_GOVERNOR_BINDING
 
 # `hooks` is last and deliberately separate: it runs engine/completion.py
