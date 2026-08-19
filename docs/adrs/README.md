@@ -106,7 +106,7 @@ Reproduce the whole thing:
 
 ```bash
 for n in 7 8 9 10 11 12 13; do python3 engine/completion.py $n; done   # GitHub issues, live
-for s in layer1 layer2 transport manifest onboarding vocabulary bindings; do python3 conformance/$s.py; done
+./tools/run-conformance.sh
 ```
 
 The gate ids are GitHub issue numbers, not `GATE-N`. They were file-roadmap ids until ADR-022 moved the roadmap of record to GitHub.

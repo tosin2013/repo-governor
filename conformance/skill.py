@@ -136,6 +136,13 @@ def main():
                   ("AGENTS.md", agents),
                   ("docs/adrs/README.md", (ROOT / "docs" / "adrs" / "README.md").read_text())]
     for doc, text in count_docs:
+        # A finditer that matches nothing runs its body zero times and the
+        # suite goes green having checked NOTHING. That is the defect class
+        # this whole file exists to catch, one level up: if a document is
+        # rephrased, or a pattern rots, the check stops looking and never says
+        # so. AGENTS.md deliberately carries no ADR count, so the floor is
+        # per-document rather than global.
+        seen_claims = 0
         for m in re.finditer(r"(\d+)\s+of\s+(\d+)\s+ADRs?[^.\n]{0,40}Accepted|"
                              r"(\d+)\s+ADRs?\s+—\s+\*\*(\d+)\s+Accepted|"
                              r"\*\*(\d+)\s+of\s+(\d+)\s+ADRs are Accepted|"
@@ -143,8 +150,17 @@ def main():
             nums = [g for g in m.groups() if g]
             claim = tuple(int(n) for n in nums)
             ok_claim = accepted in claim and total in claim
+            seen_claims += 1
             fails += check(f"{doc} count claim {claim} matches ledger ({accepted} of {total})",
                            ok_claim, f"ledger says {accepted} Accepted of {total}")
+        # README.md and docs/adrs/README.md both state a count today. If either
+        # stops matching, that is a pattern that went blind, not a document
+        # that got simpler -- and it must be reported as a failure.
+        if doc != "AGENTS.md":
+            fails += check(f"{doc} still states an ADR count this suite can read",
+                           seen_claims > 0,
+                           "found 0 count claims -- either the claim was removed "
+                           "or the pattern stopped matching it; both need a human")
 
     print("\nThe decision index accounts for every decision\n")
 
@@ -221,6 +237,85 @@ def main():
                    not bad, bad.group(0) if bad else "")
     for tool in ("onboard-interactive.py", "selftest.py"):
         fails += check(f"README points at {tool}", tool in rd)
+
+    print("\nThe conformance suite set is one fact, not six\n")
+
+    # Same defect as the ADR counts above, different noun. The suite count has
+    # been published as 7, 10, 11 and "eleven" simultaneously while disk held
+    # 12. A count is a DERIVABLE fact, and a derivable fact restated in prose
+    # is duplicated state that eventually disagrees.
+    #
+    # Three sources must agree, not two. Checking the filesystem against prose
+    # alone would go vacuous the moment the pasted loops are replaced by a call
+    # to tools/run-conformance.sh -- the runner deletes the very enumeration
+    # the check inspects. So the RUNNER's own arrays are the third source, and
+    # they are what catches a new suite file nobody wired in.
+    truth = {f.stem for f in sorted((ROOT / "conformance").glob("[a-z]*.py"))
+             if "sys.exit(main(" in f.read_text(encoding="utf-8")}
+
+    # Floor control. If the glob breaks, every regex below also finds nothing
+    # and the whole section would pass having established nothing.
+    fails += check(f"the suite set was actually derived ({len(truth)} found)",
+                   len(truth) >= 8 and "layer1" in truth,
+                   f"{sorted(truth)} -- a broken glob reads as a clean repository")
+
+    runner = ROOT / "tools" / "run-conformance.sh"
+    fails += check("a single runner exists for CI and contributors to share",
+                   runner.is_file(),
+                   "without one, every document pastes its own loop and they drift")
+    if runner.is_file():
+        rsrc = runner.read_text(encoding="utf-8")
+        declared = set()
+        for arr in re.finditer(r"^(?:HERMETIC|LIVE)=\(([^)]*)\)", rsrc, re.M):
+            declared |= set(arr.group(1).split())
+        fails += check("the runner names every suite on disk, and no others",
+                       declared == truth,
+                       f"runner-only={sorted(declared - truth)} "
+                       f"disk-only={sorted(truth - declared)} -- a suite the runner "
+                       "does not name never runs, and nothing else would notice")
+
+    # Any loop still pasted into prose is a second source of truth. The runner
+    # replaced them; one surviving is drift waiting to happen.
+    for doc in ("AGENTS.md", "CONTRIBUTING.md", "docs/installation.md",
+                "docs/adrs/README.md", ".github/PULL_REQUEST_TEMPLATE.md"):
+        f = ROOT / doc
+        if not f.is_file():
+            continue
+        text = f.read_text(encoding="utf-8")
+        stale = re.search(r"for s in\s+layer1[^\n]*", text)
+        fails += check(f"{doc} pastes no suite loop of its own",
+                       not stale,
+                       (stale.group(0)[:80] if stale else "") +
+                       " -- call tools/run-conformance.sh instead")
+
+    # Counts, anchored on the word so that "ADR-011" is not read as an 11.
+    WORDS = {"seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11,
+             "twelve": 12, "thirteen": 13}
+    COUNT = re.compile(r"(\d+|" + "|".join(WORDS) + r")\s+(?:conformance\s+)?suites?\b"
+                       r"|(\d+)\s*/\s*(\d+)\s+pass"
+                       r"|Expect\s+\**(\d+)\s*/\s*(\d+)"
+                       r"|(\d+)\s+of\s+(\d+)\s+conformance\s+suites?", re.I)
+    total_claims = 0
+    for doc in ("README.md", "AGENTS.md", "CONTRIBUTING.md", "docs/installation.md",
+                "docs/adrs/README.md", ".github/PULL_REQUEST_TEMPLATE.md"):
+        f = ROOT / doc
+        if not f.is_file():
+            continue
+        for m in COUNT.finditer(f.read_text(encoding="utf-8")):
+            raw = [g for g in m.groups() if g]
+            # "4 of 12 conformance suites fail" -- the TOTAL is the last number.
+            val = raw[-1]
+            n = WORDS.get(val.lower(), None) if not val.isdigit() else int(val)
+            if n is None:
+                continue
+            total_claims += 1
+            fails += check(f"{doc}: '{m.group(0).strip()}' matches the {len(truth)} on disk",
+                           n == len(truth),
+                           f"disk has {len(truth)}: {sorted(truth)}")
+    fails += check("at least one document still states a suite count",
+                   total_claims > 0,
+                   "found 0 -- either every count was removed, or the pattern went "
+                   "blind; a check that matches nothing is not a passing check")
 
     print(f"\n{'AGENT SURFACE: CONFORMANT' if not fails else f'AGENT SURFACE: NON-CONFORMANT ({fails})'}")
     return 0 if not fails else 1
