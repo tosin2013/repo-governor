@@ -96,11 +96,25 @@ def _load(fn, kw):
     return (data, p), None
 
 
+def _no_criteria(fn, wid, p):
+    """A file that declares nothing is not a bar that is met (issue 58)."""
+    return unknown(ROLE, fn,
+                   reason="NO_CRITERIA_DECLARED",
+                   detail=f"{p} exists but its 'criteria' array is empty. An empty bar "
+                          "states nothing for completion to be checked against, and must "
+                          "never be read as a satisfied one.",
+                   resolution=f"Declare at least one criterion in {p}, or accept that this "
+                              "work has no completion bar.",
+                   blocking=False)
+
+
 def get_criteria(kw):
     loaded, err = _load("get_criteria", kw)
     if err:
         return err
     data, p = loaded
+    if not data["criteria"]:
+        return _no_criteria("get_criteria", kw["id"], p)
     bad = [c for c in data["criteria"]
            if not isinstance(c, dict) or c.get("check") not in CHECKS]
     if bad:
