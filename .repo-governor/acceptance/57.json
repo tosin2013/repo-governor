@@ -1,0 +1,9 @@
+{
+  "$comment": "Acceptance criteria for issue 57 (status view). Declared before the work. WHAT THESE CANNOT EXPRESS: that the report is USEFUL -- that an operator reading it can tell what governance will and will not do here. A command_exit proves it exits 0, never that it said anything worth reading. The conformance check below is the closest mechanical proxy: it asserts an unbound role is REPORTED rather than omitted, which is the absence-versus-unknown distinction ADR-008 C4 already makes for adapters.",
+  "authority_id": "57",
+  "criteria": [
+    {"check": "file_exists",  "target": "engine/status.py"},
+    {"check": "command_exit", "target": "python3 engine/status.py ."},
+    {"check": "command_exit", "target": "python3 conformance/status.py"}
+  ]
+}

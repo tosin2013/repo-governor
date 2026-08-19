@@ -38,6 +38,11 @@ PROVIDERS = {
         "env": {"REPO_GOVERNOR_DECISIONS_DB": "conformance/fixtures/decisions-db"},
         "role": "decision_history",
     },
+    "file-decisions": {
+        "adapter": "adapters/decision-history-file",
+        "env": {"REPO_GOVERNOR_DECISIONS_DIR": "conformance/fixtures/decisions-file"},
+        "role": "decision_history",
+    },
     "github-decisions": {
         "adapter": "adapters/decision-history-github",
         "env": {"REPO_GOVERNOR_GH_DECISIONS_FIXTURE": "conformance/fixtures/decision-history-github.json"},
@@ -151,7 +156,8 @@ SCENARIOS = [
         "function": "get_disposition",
         "role": "decision_history",
         "expect": {"disposition": "REJECTED"},
-        "in": {"dolt-decisions": "DECLINED-1", "github-decisions": "901"},
+        "in": {"dolt-decisions": "DECLINED-1", "github-decisions": "901",
+               "file-decisions": "DECLINED-1"},
     },
     {
         "id": "no_decision_recorded",
@@ -159,7 +165,8 @@ SCENARIOS = [
         "function": "get_disposition",
         "role": "decision_history",
         "expect": {"__unknown__": True, "blocking": False},
-        "in": {"dolt-decisions": "NEVER-DECIDED", "github-decisions": "904"},
+        "in": {"dolt-decisions": "NEVER-DECIDED", "github-decisions": "904",
+               "file-decisions": "NEVER-DECIDED"},
     },
 ]
 
@@ -288,6 +295,33 @@ def main():
             print(f"    ** WRONG ** agree with each other but violate expectation: {bad}")
             print(f"       expected {json.dumps(sc['expect'], sort_keys=True)}\n")
             findings.append((sc["id"], "WRONG", f"{bad} vs expected {sc['expect']}"))
+
+    # ADR-019 rule 3: a backend that cannot supply history natively "must
+    # implement chaining itself and SAY SO in its properties". That field is
+    # the whole reason a file backend may stand beside Dolt. Assert the
+    # difference is DECLARED -- not that the two adapters differ, which is
+    # obvious, but that a consumer reading `describe` can tell which guarantee
+    # it is getting. Equivalence of ANSWERS must not imply equivalence of
+    # GUARANTEES, and nothing else in this suite would catch that.
+    print("\nA weaker chain declares itself weaker (ADR-019 rule 3)\n")
+    chains = {}
+    for _n in ("dolt-decisions", "file-decisions"):
+        _p = PROVIDERS[_n]
+        _env = dict(os.environ); _env.update(_p["env"])
+        _r = subprocess.run([sys.executable, str(ROOT / _p["adapter"]), "describe"],
+                            capture_output=True, text=True, cwd=ROOT, env=_env, timeout=30)
+        try:
+            chains[_n] = json.loads(_r.stdout)["properties"].get("chain_supplied_by_store")
+        except Exception:
+            chains[_n] = "UNREADABLE"
+    chain_ok = chains.get("dolt-decisions") is True and chains.get("file-decisions") is False
+    print(f"  [{'PASS' if chain_ok else 'FAIL'}] chain_supplied_by_store distinguishes them: {chains}")
+    if not chain_ok:
+        mismatched += 1
+        findings.append(("chain_guarantee", "WRONG",
+                         "the two decision_history backends do not declare different chain "
+                         "guarantees; a consumer cannot tell a store-supplied chain from a "
+                         "hand-rolled one, which is exactly what ADR-019 rule 3 requires"))
 
     total = len(SCENARIOS)
     print("-" * 62)

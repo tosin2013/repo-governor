@@ -1,0 +1,22 @@
+{
+  "$comment": "Acceptance criteria for issue 56 (zero-dependency decision_history). Declared before the work, from the issue's published Acceptance section. WHAT THESE CANNOT EXPRESS: condition 4 is that the adapter's `properties` DISTINGUISH it from Dolt -- that its chain is hand-rolled and says so, per ADR-019 rule 3. A command_exit can check that a conformance suite asserts the distinction; it cannot check that the distinction is honest. That reading is a human act. CORRECTION: the layer1 criterion originally named the adapter as 'decision-history-file'; layer1 requires the path form and rejects the bare name, so the check could not have run. Spelling fixed, requirement unchanged.",
+  "authority_id": "56",
+  "criteria": [
+    {
+      "check": "file_exists",
+      "target": "adapters/decision-history-file"
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/layer1.py adapters/decision-history-file"
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/layer2.py"
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/bindings.py"
+    }
+  ]
+}
