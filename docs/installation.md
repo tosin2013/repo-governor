@@ -107,3 +107,50 @@ REPO_GOVERNOR_TARGET=/path/to/governed/repo python3 engine/completion.py <id>
 ```
 
 Installing the skill into a target's `.agents/skills/` puts a full clone of this repository inside it — including this repository's `AGENTS.md`, which announces that *this* repo is governed. On a host that loads nested agent-instruction files, that statement leaks into the target. It is harmless in normal use and fatal to an Arm A activation measurement; the [activation protocol](research/activation-protocol.md) carries the check.
+
+## Hooks — deterministic delivery (optional, [ADR-029](adrs/029-hooks-as-deterministic-delivery-surface.md))
+
+The skill is *pulled*: the host decides whether the description matches the task. Measured on 2026-08-19, it did not — [#36](https://github.com/tosin2013/repo-governor/issues/36) Arm A prompt 1 went straight to writing code, and the field baseline is roughly **half** of skill invocations never firing. A hook is *pushed*: it runs whether or not the model thinks it is relevant.
+
+Install it when a missed activation matters more than the extra moving part. The skill works without it.
+
+| Host | Config file | Verified |
+|---|---|---|
+| Claude Code | `.claude/settings.json` (project) or `~/.claude/settings.json` | **yes** — payload schema confirmed against the official reference |
+| Cursor | `.cursor/hooks.json` | events and exit codes yes; **stdin field names no** |
+| Codex CLI | `.codex/hooks.json` | **no** — no Codex host has been available to this project ([#37](https://github.com/tosin2013/repo-governor/issues/37)) |
+
+```bash
+RG=/absolute/path/to/installed/skill      # the directory containing SKILL.md
+
+# Claude Code, project-scoped:
+mkdir -p .claude
+sed "s#RG_SKILL_DIR#$RG#g" "$RG/tools/hooks/claude.json" > /tmp/rg-hooks.json
+# merge /tmp/rg-hooks.json into .claude/settings.json -- do not overwrite an
+# existing settings file, it belongs to the project
+
+# confirm it works before trusting it
+echo "{\"session_id\":\"x\",\"cwd\":\"$PWD\"}" | python3 "$RG/tools/hooks/governance-hook.py" prompt
+```
+
+The last command prints an `additionalContext` block in a governed repository and **nothing at all** in an un-onboarded one. Silence there is correct, not a failure.
+
+### What it does, and what it will not do
+
+| Moment | Effect |
+|---|---|
+| every prompt | injects the requirement to run the engine before acting |
+| before `Edit`/`Write` | reports if no authority was established, if the engine refused, or if authorization is exhausted (`STOP_COMPLETE`) |
+| after a Bash call | records the authority id and disposition the engine returned |
+
+It **never decides authorization** — `engine/completion.py` remains the only thing that produces a disposition — and it makes **no claim about file scope**. Roadmap providers do not declare paths; a compiled envelope for a real GitHub issue returns `in_scope: []`, so a path check there would refuse every write with a fabricated reason. See ADR-029's *What this deliberately does not do*.
+
+### Blocking mode
+
+Advisory by default: the hook speaks, the agent decides. To let it actually stop a write, the **governed repository** opts in:
+
+```json
+{ "repo_governor": { "version": 1, "enforcement": "blocking" } }
+```
+
+and the config adds `--exit2-on-deny` to the `write` hook. Both are required; the flag alone does nothing. Enforcement is per repository because an un-onboarded repository is not a governed one, and blocking there would stop all editing everywhere the manifest is absent.

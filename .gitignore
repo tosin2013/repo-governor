@@ -34,3 +34,8 @@ venv/
 .claude/skills/repo-governor/
 .cursor/skills/
 .codex/skills/
+
+# Hook session state (ADR-029). Per-session, per-machine, never shared:
+# it records which authority a session established, which is a fact about
+# one conversation on one box and means nothing in another clone.
+.repo-governor/sessions/

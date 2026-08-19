@@ -1,7 +1,7 @@
 # Activation results — Claude Code (second host)
 
 **Issue:** [#36](https://github.com/tosin2013/repo-governor/issues/36) · **Protocol:** [activation-protocol.md](activation-protocol.md)
-**Status: in progress.** Arm A running.
+**Status: HALTED at prompt 1 of 20.** Arm A incomplete; Arm B not started.
 
 ## Host
 
@@ -69,3 +69,34 @@ Three things make this the run's most informative data point so far:
 - **It falsifies the ceiling prediction.** After the self-report, this host was predicted to sit at or near ceiling *because* the harness renders the description as a standing rule. It broke on the first prompt instead. Cursor scored FULL 20/20 on the same prompt list, so **activation is host-dependent and not a property of the description alone** -- which is what [#5](https://github.com/tosin2013/repo-governor/issues/5) needed three hosts to find out.
 
 Working tree reverted (`git checkout -- .`, `git clean -fd -e .claude`) before prompt 2.
+
+
+## Why this run stopped
+
+**Halted 2026-08-19 by operator decision, after prompt 1.** The reasoning: the skill appeared not to fire unless invoked by slash command, so completing the remaining prompts would confirm a foregone conclusion, and the time was better spent on a fix.
+
+That fix is [ADR-029](../adrs/029-hooks-as-deterministic-delivery-surface.md), and prompt 1 is cited as its evidence.
+
+**Rates, stated as they are:**
+
+```
+Arm A: 1 of 20 prompts run  (1 NONE, 0 PARTIAL, 0 FULL)   -- INCOMPLETE
+Arm B: not started                                        -- INCOMPLETE
+Controls: 0 of 3 run                                      -- INCOMPLETE
+```
+
+This file therefore **fails** issue 36's acceptance criteria, which require a rate out of 20 for both arms and 3 scored controls. That is the correct outcome: the work is not done, and the engine should say so rather than accept a partial result dressed as a finding. The same defect was fixed in `227106e`, where criteria passed on a file whose own second line read "Arm B not yet run".
+
+### What was forfeited
+
+The activation rate is **unmeasured in the published literature** — the @skills paper states plainly that its central quantity is "bounded by argument and by the literature rather than measured by us." A completed two-arm run on two hosts would have been a contribution the field does not have. Cursor's anomalous 20/20 against a ~50% industry baseline also remains unexplained.
+
+Nothing about this is irreversible. Both hosts stay installed, the protocol is unchanged, and the run can resume at prompt 2. Recorded here so the choice is visible rather than silent.
+
+### What prompt 1 alone did establish
+
+Enough to justify ADR-029, which is why the halt is defensible even though the arm is not:
+
+- activation failed on a host where the description was demonstrably in context and understood;
+- the failure was **precedence, not discovery**, so no rewording of `SKILL.md` addresses it;
+- an agent's self-report of its own always-applied rules **does not predict its behaviour** — which invalidates self-reporting as a cheap substitute for measurement on any future host.

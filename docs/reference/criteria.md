@@ -158,3 +158,5 @@ Provider SDK; plugin discovery; policy-as-code; CI enforcement; coding-agent hoo
 **None are authorized merely by inclusion here.**
 
 > ADR-001 promoted "agent skill" from this list to the primary delivery surface and deferred MCP, CLI, and CI enforcement as secondary wrappers over the same engine.
+
+> ADR-029 (2026-08-19) promoted **"coding-agent hooks"** from this list to a secondary delivery surface, on measured evidence that skill activation is unreliable (issue 36 Arm A prompt 1) and research showing hooks are no longer vendor-specific. MCP, CLI and CI enforcement remain deferred.

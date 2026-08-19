@@ -4,6 +4,7 @@
 **Ratified**: 2026-08-17 by Tosin Akinosho (§68), under the [v0.1.0 architecture ratification review](RATIFICATION-v0.1.0.md).
 **Date**: 2026-08-17
 **Domain**: Distribution & agent integration
+**Amended by**: [ADR-029](029-hooks-as-deterministic-delivery-surface.md) — "coding-agent hooks" is promoted from a deferred §65 candidate to a secondary delivery surface. The Agent Skill remains primary; the negative consequence below was measured, and the vendor-bet reasoning that deferred hooks expired when all three target hosts converged on one hook convention.
 
 ## Context
 
@@ -72,6 +73,8 @@ Secondary surfaces — MCP server, standalone CLI, CI action — are explicitly 
 
 - The 5k-token tier-2 budget is a hard constraint. The full invariant set (INV-001…INV-014), seven provider contracts, three lifecycles, and the disposition vocabulary cannot coexist in the body. Tiering discipline becomes an ongoing maintenance cost.
 - Skill activation is model-mediated: the agent decides whether the description matches the task. A governance skill that fails to activate is worse than absent, because the human assumes it ran. This is a real failure mode with no clean fix at the skill layer — mitigated in ADR-002 by making the deterministic script, not the prose, the thing that produces a verdict.
+
+  > **Measured 2026-08-19.** Issue 36 Arm A prompt 1, Claude Code / Opus 4.6: the agent stated the skill's description among its always-applied rules, then read an issue, explored the source and began writing code without consulting governance. Independently, Vercel measured skills uninvoked in 56% of cases with access. This consequence was correct, and ADR-029 adds the deterministic delivery surface it says the skill layer cannot provide.
 - No enforcement. A skill advises; it cannot block. Repo Governor returns a disposition and relies on the agent honoring it. Hard enforcement requires the deferred CI surface.
 - Cross-platform fidelity varies. 26+ platforms claim support; behavior on tier-3 loading and script execution will differ. Conformance testing (ADR-008) must cover host variation, not just provider variation.
 
