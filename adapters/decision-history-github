@@ -285,9 +285,18 @@ CAPABILITIES = {
     "revision_history": False,     # timeline exists but is not exposed here
 }
 
+def _configured():
+    """Same rule as the roadmap adapter: no repository, no answers."""
+    if FIXTURE:
+        return True, None
+    if not NWO:
+        return False, ("no repository declared; set providers.<role>.env."
+                       "REPO_GOVERNOR_GH_REPO to owner/name.")
+    return True, None
+
 if __name__ == "__main__":
     sys.exit(main(ROLE, CAPABILITIES, FUNCTIONS,
                   {"name": "decision-history-github",
                    "permissions": {"read": True, "write": False},
                    "mode": "fixture" if FIXTURE else "live"},
-                  properties=PROPERTIES, probe=_probe))
+                  properties=PROPERTIES, probe=_probe, config_probe=_configured))

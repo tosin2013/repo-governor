@@ -163,7 +163,7 @@ def parse_args(argv):
 
 
 def main(role, capabilities, functions, describe_extra=None, properties=None, probe=None,
-         writers=None, writers_probe=None, transports=None):
+         writers=None, writers_probe=None, transports=None, config_probe=None):
     """Standard entry point. `functions` maps name -> callable(kw) -> response.
 
     `capabilities` are claims that MUST be exercisable by a conformance probe
@@ -213,6 +213,10 @@ def main(role, capabilities, functions, describe_extra=None, properties=None, pr
                   "properties": properties or {}})
             return 0
         reachable = True if probe is None else bool(probe())
+        # (ok, detail) or a bare bool. The detail is what an operator needs:
+        # "not configured" without naming the missing thing is not actionable.
+        _cfg = (True, None) if config_probe is None else config_probe()
+        configured, config_detail = _cfg if isinstance(_cfg, tuple) else (bool(_cfg), None)
         writable = reachable and (True if writers_probe is None else bool(writers_probe()))
         d = {
             "contract_version": CONTRACT_VERSION,
@@ -222,7 +226,15 @@ def main(role, capabilities, functions, describe_extra=None, properties=None, pr
             "properties": properties or {},
             "functions": sorted(functions),
             "writers": sorted(writers or {}) if writable else [],
+            # `configured` is a THIRD axis, separate from reachable and
+            # writable. A reachable transport with no identity declared can
+            # answer nothing, and `--validate` reported READY_FOR_GOVERNANCE
+            # for exactly that (issue 51). The adapter answers it, because
+            # which variable it needs is adapter-specific knowledge ADR-003
+            # keeps out of the engine. Default True: an adapter with nothing
+            # to configure is configured.
             "transport": {"reachable": reachable, "writable": writable,
+                          "configured": configured, "configured_detail": config_detail,
                           "supports": sorted(transports or {})},
         }
         if describe_extra:

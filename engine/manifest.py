@@ -274,6 +274,19 @@ def check_adapters(manifest):
             if not d.get("transport", {}).get("reachable", True):
                 findings.append((role, adapter, "TRANSPORT_UNREACHABLE",
                                  "adapter advertises no capabilities; transport is not configured"))
+            # A binding can be well-formed, reachable, and still answer nothing.
+            # --validate reported READY_FOR_GOVERNANCE for exactly that, and it
+            # is what a person runs to find out whether they onboarded
+            # correctly -- so a green verdict there is worse than a red one,
+            # because the next command says PROVIDER_UNAVAILABLE and they have
+            # to work out which to believe (issue 51).
+            #
+            # The adapter answers this, not the engine: which variable it needs
+            # is adapter-specific knowledge ADR-003 keeps out of here.
+            if d.get("transport", {}).get("configured", True) is False:
+                findings.append((role, adapter, "NOT_CONFIGURED",
+                                 d["transport"].get("configured_detail")
+                                 or "adapter reports it is not configured"))
             # Drift: the manifest grants a write the transport cannot serve.
             # Capabilities belong to (provider x transport), so a grant made when
             # the transport was writable can silently stop being honourable (#17).
