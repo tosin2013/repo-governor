@@ -205,6 +205,23 @@ def main():
                 fails += check(f"{doc} does not still call accepted ADR-{num} proposed", not stale,
                                "ratification made this line stale")
 
+    # --- the README's install instructions must be the ones that work --------
+    # For 83 commits the README said "Clone it into a skills directory". That
+    # drags this repository's own AGENTS.md, CLAUDE.md and .repo-governor.json
+    # into someone else's project, and the manifest makes the engine resolve the
+    # INSTALL directory as the repository under governance (ADR-027) -- it then
+    # answers confidently about the wrong project. tools/install-skill.sh was
+    # written to prevent exactly that and the README never mentioned it.
+    rd = (ROOT / "README.md").read_text()
+    fails += check("README has an Install section", "\n## Install" in rd)
+    fails += check("README install uses the script", "install-skill.sh" in rd,
+                   "a plain clone installs this repo's manifest into someone else's repo")
+    bad = re.search(r"[Cc]lone (it |this )?into a skills director", rd)
+    fails += check("README does not tell people to clone into a skills directory",
+                   not bad, bad.group(0) if bad else "")
+    for tool in ("onboard-interactive.py", "selftest.py"):
+        fails += check(f"README points at {tool}", tool in rd)
+
     print(f"\n{'AGENT SURFACE: CONFORMANT' if not fails else f'AGENT SURFACE: NON-CONFORMANT ({fails})'}")
     return 0 if not fails else 1
 

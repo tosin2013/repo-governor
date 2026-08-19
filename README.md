@@ -78,6 +78,35 @@ The v0.1.0 tag itself emits five; that limitation is recorded in the [ratificati
 
 Governance depth scales with repository condition (L0 greenfield → L4 mature/high-assurance), so a two-file repository needs Git, a ten-line manifest, and four invariants — nothing more.
 
+## Install
+
+```bash
+git clone https://github.com/tosin2013/repo-governor /tmp/rg
+/tmp/rg/tools/install-skill.sh /path/to/your/repo .claude/skills
+```
+
+**Use the script rather than cloning into a skills directory directly.** A plain clone brings this repository's own `AGENTS.md`, `CLAUDE.md` and `.repo-governor.json` along with it — and that last one makes the engine resolve the *install directory* as the repository under governance, so it answers confidently about the wrong project ([ADR-027](docs/adrs/027-the-governed-repository-is-not-the-install-directory.md)). The script clones and then prunes. It also offers to configure a hook, and refuses to in a repository that has no manifest, where the hook would be silent anyway.
+
+Skills are discovered at session start, so start a **new** session and confirm the host lists `repo-governor`.
+
+Then bind providers to roles. Detection cannot see which system is your roadmap authority, or what *admitted* means in it — milestone, project column, label — so it asks:
+
+```bash
+python3 /tmp/rg/tools/onboard-interactive.py /path/to/your/repo
+```
+
+That writes a **proposal**. Review it, rename it to `.repo-governor.json`, and commit — binding is a human act, and the commit is what stops a crafted `docs/adr/` in a fork from binding itself ([ADR-010](docs/adrs/010-provider-detection-separated-from-binding.md)).
+
+### Then find out whether it actually works
+
+```bash
+python3 /tmp/rg/tools/selftest.py /path/to/your/repo
+```
+
+Installing a skill does not mean it will fire. Published benchmarks put roughly half of skill invocations at never firing, and this project measured **20/20 on one host and 0/2 on another** with the same skill, prompts and repository. The self-test gives you four prompts to run in your own agent and tells you what each score means. **A low score is the useful result**, and there is a [form for reporting it](https://github.com/tosin2013/repo-governor/issues/new?template=activation-result.yml).
+
+If it scores below 3/3: add an `AGENTS.md` saying the repository is governed and how to run the engine. That was the strongest single predictor measured, and every harness reads it. See [`docs/installation.md`](docs/installation.md) for the hook surface, which is optional and which most repositories should not install.
+
 ## Repository layout
 
 ```text
@@ -113,7 +142,7 @@ docs/
 
 ## Design commitments
 
-- **Ships as an [Agent Skill](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview)** — an open standard adopted by 26+ platforms. Clone it into a skills directory ([which one depends on the host](docs/installation.md)); no install, no service, no vendor lock. ([ADR-001](docs/adrs/001-agent-skill-as-primary-delivery-surface.md))
+- **Ships as an [Agent Skill](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview)** — an open standard adopted by 26+ platforms. Installed with [`tools/install-skill.sh`](tools/install-skill.sh) into a skills directory ([which one depends on the host](docs/installation.md)); no service, no registry, no vendor lock. ([ADR-001](docs/adrs/001-agent-skill-as-primary-delivery-surface.md))
 - **Deterministic, not model-judged** — invariants are executable predicates, not prose an agent is asked to honor. Same inputs, same disposition, always. ([ADR-002](docs/adrs/002-deterministic-policy-engine-separate-from-model-judgment.md))
 - **Zero dependencies** — Python stdlib only. A tool that rules on what agents may change shouldn't drag in a transitive dependency tree. Adapters may be written in any language. ([ADR-011](docs/adrs/011-python-stdlib-only-engine-with-language-agnostic-adapters.md))
 - **Deny by default** — no permission is inferred from an available credential. ([ADR-005](docs/adrs/005-deny-by-default-permission-model.md))
