@@ -15,6 +15,7 @@ import copy
 import json
 import sys
 import tempfile
+import pathlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -99,7 +100,63 @@ def main():
         fails += not ok
         print(f"  [{'PASS' if ok else 'FAIL'}] {role}.{verb:<11} -> {'ALLOW' if got else 'DENY'}   {why[:56]}")
 
-    total = len(CASES) + len(PERM_CASES)
+    # A binding can be well-formed, reachable, and answer nothing. --validate
+    # said READY_FOR_GOVERNANCE for exactly that, and it is the last check
+    # before someone trusts the answers -- so a green verdict there is worse
+    # than a red one, because the very next command says PROVIDER_UNAVAILABLE
+    # and the operator has to decide which to believe (issue 51).
+    print("\nA binding that cannot answer is not READY_FOR_GOVERNANCE\n")
+    import copy as _copy, subprocess as _sp, tempfile as _tf, os as _os
+    extra = 0
+
+    def _validate(manifest_obj):
+        with _tf.TemporaryDirectory() as td:
+            r = pathlib.Path(td) / "repo"
+            r.mkdir()
+            _sp.run(["git", "init", "-q", str(r)], capture_output=True)
+            (r / ".repo-governor.json").write_text(json.dumps(manifest_obj))
+            env = dict(_os.environ); env["REPO_GOVERNOR_TARGET"] = str(r)
+            return _sp.run([sys.executable, str(ROOT / "engine" / "manifest.py"), "--validate"],
+                           capture_output=True, text=True, cwd=str(r), env=env, timeout=120).stdout
+
+    base = json.loads((ROOT / ".repo-governor.json").read_text())
+    stripped = _copy.deepcopy(base)
+    stripped["providers"] = {k: v for k, v in base["providers"].items()
+                             if k in ("repository", "roadmap_authority") or k.startswith("$")}
+    stripped["permissions"] = {k: v for k, v in base["permissions"].items()
+                               if k in ("repository", "roadmap_authority") or k.startswith("$")}
+    kept = _copy.deepcopy(stripped)
+    stripped["providers"]["roadmap_authority"] = dict(stripped["providers"]["roadmap_authority"])
+    stripped["providers"]["roadmap_authority"].pop("env", None)
+
+    out_bad = _validate(stripped)
+    ok = "READY_FOR_GOVERNANCE" not in out_bad and "NOT_CONFIGURED" in out_bad
+    extra += not ok
+    print(f"  [{'PASS' if ok else 'FAIL'}] a binding with no declared identity is refused"
+          + ("" if ok else f"\n         {out_bad.strip()[:180]}"))
+
+    ok2 = "REPO_GOVERNOR_GH_REPO" in out_bad
+    extra += not ok2
+    print(f"  [{'PASS' if ok2 else 'FAIL'}] and the finding names the missing configuration"
+          + ("" if ok2 else "\n         'not configured' without naming it is not actionable"))
+
+    # Positive control. Without it, the check above passes for any manifest
+    # that fails to validate for ANY reason.
+    out_good = _validate(kept)
+    ok3 = "READY_FOR_GOVERNANCE" in out_good
+    extra += not ok3
+    print(f"  [{'PASS' if ok3 else 'FAIL'}] control: the same binding WITH identity is ready"
+          + ("" if ok3 else f"\n         {out_good.strip()[:180]}"))
+
+    # The engine must not have learned an adapter's variable names.
+    src = (ROOT / "engine" / "manifest.py").read_text()
+    ok4 = "REPO_GOVERNOR_GH_REPO" not in src and "LINEAR_API_KEY" not in src
+    extra += not ok4
+    print(f"  [{'PASS' if ok4 else 'FAIL'}] the engine names no adapter's configuration (ADR-003)"
+          + ("" if ok4 else "\n         adapter-specific knowledge must stay in the adapter"))
+
+    fails += extra
+    total = len(CASES) + len(PERM_CASES) + 4
     print(f"\n{total - fails}/{total} checks passed")
     print("MANIFEST LOADER: " + ("CONFORMANT" if not fails else f"NON-CONFORMANT ({fails})"))
     return 0 if not fails else 1

@@ -495,9 +495,20 @@ CAPABILITIES = {
     "acceptance_conditions": False,  # honest: always UNKNOWN
 }
 
+def _configured():
+    """Identity is never defaulted (ADR-028), so an unset repository means this
+    adapter can answer nothing -- and --validate used to call that ready."""
+    if FIXTURE:
+        return True, None
+    if not NWO:
+        return False, ("no repository declared; set providers.<role>.env."
+                       "REPO_GOVERNOR_GH_REPO to owner/name. Identity is never "
+                       "defaulted (ADR-028), so every query will refuse.")
+    return True, None
+
 if __name__ == "__main__":
     sys.exit(main(ROLE, CAPABILITIES, FUNCTIONS,
                   {"name": "github-projects",
                    "permissions": {"read": True, "write": False},
                    "mode": "fixture" if FIXTURE else "live"},
-                  properties=PROPERTIES, probe=_probe))
+                  properties=PROPERTIES, probe=_probe, config_probe=_configured))

@@ -358,9 +358,16 @@ CAPABILITIES = {
     "acceptance_conditions": False,
 }
 
+def _configured():
+    if FIXTURE:
+        return True, None
+    if not API_KEY:
+        return False, "LINEAR_API_KEY is unset; every query will refuse."
+    return True, None
+
 if __name__ == "__main__":
     sys.exit(main(ROLE, CAPABILITIES, FUNCTIONS,
                   {"name": "linear",
                    "permissions": {"read": True, "write": False},
                    "mode": "fixture" if FIXTURE else ("live" if API_KEY else "unconfigured")},
-                  properties=PROPERTIES, probe=_probe))
+                  properties=PROPERTIES, probe=_probe, config_probe=_configured))
