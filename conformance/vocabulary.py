@@ -31,6 +31,10 @@ ACCEPTANCE_ENV = {"REPO_GOVERNOR_ACCEPTANCE_DIR": "conformance/fixtures/acceptan
 sys.path.insert(0, str(ROOT / "engine"))
 import vocabulary as V  # noqa: E402
 
+import _count as _CNT  # noqa: E402 -- alias avoids `C`, already bound to
+# `completion` in two suites, where the collision silently rebound it (issue 67).
+_CNT.watch("vocabulary")
+
 SCAN_DIRS = ("adapters", "engine")
 REASON_PATTERNS = (
     re.compile(r'reason\s*=\s*"([A-Z_]{3,})"'),

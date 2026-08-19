@@ -17,14 +17,15 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import _count as _CNT  # noqa: E402 -- uniform counting; alias is deliberate,
-# `C` is already taken by `completion` in two suites and the collision silently
-# rebound it (issue 67).
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "engine"))
 import envelope as E  # noqa: E402
 import vocabulary as V  # noqa: E402
+
+import _count as _CNT  # noqa: E402 -- alias avoids `C`, already bound to
+# `completion` in two suites, where the collision silently rebound it (issue 67).
+_CNT.watch("envelope")
 
 # A rich envelope. Real trackers rarely supply this much -- which is issue #2,
 # measured by `thinness` rather than assumed away.
@@ -48,7 +49,6 @@ SECTION_40 = [
 
 
 def check(label, ok, detail=""):
-    _CNT.tally(ok)
     print(f"  [{'PASS' if ok else 'FAIL'}] {label}" + (f"    {detail}" if detail and not ok else ""))
     return 0 if ok else 1
 
@@ -123,7 +123,6 @@ def main():
                    str(bare))
 
     print(f"\n{'ENVELOPE: CONFORMANT' if not fails else f'ENVELOPE: NON-CONFORMANT ({fails})'}")
-    print(_CNT.line("envelope"))
     return 0 if not fails else 1
 
 

@@ -17,6 +17,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+import _count as _CNT  # noqa: E402 -- alias avoids `C`, already bound to
+# `completion` in two suites, where the collision silently rebound it (issue 67).
+_CNT.watch("transport")
+
 ROOT = Path(__file__).resolve().parent.parent
 
 SUITE = [

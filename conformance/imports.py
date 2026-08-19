@@ -40,9 +40,10 @@ import sys
 import sysconfig
 from pathlib import Path
 
-import _count as _CNT  # noqa: E402 -- uniform counting; alias is deliberate,
-# `C` is already taken by `completion` in two suites and the collision silently
-# rebound it (issue 67).
+import _count as _CNT  # noqa: E402 -- alias avoids `C`, already bound to
+# `completion` in two suites, where the collision silently rebound it (issue 67).
+_CNT.watch("imports")
+
 
 ROOT = Path(__file__).resolve().parent.parent
 ENGINE = ROOT / "engine"
@@ -74,7 +75,6 @@ STDLIB_DIR = Path(sysconfig.get_paths()["stdlib"]).resolve()
 
 
 def check(label, ok, detail=""):
-    _CNT.tally(ok)
     print(f"  [{'PASS' if ok else 'FAIL'}] {label}" + (f"\n         {detail}" if detail else ""))
     return 0 if ok else 1
 
@@ -246,7 +246,6 @@ def main():
                        "this one is executed IN the engine process, where rule 1 applies")
 
     print(f"\n{'IMPORTS: CONFORMANT' if not fails else f'IMPORTS: NON-CONFORMANT ({fails})'}")
-    print(_CNT.line("imports"))
     return 0 if not fails else 1
 
 

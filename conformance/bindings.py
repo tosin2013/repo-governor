@@ -20,9 +20,6 @@ import sys
 import tempfile
 from pathlib import Path
 
-import _count as _CNT  # noqa: E402 -- uniform counting; alias is deliberate,
-# `C` is already taken by `completion` in two suites and the collision silently
-# rebound it (issue 67).
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -30,6 +27,10 @@ import _preflight  # noqa: E402
 sys.path.insert(0, str(ROOT / "engine"))
 import bindings as B  # noqa: E402
 import manifest as MF  # noqa: E402
+
+import _count as _CNT  # noqa: E402 -- alias avoids `C`, already bound to
+# `completion` in two suites, where the collision silently rebound it (issue 67).
+_CNT.watch("bindings")
 
 BASE = json.loads((ROOT / ".repo-governor.json").read_text())
 
@@ -41,7 +42,6 @@ DECISION_PATH = ("completion.py",)
 
 
 def check(label, ok, detail=""):
-    _CNT.tally(ok)
     print(f"  [{'PASS' if ok else 'FAIL'}] {label}" + (f"    {detail}" if detail and not ok else ""))
     return 0 if ok else 1
 
@@ -268,7 +268,6 @@ def main():
     print(f"\n{'BINDINGS: CONFORMANT' if not fails else f'BINDINGS: NON-CONFORMANT ({fails})'}")
     if fails:
         _preflight.attribute(absent)
-    print(_CNT.line("bindings"))
     return 0 if not fails else 1
 
 
