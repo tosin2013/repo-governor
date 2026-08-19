@@ -1,5 +1,5 @@
 {
-  "$comment": "Claude Code hook config (ADR-029). VERIFIED against code.claude.com/docs/en/hooks, 2026-08-19. Merge into .claude/settings.json (project) or ~/.claude/settings.json (user). Replace RG_SKILL_DIR with the absolute path to the installed skill. Add --exit2-on-deny to the write hook only if the governed repository sets repo_governor.enforcement to 'blocking'; the flag alone does nothing.",
+  "$comment": "Claude Code hook config (ADR-029). VERIFIED against code.claude.com/docs/en/hooks, 2026-08-19. Merge into .claude/settings.json (project) or ~/.claude/settings.json (user). Substitute the placeholder token (skill dir) with sed before use -- see docs/installation.md. Add --exit2-on-deny to the write hook only if the governed repository sets repo_governor.enforcement to 'blocking'; the flag alone does nothing.",
   "hooks": {
     "UserPromptSubmit": [
       {
