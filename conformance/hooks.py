@@ -302,6 +302,21 @@ def main():
                    "the section that recommends the surface must cite what testing it showed")
     fails += check("the hook section calls the surface optional",
                    "optional" in hook_sec.lower())
+    # Every host with a shipped template must appear in the matrix, and every
+    # unverified one must link the issue that says so. A template that ships
+    # without a row is a host we quietly claim to support.
+    for host, iss in (("Claude Code", None), ("Cursor", "50"), ("Codex", "47"),
+                      ("Gemini", "48"), ("VS Code", "49")):
+        fails += check(f"install docs list {host}", host in hook_sec)
+        if iss:
+            fails += check(f"{host} row links its unvalidated-host issue",
+                           f"/issues/{iss}" in hook_sec,
+                           "an unverified host without a way to report is a dead end")
+    fails += check("docs define what 'verified' means",
+                   "Verified\" means one specific thing" in hook_sec
+                   or "means one specific thing" in hook_sec,
+                   "vendor docs are not verification -- Claude Code's documented "
+                   "output shape was wrong")
 
     # --- the installer may advise and offer; it may never write silently -----
     # Tested by RUNNING it, not by grepping. The first version grepped for

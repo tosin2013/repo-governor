@@ -125,11 +125,19 @@ The hook was built to fix an activation miss ([#36](https://github.com/tosin2013
 
 **If you want governance to activate reliably, write an `AGENTS.md`. That is the finding.**
 
-| Host | Config file | Verified |
-|---|---|---|
-| Claude Code | `.claude/settings.json` (project) or `~/.claude/settings.json` | **yes** — payload schema confirmed against the official reference |
-| Cursor | `.cursor/hooks.json` | events and exit codes yes; **stdin field names no** |
-| Codex CLI | `.codex/hooks.json` | **no** — no Codex host has been available to this project ([#37](https://github.com/tosin2013/repo-governor/issues/37)) |
+| Host | Config file | Prompt-time event | Verified on a real host? |
+|---|---|---|---|
+| **Claude Code** | `.claude/settings.json` | `UserPromptSubmit` | **yes** — token matched operator and model, 2026-08-19 |
+| Cursor | `.cursor/hooks.json` | `beforeSubmitPrompt` | no — [issue 50](https://github.com/tosin2013/repo-governor/issues/50) |
+| Codex | `.codex/hooks.json` | **none exists** | no — [issue 47](https://github.com/tosin2013/repo-governor/issues/47) |
+| Gemini CLI | `.gemini/settings.json` | `BeforeAgent` | no — [issue 48](https://github.com/tosin2013/repo-governor/issues/48) |
+| VS Code / Copilot | `.github/hooks/*.json` | `UserPromptSubmit` | no — [issue 49](https://github.com/tosin2013/repo-governor/issues/49) |
+
+**"Verified" means one specific thing**: someone installed it, asked the model for a delivery token with no tool calls, and the model stated the token the operator saw. Event names and exit codes taken from vendor documentation are *not* verification — on Claude Code the documented output shape was wrong, and every visible signal said the hook was working while the model received nothing.
+
+Each unverified row has an issue explaining exactly what is unknown for that host and what to run. **A report that it does not work is more useful than another confirmation from the host we can already run.**
+
+Codex documents **no prompt-submit event at all**, so only the write check installs there — the hook cannot deliver the requirement before the agent acts, and an `AGENTS.md` is the whole activation remedy on that host. Its project hooks also load only when `.codex/` is *trusted*, which otherwise looks identical to a hook doing nothing.
 
 The installer offers it when the host is Claude Code and the target is **governed**:
 
