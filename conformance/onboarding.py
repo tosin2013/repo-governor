@@ -207,7 +207,7 @@ def main():
 
             # 2. the interactive tool must produce something that actually validates
             r = _sp.run([sys.executable, str(ROOT_ / "tools" / "onboard-interactive.py"), str(tgt)],
-                        input="1\nn\n1\n", capture_output=True, text=True)
+                        input="1\nn\n1\n\n", capture_output=True, text=True)
             tool_out = r.stdout      # `r` is reused for --validate below
             prop = tgt / ".repo-governor.proposed.json"
             rep.add("proposal-e2e", "onboard-interactive writes a proposal", prop.exists(), r.stderr[:120])
@@ -261,6 +261,49 @@ def main():
                 # NOT_ON_BOARD. Only asking a real question exposes that.
                 # The survey is consent-gated: declining it must still produce a
                 # working manifest. It informs the choice; it is not a step.
+                # The condition must be the ASSESSED one. It was hardcoded to
+                # The condition is ASSESSED and then CONFIRMED by a person. It
+                # was hardcoded to L1/GOVERNOR_LITE with a comment telling the
+                # reader to fix it by hand -- on a repository detection had put
+                # at L4 because floor indicators fired. The engine says a floor
+                # may not be overridden downward, so the tool was committing the
+                # violation it printed a warning about two screens earlier.
+                a = _sp.run([sys.executable, str(ROOT_ / "engine" / "onboard.py"),
+                             str(tgt), "--json"], capture_output=True, text=True)
+                want = json.loads(a.stdout)["condition"]
+                rep.add("proposal-e2e", "the condition is assessed, not defaulted",
+                        m["condition"]["assessed"] == want["suggested"],
+                        f"proposal {m['condition']['assessed']}, "
+                        f"assessed {want['suggested']}")
+                rep.add("proposal-e2e", "the tool shows the indicators behind the level",
+                        "indicators" in tool_out,
+                        "a bare verdict cannot be weighed by a person or an agent")
+
+            # A floor may be raised, never lowered. Build a repo that floors at
+            # L4 and try to force it down.
+            fl = _pl.Path(td) / "floored"
+            (fl / "src").mkdir(parents=True)
+            _sp.run(["git", "init", "-q", str(fl)], capture_output=True)
+            _sp.run(["git", "-C", str(fl), "remote", "add", "origin",
+                     "https://github.com/acme/w.git"], capture_output=True)
+            (fl / "src" / "a.ts").write_text("export const a = 1;\n")
+            _sp.run(["git", "-C", str(fl), "add", "-A"], capture_output=True)
+            _sp.run(["git", "-C", str(fl), "-c", "user.email=t@t", "-c", "user.name=t",
+                     "commit", "-q", "-m", "i"], capture_output=True)
+            _sp.run([sys.executable, str(ROOT_ / "tools" / "onboard-interactive.py"),
+                     str(fl)], input="1\nn\n1\nL0\n", capture_output=True, text=True)
+            fp = fl / ".repo-governor.proposed.json"
+            got_l = json.loads(fp.read_text())["condition"]["assessed"] if fp.exists() else None
+            rep.add("proposal-e2e", "a floor cannot be overridden downward",
+                    got_l == "L4",
+                    f"asked for L0 on a floored repo and got {got_l!r}; "
+                    "compatibility obligations do not go away by declaring a lower level")
+            if fp.exists():
+                rep.add("proposal-e2e", "the manifest names why the floor holds",
+                        "floor" in json.dumps(json.loads(fp.read_text())["condition"]).lower(),
+                        "a reviewer must see why the level cannot be lowered")
+
+            if prop.exists():
                 rep.add("proposal-e2e", "declining the signal survey still binds",
                         m["providers"]["roadmap_authority"]["admission"]["signal"]
                         == "milestone",
@@ -302,7 +345,7 @@ def main():
             # defect ADR-028 exists for, and precisely what an earlier version of
             # this check missed by asserting on a repo that had a remote.
             r = _sp.run([sys.executable, str(ROOT_ / "tools" / "onboard-interactive.py"),
-                         str(bare)], input="me/mine\n1\nn\n1\n", capture_output=True, text=True)
+                         str(bare)], input="me/mine\n1\nn\n1\n\n", capture_output=True, text=True)
             bp = bare / ".repo-governor.proposed.json"
             got = json.loads(bp.read_text())["repository"]["id"] if bp.exists() else None
             # The tool prints a URL. A URL that 404s is worse than no URL: it

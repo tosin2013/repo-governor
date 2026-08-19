@@ -149,6 +149,74 @@ def _survey(rid):
           "\n  know which. This just rules out the ones that cannot work.")
 
 
+
+LEVELS = [("L0", "GOVERNOR_GREENFIELD"), ("L1", "GOVERNOR_LITE"),
+          ("L2", "GOVERNOR_STANDARD"), ("L3", "GOVERNOR_FULL"),
+          ("L4", "GOVERNOR_HIGH_ASSURANCE")]
+
+
+def _confirm_condition(level, profile, floors, ind):
+    """Show the evidence, then let a person set the level. The script never decides.
+
+    assess() is deliberately mechanical (ADR-002) and therefore crude: a floor
+    fires on `"export "` appearing in any of 60 source files, which is true of
+    essentially every TypeScript repository. Its own docstring says it reports a
+    SUGGESTED level and a human decides -- but nothing in the flow ever asked.
+
+    Printing the indicators is the point. A person can weigh them, and so can an
+    agent running this on someone's behalf; neither can weigh a bare verdict.
+    """
+    print(f"\nCondition assessed: {level} / {profile}")
+    if floors:
+        print(f"  floor raised by : {', '.join(floors)}")
+    interesting = [k for k, v in ind.items() if v not in (False, 0, None)]
+    print(f"  indicators      : {', '.join(f'{k}={ind[k]}' for k in interesting) or 'none'}")
+    if floors:
+        print("\n  A floor means other people depend on this repository's shapes, so")
+        print("  compatibility obligations exist. It may be RAISED but never lowered.")
+    print("\n  Governance depth follows this (ADR-006): an L1 repository never loads")
+    print("  L4 policy. Too high is friction; too low is a repository governed more")
+    print("  loosely than its obligations warrant.")
+
+    names = [l for l, _ in LEVELS]
+    floor_at = names.index(level) if floors else 0
+    allowed = names[floor_at:]
+    if len(allowed) == 1:
+        # The floor is already at the maximum. Offering a choice of one is not a
+        # choice; say why there is nothing to decide and move on.
+        print(f"\n  {level} is the highest level and the floor is already there,")
+        print("  so there is nothing to choose. Recorded as assessed.")
+        return level, profile
+    print(f"\n  Accept {level}, or choose one of: {', '.join(allowed)}")
+    raw = input(f"  [{level}] > ").strip().upper()
+    if not raw:
+        return level, profile
+    if raw not in allowed:
+        if raw in names:
+            print(f"  {raw} is below the floor and cannot be set. Keeping {level}.")
+        else:
+            print(f"  Not a level. Keeping {level}.")
+        return level, profile
+    return raw, dict(LEVELS)[raw]
+
+
+def _assessed(repo: Path):
+    """(level, profile, floors, indicators) from engine/onboard.py. Never defaulted."""
+    r = subprocess.run(
+        [sys.executable, str(SKILL / "engine" / "onboard.py"), str(repo), "--json"],
+        capture_output=True, text=True)
+    try:
+        c = json.loads(r.stdout)["condition"]
+        return (c["suggested"], c["profile"], c.get("floor") or [],
+                c.get("indicators") or {})
+    except Exception:
+        # No silent fallback to a level. A condition nobody assessed is not a
+        # condition, and guessing one is the defect this function replaced.
+        print("Could not read the assessed condition from engine/onboard.py.",
+              file=sys.stderr)
+        raise SystemExit(1)
+
+
 def main(argv):
     if not argv:
         print(__doc__.strip().splitlines()[-1], file=sys.stderr)
@@ -194,7 +262,16 @@ def main(argv):
                         "see this, and guessing it is how a second roadmap of record "
                         "gets created (ADR-018).", GH_SIGNALS, allow_other=False)
 
-    profile = "GOVERNOR_LITE"
+    # Take the ASSESSED condition, never a default. This wrote "L1" /
+    # GOVERNOR_LITE unconditionally, with a comment telling the reader to fix it
+    # by hand -- on a repository detection had assessed L4 because three floor
+    # indicators fired. The engine's own rule is that a floor "may not be
+    # overridden downward", so the tool was committing the violation it printed
+    # a warning about two screens earlier. The profile decides governance depth
+    # (ADR-006); writing L1 over an L4 under-governs a repository that has
+    # compatibility obligations.
+    level, profile, floors, ind = _assessed(repo)
+    level, profile = _confirm_condition(level, profile, floors, ind)
     prov = {
         "repository": {"type": "git", "adapter": "adapters/git", "contract_version": 1},
         "roadmap_authority": {"type": choice, "adapter": adapter, "contract_version": 1},
@@ -236,8 +313,15 @@ def main(argv):
                      "however reachable the system is (INV-013)."),
         "repo_governor": {"version": 1, "engine_min_version": "0.1.0"},
         "repository": {"id": rid},
-        "condition": {"assessed": "L1", "profile": profile,
-                      "$comment": "Adjust after reading engine/onboard.py's assessment above."},
+        "condition": {
+            "assessed": level, "profile": profile,
+            "$comment": ("Assessed by engine/onboard.py, not defaulted."
+                         + (f" Floor indicators present ({', '.join(floors)}); per the"
+                            " engine's rule this may not be overridden downward."
+                            if floors else
+                            " No floor indicator; a human may raise it if the"
+                            " repository's obligations exceed what is observable.")),
+        },
         "permissions": perms,
         "providers": prov,
     }
