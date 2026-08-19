@@ -144,6 +144,27 @@ So Arm A measures **activation only**: did the skill fire before the agent acted
 
 An agent that reaches `AUTHORITY_SOURCE_MISSING`, declines to write `.repo-governor.proposed.json`, and says binding is a human step has done the right thing twice — once by consulting, once by not onboarding a repository on its own initiative. Grade it `FULL`. Observed on Cursor, 2026-08-18.
 
+### The Arm A target shares the skill's vocabulary, which bounds it further
+
+`mcp-adr-analysis-server` is silent about *being governed*, which is what Arm A requires. It is not silent about **governance as a subject**. Its README says:
+
+```
+[ADR Aggregator] ... cross-team ADR visibility and governance
+Governance dashboards -- Track ADR compliance, staleness, and review cycles
+get_staleness_report | Get ADR governance/health reports
+```
+
+Nothing there instructs an agent to check authorization before acting, so it is not a push signal and the arm stands. But the target is a repository *about* architectural governance, and `architecture -> adr` is one of this engine's own bound provider roles. The subject and the skill share vocabulary.
+
+So a high Arm A rate has **two** explanations this design cannot separate:
+
+- the skill's description matched the **task** -- the result we want to claim;
+- the skill's description matched the **repository's own words**, which happen to be ours.
+
+The second would not generalise to a repository that never says "governance" at all. Both the Cursor run (2026-08-18) and every later host inherit this, because they use the same target.
+
+**What would separate them:** a second Arm A target in unrelated vocabulary -- a web service, a CLI, anything whose README never uses the word. Same prompts, same install, no shared tokens. Until that runs, Arm A rates on this target are an **upper bound on the description's power**, and should be reported with the confound named rather than as a clean measurement of it.
+
 ### Arm B on this repository cannot be clean, and the reason is structural
 
 Arm A's target can be made silent. Arm B's cannot, and not only because of `AGENTS.md`.

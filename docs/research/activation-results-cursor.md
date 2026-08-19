@@ -42,6 +42,8 @@ The field was **not** the one the protocol originally described. No third-party 
 
 **FULL 20/20. PARTIAL 0. NONE 0.** No competing skill fired on any prompt.
 
+**Qualified 2026-08-19.** The target's README uses "governance" three times (ADR Aggregator, governance dashboards, ADR governance/health reports). It never tells an agent the repo is governed, so the arm stands -- but subject and skill share vocabulary, and this run cannot separate *the description matched the task* from *the description matched the repo's own words*. Read 20/20 as an upper bound on the description's power. See the protocol's *The Arm A target shares the skill's vocabulary*.
+
 Every prompt consulted governance and ran the engine before acting. Notable individual results rather than a 20-row table of the same value:
 
 | # | Prompt | Note |
