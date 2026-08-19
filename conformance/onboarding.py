@@ -205,6 +205,28 @@ def main():
                          str(bare)], input="me/mine\n1\n1\n", capture_output=True, text=True)
             bp = bare / ".repo-governor.proposed.json"
             got = json.loads(bp.read_text())["repository"]["id"] if bp.exists() else None
+            # The tool prints a URL. A URL that 404s is worse than no URL: it
+            # tells someone their tracker is a gap AND that nobody wants to hear
+            # about it. Check the template exists and that the two names agree.
+            tmpl = ROOT_ / ".github" / "ISSUE_TEMPLATE" / "adapter-request.yml"
+            tool_src = (ROOT_ / "tools" / "onboard-interactive.py").read_text()
+            rep.add("proposal-e2e", "the adapter-request template exists", tmpl.exists(),
+                    "onboard-interactive.py links to it")
+            rep.add("proposal-e2e", "the tool links to the template that exists",
+                    tmpl.name in tool_src,
+                    "a 404 tells someone their tracker is a gap and nobody wants to hear it")
+            if tmpl.exists():
+                body = tmpl.read_text()
+                rep.add("proposal-e2e", "the template asks what ADMITTED means (ADR-018)",
+                        "ADMITTED mean" in body,
+                        "the one question detection can never answer")
+                rep.add("proposal-e2e", "the template asks how work is WITHDRAWN",
+                        "WITHDRAWN" in body,
+                        "an agent working on withdrawn work is the failure this prevents")
+                rep.add("proposal-e2e", "the template carries the public-repo warning",
+                        "51" in body and "public" in body,
+                        "requesters must not paste private workspace content")
+
             rep.add("proposal-e2e", "no remote: it asks rather than defaulting (ADR-028)",
                     got == "me/mine",
                     f"got {got!r} -- a value it was never told is a defaulted identity")

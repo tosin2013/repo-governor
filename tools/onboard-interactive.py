@@ -78,15 +78,22 @@ def repo_id(repo: Path):
     return m.group(1) if m else None
 
 
+REPO = "tosin2013/repo-governor"
+TEMPLATE = "adapter-request.yml"
+
+
 def contribute(repo, what):
     print(f"\n  No adapter ships for {what}.")
     print("  That is a gap worth recording rather than a reason to stop -- the")
     print("  provider abstraction exists so a tracker can be added without")
     print("  touching the engine (ADR-003).\n")
-    print("  File it:")
-    print(f'    gh issue create --repo tosin2013/repo-governor \\')
-    print(f'      --title "Adapter request: <your tracker>" \\')
-    print(f'      --body "Role: {what}. Tracker: <name>. What admission means there: <...>"')
+    # The form asks what an adapter must be able to answer -- above all what
+    # ADMITTED means in that system, which is the one thing detection can never
+    # see (ADR-018). Someone who can answer it has most of the design already.
+    print("  File it (a form asks the questions an adapter has to answer):")
+    print(f"    https://github.com/{REPO}/issues/new?template={TEMPLATE}")
+    print("\n  Or from the terminal:")
+    print(f"    gh issue create --repo {REPO} --template {TEMPLATE}")
     print("\n  Or write one: adapters/_protocol.py is the contract, and every")
     print("  shipped adapter is a single file. See CONTRIBUTING.md.")
 
