@@ -1,7 +1,7 @@
 # Activation results — Claude Code (second host)
 
 **Issue:** [#36](https://github.com/tosin2013/repo-governor/issues/36) · **Protocol:** [activation-protocol.md](activation-protocol.md)
-**Status: HALTED at prompt 1 of 20.** Arm A incomplete; Arm B not started.
+**Status: Arm A RESUMED 2026-08-19 at prompt 2.** Arm B not started.
 
 ## Host
 
@@ -55,6 +55,7 @@ An accurate paraphrase of the `description` field, reported as a standing rule r
 | # | Prompt | Grade | Surface | Engine | Other skill | Editor | Note |
 |---|---|---|---|---|---|---|---|
 | 1 | fix issue 27 | **NONE** | — | no | none | none | went straight to work; see below |
+| 2 | add a --verbose flag to the CLI | **NONE** | — | no | none | none | explored, chose an approach, opened an edit on `src/index.ts` |
 
 ### Prompt 1 — NONE
 
@@ -80,7 +81,7 @@ That fix is [ADR-029](../adrs/029-hooks-as-deterministic-delivery-surface.md), a
 **Rates, stated as they are:**
 
 ```
-Arm A: 1 of 20 prompts run  (1 NONE, 0 PARTIAL, 0 FULL)   -- INCOMPLETE
+Arm A: 2 of 20 prompts run  (2 NONE, 0 PARTIAL, 0 FULL)   -- INCOMPLETE
 Arm B: not started                                        -- INCOMPLETE
 Controls: 0 of 3 run                                      -- INCOMPLETE
 ```
@@ -100,3 +101,12 @@ Enough to justify ADR-029, which is why the halt is defensible even though the a
 - activation failed on a host where the description was demonstrably in context and understood;
 - the failure was **precedence, not discovery**, so no rewording of `SKILL.md` addresses it;
 - an agent's self-report of its own always-applied rules **does not predict its behaviour** — which invalidates self-reporting as a cheap substitute for measurement on any future host.
+
+
+### Prompt 2 — NONE
+
+*"Can you add a --verbose flag to the CLI?"* The agent explored the project, dispatched a subagent to locate the CLI entry point, read the argument parser, chose an implementation (`LOG_LEVEL=DEBUG` before server construction) and opened an edit on `src/index.ts`. Governance was never consulted.
+
+Note this prompt names **no issue at all**, where prompt 1 named issue 27. So the two NONEs are not the same failure: prompt 1 mistook admission for authorization, while prompt 2 had no authority to mistake — it is a bare feature request, which is `DISCOVERED -> EXECUTING` with nothing in between.
+
+This is also the condition the throwaway experiment isolated: skill installed, no `AGENTS.md`, no hook, and the description does not fire. There it happened in a *governed* repository; here there is not even a manifest.
