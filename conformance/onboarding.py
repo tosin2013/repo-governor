@@ -107,6 +107,49 @@ def run_fixture(name, fx, tmp, rep):
     return repo, res
 
 
+
+def _parse_form(path):
+    """(ok, detail). Needs a YAML parser; names the missing one rather than skipping.
+
+    Same rule as conformance/_preflight.py: an absent dependency makes a verdict
+    red WITH ITS CAUSE, never green by omission. A malformed issue form is
+    exactly the defect worth catching -- GitHub does not reject it, it quietly
+    serves a blank issue box instead, so the template looks installed while
+    asking nothing.
+    """
+    import subprocess as sp
+    try:
+        import yaml
+        d = yaml.safe_load(path.read_text())
+    except ImportError:
+        rb = sp.run(["ruby", "-ryaml", "-rjson", "-e",
+                     f"print YAML.load_file({str(path)!r}).to_json"],
+                    capture_output=True, text=True)
+        if rb.returncode != 0:
+            return False, ("no YAML parser available -- install pyyaml or ruby. "
+                           "Skipping would report a malformed form as conformant.")
+        d = json.loads(rb.stdout)
+    except Exception as e:
+        return False, f"YAML does not parse: {e}"
+
+    for k in ("name", "description", "body"):
+        if k not in d:
+            return False, f"missing required top-level key: {k}"
+    for i, b in enumerate(d["body"]):
+        t = b.get("type")
+        if t not in ("markdown", "input", "textarea", "dropdown", "checkboxes"):
+            return False, f"field {i}: unknown type {t!r}"
+        if t == "markdown":
+            continue
+        if not b.get("id"):
+            return False, f"field {i} ({t}): no id"
+        if not (b.get("attributes") or {}).get("label"):
+            return False, f"field {i} ({t}): no attributes.label"
+        if t == "dropdown" and not b["attributes"].get("options"):
+            return False, f"dropdown {b['id']}: no options"
+    return True, ""
+
+
 def main():
     rep = R()
     with tempfile.TemporaryDirectory() as td:
@@ -223,6 +266,13 @@ def main():
                 rep.add("proposal-e2e", "the template asks how work is WITHDRAWN",
                         "WITHDRAWN" in body,
                         "an agent working on withdrawn work is the failure this prevents")
+                # PARSE it, not just grep it. A malformed issue form does not
+                # error -- GitHub silently falls back to a blank issue box, so
+                # the template appears to work while asking none of its
+                # questions. String checks cannot see that.
+                ok_parse, why = _parse_form(tmpl)
+                rep.add("proposal-e2e", "the template is a well-formed GitHub issue form",
+                        ok_parse, why)
                 rep.add("proposal-e2e", "the template carries the public-repo warning",
                         "51" in body and "public" in body,
                         "requesters must not paste private workspace content")
