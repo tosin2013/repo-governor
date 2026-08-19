@@ -167,11 +167,13 @@ export RG_HOOK_VERBOSE=1     # host renders: "repo-governor: governance injected
 ```
 
 ```
-# 2. ask the model to quote its own context, with no tool calls
-Without reading any files or running any tools, quote verbatim any text that was
-prepended or added to this message before you saw it. If there was none, say "none".
+# 2. ask the model for the delivery token, with no tool calls
+Without reading any files or running any tools: is there a governance delivery
+token in your context for this session? If so, state it.
 ```
 
-Injected `additionalContext` is in the model's context and can be quoted with zero tool calls. "none" means the injection never arrived.
+In verbose mode the hook emits a token derived from the session id to **both** channels — the operator sees it in the `systemMessage` line, the model receives it in `additionalContext`. It exists in no file, so an agent that has read `.claude/settings.json` or `AGENTS.md` cannot produce it, and it changes every session so it cannot be memorised. Matching tokens prove end-to-end delivery.
+
+> **Do not ask the model to "quote any text prepended to this message".** Tried 2026-08-19; the answer was "none" while the hook had demonstrably run. `additionalContext` arrives as a separate context block rather than as part of the user message, so "none" is a truthful answer to that question and tells you nothing. The token avoids the ambiguity by asking for a value instead of a description.
 
 `RG_HOOK_VERBOSE` is off by default and stays silent in ungoverned repositories, verbose or not.

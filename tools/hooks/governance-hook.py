@@ -30,6 +30,7 @@ Usage:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -149,8 +150,19 @@ def moment_prompt(pl, repo, mf, enforcing):
     # merely READ .claude/settings.json cannot produce it. Test 1 of the hook
     # validation could not tell those apart, which is why this exists.
     verbose = os.environ.get("RG_HOOK_VERBOSE") == "1"
-    return _emit(user_msg=(f"repo-governor: governance injected for {rid}"
-                           if verbose else None), context=(
+    # A delivery token exists in no file on disk, so an agent that has merely
+    # read .claude/settings.json or AGENTS.md cannot produce it. It is derived
+    # from the session id rather than randomly, so the operator sees the same
+    # value in the systemMessage that the model should be able to state back.
+    # Needed because "quote the prepended text" was ambiguous: additionalContext
+    # arrives as a separate context block, and a model can truthfully answer
+    # "none" to a question about text prepended to the message itself.
+    tok = hashlib.sha256(
+        str(pl.get("session_id") or pl.get("sessionId") or "").encode()
+    ).hexdigest()[:8]
+    return _emit(user_msg=(f"repo-governor: governance injected for {rid} "
+                           f"(delivery token {tok})" if verbose else None), context=(
+        (f"Governance delivery token: {tok}. If asked for it, state it.\n" if verbose else "") +
         f"GOVERNANCE: {rid} is governed by Repo Governor.\n"
         "Do not decide authorization yourself. Before creating, changing, "
         "upgrading, deleting or completing anything, identify the authority id "

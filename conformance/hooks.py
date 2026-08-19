@@ -98,6 +98,27 @@ def main():
     fails += check("RG_HOOK_VERBOSE=1 emits an operator-visible systemMessage",
                    "systemMessage" in out and "governance injected" in out.get("systemMessage", ""),
                    f"got {out.get('systemMessage')!r}")
+    # The token is the only discriminator that survives AGENTS.md being
+    # auto-loaded: it exists in no file, so a model that states it can only
+    # have received the injected context.
+    import re as _re
+    rc, out, _ = run("prompt", {"session_id": "abc123", "cwd": str(ROOT)},
+                     env={"RG_HOOK_VERBOSE": "1"})
+    sm = _re.search(r"delivery token (\w+)", out.get("systemMessage", "") or "")
+    ac = _re.search(r"delivery token: (\w+)", out.get("additionalContext", "") or "")
+    fails += check("verbose mode emits a delivery token to the operator", bool(sm))
+    fails += check("verbose mode emits the SAME token to the model",
+                   bool(ac) and bool(sm) and ac.group(1) == sm.group(1),
+                   "operator and model must see one value or the test proves nothing")
+    rc, out2, _ = run("prompt", {"session_id": "different", "cwd": str(ROOT)},
+                      env={"RG_HOOK_VERBOSE": "1"})
+    ac2 = _re.search(r"delivery token: (\w+)", out2.get("additionalContext", "") or "")
+    fails += check("the token varies by session, so it cannot be memorised",
+                   bool(ac2) and ac2.group(1) != ac.group(1))
+    rc, out3, _ = run("prompt", {"session_id": "abc123", "cwd": str(ROOT)})
+    fails += check("no token when RG_HOOK_VERBOSE is unset",
+                   "token" not in json.dumps(out3).lower())
+
     with tempfile.TemporaryDirectory() as td:
         rc, out, _ = run("prompt", {"session_id": "t", "cwd": td}, cwd=td,
                          env={"RG_HOOK_VERBOSE": "1"})
@@ -206,11 +227,16 @@ def main():
                 fails += check(f"{host} template is valid JSON", False, str(e))
 
     # --- stdlib only (ADR-011) ----------------------------------------------
-    third_party = [l for l in src.splitlines()
-                   if l.startswith("import ") or l.startswith("from ")]
-    bad = [l for l in third_party
-           if not any(m in l for m in ("json", "os", "re", "subprocess", "sys",
-                                       "pathlib", "__future__", "engine"))]
+    # Tested against sys.stdlib_module_names, not a hand-maintained allowlist.
+    # The first version was an allowlist and failed on `hashlib` -- which is
+    # stdlib. A list that must be edited whenever correct code changes is a
+    # check that reports on its own maintenance, not on the property.
+    mods = set()
+    for l in src.splitlines():
+        m = re.match(r"(?:from|import)\s+([A-Za-z_][\w.]*)", l.strip())
+        if m:
+            mods.add(m.group(1).split(".")[0])
+    bad = sorted(mods - set(sys.stdlib_module_names) - {"engine"})
     fails += check("hook imports stdlib only (ADR-011)", not bad, str(bad))
 
     print(f"\n{'HOOKS: CONFORMANT' if not fails else f'HOOKS: NON-CONFORMANT ({fails})'}")
