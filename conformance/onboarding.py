@@ -251,6 +251,40 @@ def main():
             # The tool prints a URL. A URL that 404s is worse than no URL: it
             # tells someone their tracker is a gap AND that nobody wants to hear
             # about it. Check the template exists and that the two names agree.
+            # Every issue form is parsed, not grepped. A malformed one does not
+            # error -- GitHub serves a blank issue box instead, so it looks
+            # installed while asking none of its questions.
+            for name in ("adapter-request.yml", "activation-result.yml", "config.yml"):
+                f = ROOT_ / ".github" / "ISSUE_TEMPLATE" / name
+                rep.add("templates", f"{name} exists", f.exists())
+                if f.exists() and name != "config.yml":
+                    ok_f, why_f = _parse_form(f)
+                    rep.add("templates", f"{name} is a well-formed issue form", ok_f, why_f)
+                    rep.add("templates", f"{name} carries the public-repo rule (51)",
+                            "51" in f.read_text() and "public" in f.read_text().lower())
+
+            # The activation form must not invite a run that cannot be scored.
+            av = (ROOT_ / ".github" / "ISSUE_TEMPLATE" / "activation-result.yml").read_text()
+            for phrase, why in (
+                ("One prompt per session", "batching measures persistence, not activation"),
+                ("did not correct the agent", "a rescued miss is destroyed data"),
+                ("never named Repo Governor", "naming it guarantees activation"),
+                ("competing", "a rate without its field cannot be compared"),
+            ):
+                rep.add("templates", f"activation form asks about: {phrase}",
+                        phrase.lower() in av.lower(), why)
+
+            # The PR form must carry the two defects this repository actually has.
+            pr = (ROOT_ / ".github" / "PULL_REQUEST_TEMPLATE.md").read_text()
+            rep.add("templates", "PR template asks whether the test was mutated",
+                    "mutated" in pr.lower(),
+                    "PR 43 shipped a tautology that passed and looked like coverage")
+            rep.add("templates", "PR template warns about closing keywords",
+                    "closing verb" in pr.lower(),
+                    "this repository has closed the same issue twice by accident")
+            rep.add("templates", "PR template asks which authority admits the work",
+                    "Authority:" in pr, "INV-002: admission is not authorization")
+
             tmpl = ROOT_ / ".github" / "ISSUE_TEMPLATE" / "adapter-request.yml"
             tool_src = (ROOT_ / "tools" / "onboard-interactive.py").read_text()
             rep.add("proposal-e2e", "the adapter-request template exists", tmpl.exists(),
