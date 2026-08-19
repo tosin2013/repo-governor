@@ -36,6 +36,19 @@ ROOT = Path(__file__).resolve().parent.parent
 EXACT = {
     "engine/version.py": (r'^ENGINE_VERSION\s*=\s*"([^"]+)"', "the engine's own version"),
 }
+# The version a READER is told to install. Not decoration: the README pinned
+# v0.1.0 while v0.2.1 was Latest, across two releases, because pinning a
+# literal closed the "install is not a release" gap and opened a worse one --
+# unpinned it merely tracked main, pinned it is confidently wrong and rots
+# silently. This is the same class as ENGINE_VERSION, so it is checked the
+# same way rather than watched.
+INSTALL_PIN = {
+    "README.md": (r"--branch v([0-9]+\.[0-9]+\.[0-9]+)",
+                  "the version the README tells people to clone"),
+    "docs/installation.md": (r"--branch v([0-9]+\.[0-9]+\.[0-9]+)",
+                             "the version the installation guide tells people to clone"),
+}
+
 FLOOR = {
     ".repo-governor.json": (r'"engine_min_version"\s*:\s*"([^"]+)"',
                             "this repository's own manifest floor"),
@@ -88,6 +101,17 @@ def main(argv):
         fails += check(f"{rel} ({meaning}) is {tag}", got == tag,
                        f"states {got!r}, the tag says {tag!r} -- decision records would "
                        "cite an engine that is not this one")
+
+    for rel, (pat, meaning) in INSTALL_PIN.items():
+        got, err = read(rel, pat)
+        if err:
+            # A pattern that matches nothing is a check that went blind, not a
+            # document that got simpler.
+            fails += check(f"{rel} names an install version", False, err)
+            continue
+        fails += check(f"{rel} ({meaning}) pins {tag}", got == tag,
+                       f"tells readers to install v{got} while releasing v{tag} -- "
+                       "a stale pin is worse than none, because it looks deliberate")
 
     floors = {}
     for rel, (pat, meaning) in FLOOR.items():

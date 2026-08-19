@@ -9,7 +9,7 @@ Repo Governor ships as an [Agent Skill](https://platform.claude.com/docs/en/agen
 `.agents/skills/` is read by more than one vendor and is the closest thing to a neutral location. This repository already uses the same pattern one level up: `AGENTS.md` holds the content and `CLAUDE.md` is a one-line pointer to it, because [ADR-001](adrs/001-agent-skill-as-primary-delivery-surface.md) makes tool-independence the thesis rather than a preference.
 
 ```bash
-git clone --branch v0.1.0 https://github.com/tosin2013/repo-governor /tmp/repo-governor
+git clone --branch v0.2.1 https://github.com/tosin2013/repo-governor /tmp/repo-governor
 /tmp/repo-governor/tools/install-skill.sh <target-repo>
 ```
 

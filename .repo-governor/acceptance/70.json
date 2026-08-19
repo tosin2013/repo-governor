@@ -1,0 +1,8 @@
+{
+  "$comment": "Acceptance criteria for issue 70. WHAT THESE CANNOT EXPRESS: that the pin is CORRECT at the moment of release. check-version.py takes the tag as an argument, so running it here proves the sites agree with the version this tree claims -- release.yml running it against the real tag is what makes it a gate. That is a property of the pipeline, not of a command run by hand.",
+  "authority_id": "70",
+  "criteria": [
+    {"check": "command_exit", "target": "python3 tools/check-version.py v0.2.1"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh skill"}
+  ]
+}
