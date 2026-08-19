@@ -302,6 +302,12 @@ These were all hit while building this skill.
 
 - **`gh project link --owner "@me"` fails** with `'owner/repo' has different owner from '@me'`. `gh` compares the `--repo` owner string against the literal `@me` instead of resolving it. Use the real login: `--owner tosin2013`.
 - **`gh project link` succeeds silently and exits 0** — no output on success. It also works with only `read:project`. You cannot tell success from a no-op by exit code; verify with the GraphQL query below.
+- **`gh project item-list` defaults to `--limit 30`, and silently truncates.** Observed 2026-08-19 on this repository: the board appeared to "stop at issue 30", and comparing that list against `gh issue list` produced a confident, wrong diagnosis that 14 issues were missing from the board. The board held 34. Always pass `--limit` well above the item count before comparing board membership to anything:
+  ```bash
+  gh project item-list <n> --owner <login> --limit 200 --format json
+  ```
+  The failure mode is nasty because truncation looks exactly like a real gap, and the remedy for a real gap — adding items — is harmless enough that you may never notice you were wrong. Check the item count against `--limit` before believing a diff.
+
 - **`gh project list` shows every project you own, not this repo's.** Two untitled projects on an account are common. The only reliable repo↔project check is:
   ```bash
   gh api graphql -f query='query{ repository(owner:"<owner>", name:"<repo>"){ projectsV2(first:20){ nodes{ number title url } } } }' \
