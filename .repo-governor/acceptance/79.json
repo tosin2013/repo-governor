@@ -1,0 +1,9 @@
+{
+  "$comment": "Acceptance criteria for issue 79. WHAT THIS CANNOT EXPRESS: whether the profile's required_roles list is CORRECT for each level. That is ADR-006's judgement, already made and recorded in policies/*.json; this issue only makes the engine read what was written.",
+  "authority_id": "79",
+  "criteria": [
+    {"check": "command_exit", "target": "./tools/run-conformance.sh status"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh manifest"},
+    {"check": "command_exit", "target": "python3 engine/manifest.py --validate"}
+  ]
+}

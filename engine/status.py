@@ -46,6 +46,7 @@ sys.path.insert(0, str(ROOT / "engine"))
 
 import bindings as B  # noqa: E402
 import manifest as MF  # noqa: E402
+import vocabulary as V  # noqa: E402
 
 SCHEMA = ROOT / "schemas" / "manifest-v1.json"
 
@@ -115,6 +116,12 @@ def main(argv):
     print(f"  condition  : {m['condition']['assessed']} / {m['condition']['profile']}")
     print(f"  standing in: {target}")
 
+    # ADR-006 line 18: the profile "determines which policy packs load and
+    # which providers are required". The second half went unimplemented, so an
+    # L4 repository could bind two of the five roles its profile demands and
+    # hear nothing (issue 79). Unbound and unbound-but-required are different
+    # facts and a reader needs to tell them apart.
+    need = set(V.required_roles(m["condition"]["profile"]))
     print(f"\nROLES ({len(prov)} of {len(all_roles)} bound)\n")
     caps = {}
     for role in all_roles:
@@ -122,7 +129,11 @@ def main(argv):
         if not b:
             # INV-013: an unbound provider has no governance function. That is
             # an expected state and a reportable one, not an error.
-            print(f"  {role:<20} UNBOUND   — no governance function here (INV-013)")
+            if role in need:
+                print(f"  {role:<20} UNBOUND   — REQUIRED by {m['condition']['profile']} "
+                      f"and not bound")
+            else:
+                print(f"  {role:<20} UNBOUND   — no governance function here (INV-013)")
             continue
         for one in (b if isinstance(b, list) else [b]):
             d = describe(one)
@@ -202,6 +213,13 @@ def main(argv):
     print("    advertises an enumeration function (every one takes an id), so the")
     print("    set of admitted work cannot be listed and this cannot be subtracted")
     print("    from it. Check a specific id with: engine/completion.py <id>")
+
+    missing = sorted(r for r in need if r not in prov)
+    if missing:
+        print(f"\n  {m['condition']['profile']} requires {len(need)} role(s); "
+              f"{len(missing)} not bound: {', '.join(missing)}")
+        print("  That is a configuration gap, not a verdict. Nothing here refuses to")
+        print("  answer because of it, and the assessed level is a human's to change.")
 
     unbound = [r for r in all_roles if r not in prov]
     if unbound:

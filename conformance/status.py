@@ -183,6 +183,49 @@ def main():
                        "licence   present" in out2,
                        "otherwise the ABSENT check passes because it always says ABSENT")
 
+    print("\nA profile's required roles are read, not merely declared\n")
+
+    import sys as _s
+    _s.path.insert(0, str(ROOT / "engine"))
+    import vocabulary as _V
+
+    fails += check("policies still declare required_roles",
+                   bool(_V.required_roles("GOVERNOR_HIGH_ASSURANCE")),
+                   "the mapping lived in policies/*.json unread for the life of the "
+                   "project; an empty read here would restore that silently")
+    fails += check("a heavier profile requires more than a lighter one",
+                   len(_V.required_roles("GOVERNOR_HIGH_ASSURANCE"))
+                   > len(_V.required_roles("GOVERNOR_LITE")),
+                   "progressive governance (ADR-006) is the whole point")
+    fails += check("an unknown profile requires nothing, and invents nothing",
+                   _V.required_roles("NOT_A_PROFILE") == (),
+                   "guessing a default would be the assumption ADR-018 forbids, "
+                   "applied to profiles")
+
+    with tempfile.TemporaryDirectory() as td:
+        heavy = dict(MINIMAL)
+        heavy["condition"] = {"assessed": "L4", "profile": "GOVERNOR_HIGH_ASSURANCE"}
+        r = bare_repo(td, manifest=heavy)
+        rc, out = run(r)
+        fails += check("an L4 repository is told which required roles are unbound",
+                       "REQUIRED by GOVERNOR_HIGH_ASSURANCE" in out,
+                       "unbound and unbound-but-required are different facts")
+        fails += check("and told it is a configuration gap, not a verdict",
+                       "not a verdict" in out,
+                       "an unmet requirement that reads like a refusal is the "
+                       "over-escalation section 54 names")
+        fails += check("the report still succeeds", rc == 0,
+                       "an unmet requirement must not turn the report into a failure")
+
+        # Positive control: a profile whose requirement IS met says nothing.
+        light = dict(MINIMAL)
+        light["condition"] = {"assessed": "L1", "profile": "GOVERNOR_LITE"}
+        r2 = bare_repo(td + "/light", manifest=light)
+        _rc2, out2 = run(r2)
+        fails += check("control: a profile whose requirements are met reports none unbound",
+                       "REQUIRED by GOVERNOR_LITE" not in out2,
+                       "otherwise the check above passes for any repository at all")
+
     print("\nIt does not claim what no provider can supply\n")
     rc, out = run(ROOT)
     fails += check("it says admitted-work-without-criteria is NOT COMPUTABLE",

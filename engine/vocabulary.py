@@ -163,7 +163,39 @@ def _load_profiles():
     return out
 
 
+def _load_required_roles():
+    """Which provider roles a profile requires (ADR-006 rule 4).
+
+    The mapping has been in policies/*.json since the profiles were written and
+    was read by nothing -- ADR-006 line 18 says the profile "determines which
+    policy packs load and which providers are required", and only the first
+    half was ever implemented. A repository assessed L4 loaded a profile
+    demanding five roles, bound two, and nothing said a word (issue 79).
+    """
+    import json
+    from pathlib import Path
+    out = {}
+    d = Path(__file__).resolve().parent.parent / "policies"
+    if not d.is_dir():
+        return out
+    for p in sorted(d.glob("*.json")):
+        pol = json.loads(p.read_text())
+        out[pol["profile"]] = tuple(pol.get("required_roles", []))
+    return out
+
+
 PROFILE_ESCALATIONS = _load_profiles()
+PROFILE_REQUIRED_ROLES = _load_required_roles()
+
+
+def required_roles(profile):
+    """Roles this profile requires. Unknown profile => empty, never a guess.
+
+    An unrecognised profile must not silently require nothing AND must not
+    invent a default: callers distinguish the two by asking whether the
+    profile is known, which is why this does not raise.
+    """
+    return PROFILE_REQUIRED_ROLES.get(profile, ())
 
 
 def classify(reason, profile="GOVERNOR_LITE"):
