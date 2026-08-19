@@ -1,0 +1,18 @@
+{
+  "$comment": "Acceptance criteria for issue 66. Declared before the work. WHAT THESE CANNOT EXPRESS: condition 1 is that the workflow pages name the governed repository's own conventions as BINDING. A command_exit can check the words are present; it cannot check an agent reads them, which is what issue 5 measures and what no criterion here can settle. CORRECTION: these invoked the suites directly (python3 conformance/X.py) and read False while passing by hand. The engine exports REPO_GOVERNOR_TARGET into every command_exit target (issue 54), and hooks and onboarding both assert the UNGOVERNED case, so an inherited target makes them correctly fail. Routed through tools/run-conformance.sh, which scrubs those variables. The requirement is unchanged; the invocation was wrong for the environment the engine runs it in.",
+  "authority_id": "66",
+  "criteria": [
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh skill"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh hooks"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh onboarding"
+    }
+  ]
+}

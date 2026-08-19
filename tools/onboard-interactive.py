@@ -109,7 +109,11 @@ def contribute(repo, what):
     print("\n  Or from the terminal:")
     print(f"    gh issue create --repo {REPO} --template {TEMPLATE}")
     print("\n  Or write one: adapters/_protocol.py is the contract, and every")
-    print("  shipped adapter is a single file. See CONTRIBUTING.md.")
+    print("  shipped adapter is a single file. Contribution guide:")
+    # A URL, not a filename. install-skill.sh prunes CONTRIBUTING.md, so naming
+    # the file would point at something the install does not carry -- and where
+    # a host repository has its own, it would name the wrong one.
+    print(f"    https://github.com/{REPO}/blob/main/CONTRIBUTING.md")
 
 
 

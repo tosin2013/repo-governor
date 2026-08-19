@@ -237,7 +237,14 @@ def main():
                     "it was asked after the condition question, reading as a "
                     "continuation of something else")
             prop = tgt / ".repo-governor.proposed.json"
-            rep.add("proposal-e2e", "onboard-interactive writes a proposal", prop.exists(), r.stderr[:120])
+            # Captured BEFORE the rename below moves the file away. A later
+            # `if prop.exists():` guard tested a path this line deletes, so
+            # eight assertions after it never ran -- the suite reported PASS
+            # over checks that were never executed, which is the vacuity this
+            # repository keeps rediscovering, this time as unreachable code.
+            made_proposal = prop.exists()
+            rep.add("proposal-e2e", "onboard-interactive writes a proposal", made_proposal,
+                    r.stderr[:120])
             if prop.exists():
                 prop.rename(tgt / ".repo-governor.json")
                 r = _sp.run([sys.executable, str(ROOT_ / "engine" / "manifest.py"), "--validate"],
@@ -330,7 +337,7 @@ def main():
                         "floor" in json.dumps(json.loads(fp.read_text())["condition"]).lower(),
                         "a reviewer must see why the level cannot be lowered")
 
-            if prop.exists():
+            if made_proposal:
                 rep.add("proposal-e2e", "declining the signal survey still binds",
                         m["providers"]["roadmap_authority"]["admission"]["signal"]
                         == "milestone",
@@ -340,6 +347,13 @@ def main():
                         '"GitHub"' in src_t and "GitHub issues / Projects" not in src_t,
                         "naming Projects there primed four consecutive operators to "
                         "pick 'Project column/status' at the NEXT question")
+                rep.add("proposal-e2e",
+                        "the contribution pointer is a URL, not a pruned filename",
+                        "blob/main/CONTRIBUTING.md" in src_t
+                        and "See CONTRIBUTING.md" not in src_t,
+                        "install-skill.sh prunes CONTRIBUTING.md, so naming the file "
+                        "points at something the install does not carry -- and where the "
+                        "host repository has its own, it names the wrong one")
                 rep.add("proposal-e2e", "the survey warns existing != means admitted",
                         "not the same as MEANING admitted" in src_t,
                         "a repo can have milestones that are release buckets")

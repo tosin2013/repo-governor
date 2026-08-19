@@ -30,6 +30,24 @@ For a request that arrives outside the tracker ("can you quickly add…"):
 
 `AUTHORITY_SOURCE_MISSING` means the repository is not onboarded; run onboarding and stop — binding is a human act (ADR-010).
 
+## The repository's own rules bind you too
+
+Repo Governor answers whether the work is **authorized**. It does not answer how this repository wants work **done**, and those are different questions with different sources. The engine cannot check house style, and should not pretend to.
+
+So before you change anything, read whichever of these exist **in the repository you are governing** — not the copies inside the skill's own directory:
+
+| File | What it settles |
+|---|---|
+| `CONTRIBUTING.md` | branch policy, what must be green before a pull request, commit-message rules |
+| `AGENTS.md` | instructions written for you specifically — most harnesses load it automatically, but not every one does |
+| `.github/PULL_REQUEST_TEMPLATE.md` | what the maintainer will ask you for anyway, so you may as well know it now |
+
+**Their do-not clauses bind you exactly as this page's do.** A correct verdict, landed against the house rules, is still a change the maintainer has to unpick.
+
+The failures here are mundane and expensive, and none of them is a governance question: committing to the default branch where the project requires a branch; opening a pull request without running the checks it asks for; a commit message whose wording fires a tracker's automation and closes something nobody meant to close.
+
+If the repository states no conventions, that is an answer too — proceed, and do not invent rules on its behalf.
+
 ## The forbidden shortcut
 
 **Request → implementation.** A request existing — in chat, in a TODO, in a reasonable-sounding sentence — is not admission. The lifecycle's first illegal transition, `DISCOVERED → EXECUTING`, is most often taken in the first five minutes of a session, before anyone has asked whether the work is on the roadmap at all.
