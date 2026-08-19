@@ -1,0 +1,8 @@
+{
+  "$comment": "Acceptance criteria for issue 67. WHAT THIS CANNOT EXPRESS: that no unreachable assertion remains anywhere. A floor on executed counts catches a DROP, which is the observed failure -- eight assertions stopped running and nothing noticed. It does not prove every assertion site is reachable today; that would need per-site coverage, and the honest limit is recorded in the suite itself rather than implied by a green run.",
+  "authority_id": "67",
+  "criteria": [
+    {"check": "file_exists",  "target": "conformance/coverage.py"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh coverage"}
+  ]
+}

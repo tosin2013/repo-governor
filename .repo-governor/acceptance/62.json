@@ -1,0 +1,8 @@
+{
+  "$comment": "Acceptance criteria for issue 62. The small fix is one adapter; the declared bar is the general one -- Layer 1 gains a REACHABLE BUT STRUCTURALLY WRONG case, distinct from the unreachable case it already has, so the crash class is caught across every adapter rather than patched in the one where it was noticed. WHAT THIS CANNOT EXPRESS: that every adapter is now correct on every malformed shape. It asserts each adapter refuses ONE deliberately wrong structure with a typed error; a different wrong shape is a different test.",
+  "authority_id": "62",
+  "criteria": [
+    {"check": "command_exit", "target": "./tools/run-conformance.sh layer1"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh transport"}
+  ]
+}

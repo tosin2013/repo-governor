@@ -24,6 +24,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import tempfile
 import sys
 from pathlib import Path
 
@@ -58,6 +59,7 @@ SUITE = {
         "unknown_fn": None,
     },
     "adapters/file-roadmap": {
+        "malformed": ("REPO_GOVERNOR_ROADMAP", '{"items":[{"id":"AUTHORIZED-1"}]}'),
         "role": "roadmap_authority",
         "probe": {"id": "AUTHORIZED-1"},
         "capability_fn": {
@@ -106,6 +108,7 @@ SUITE = {
         "unknown_fn": ("get_criteria", {"id": "NOSUCH"}),
     },
     "adapters/execution-file": {
+        "malformed": ("REPO_GOVERNOR_EXECUTION", '{"roots":"not-a-mapping"}'),
         "role": "execution",
         "probe": {"id": "AUTHORIZED-1"},
         "capability_fn": {
@@ -123,6 +126,7 @@ SUITE = {
         "absence_fn": ("get_tasks", {"id": "NO-SUCH"}),
     },
     "adapters/change-signals-file": {
+        "malformed": ("REPO_GOVERNOR_SIGNALS", '{"signals":"not-a-list"}'),
         "role": "change_signals",
         "probe": {},
         "capability_fn": {
@@ -368,6 +372,38 @@ def check_adapter(adapter, spec, rep):
     _, c, _ = q(adapter, role, fn, kw, base_env=base)
     rep.add(adapter, "C7 byte-identical across runs", a == b == c,
             "" if a == b == c else "output varies between identical invocations")
+
+    # C10 REACHABLE BUT STRUCTURALLY WRONG. Distinct from C3, which points the
+    # adapter at a path that does not exist. This gives it a store that EXISTS,
+    # parses as JSON, and has the wrong shape -- the gap between "unreachable"
+    # and "reachable but unusable", which ADR-008 names as two cases and the
+    # suite only tested one.
+    #
+    # It matters because of how the failure presents. file-roadmap raised
+    # AttributeError on `items` as a list; the traceback reached the engine as
+    # reason NON_JSON, sending a reader to look for a syntax error in a file
+    # that is valid JSON. Worse, a crashed provider returns UNKNOWN, and
+    # UNKNOWN satisfies any assertion written as `decision != SOMETHING` -- so
+    # the crash quietly made a test pass elsewhere.
+    mal = spec.get("malformed")
+    if mal:
+        var, content = mal
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as fh:
+            fh.write(content)
+            bad_path = fh.name
+        try:
+            fn, kw = spec["capability_fn"][next(iter(spec["capability_fn"]))]
+            r, raw, _ = q(adapter, spec["role"], fn, kw, {var: bad_path}, base_env=base)
+            crashed = "Traceback" in (raw or "")
+            typed = bool(r) and not r.get("ok") and \
+                (r.get("error") or {}).get("type") in ("MALFORMED_SOURCE", "PROVIDER_UNAVAILABLE")
+            ok10 = typed and not crashed
+            rep.add(adapter, "C10 malformed store -> typed error, not a crash", ok10,
+                    "" if ok10 else ("traceback leaked to the caller: " + (raw or "")[:120]
+                                     if crashed else
+                                     f"got {json.dumps(r)[:120] if r else (raw or '')[:120]}"))
+        finally:
+            os.unlink(bad_path)
 
 
 def main(argv):
