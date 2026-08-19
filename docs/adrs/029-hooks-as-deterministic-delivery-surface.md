@@ -64,7 +64,7 @@ Worse for the original motivation: the hook is deliberately silent in un-onboard
 
 **What survives is enforcement, and only that.** `AGENTS.md` is prose and cannot stop a write; `PreToolUse` with exit 2 can. ADR-001's second named weakness — *"A skill advises; it cannot block"* — is untouched by prose and remains the hook's sole unrefuted justification. It has not been tested. Until it is, this ADR stays `Proposed`, and the activation argument in its Context above should be read as **the reason it was written, not as a finding it established**.
 
-Full record: [`docs/research/hook-validation-results.md`](../research/hook-validation-results.md).
+Full record: [`docs/research/hook-validation-results.md`](../research/hook-validation-results.md). Candidates that depend on the enforcement test are captured in [issue 45](https://github.com/tosin2013/repo-governor/issues/45), **unmilestoned and therefore `NOT_ADMITTED`** — if enforcement fails, this surface should be deleted rather than kept as a plausible-sounding option, and issue 45 goes with it.
 
 ## Consequences
 
