@@ -227,6 +227,36 @@ def main():
                 rep.add("proposal-e2e", "it grants no write anywhere (ADR-005 deny by default)",
                                not any(v.get("write") for v in perms.values()
                                        if isinstance(v, dict)))
+                # Two checks, because the generator emitted admission.signal --
+                # which the adapter ignores -- and no env block at all,
+                # producing a manifest that validated as READY_FOR_GOVERNANCE
+                # and then answered PROVIDER_UNAVAILABLE for every id.
+                #
+                # 1. the vars whose ABSENCE makes the adapter refuse. Only these
+                #    are required; the adapter reads three others that are
+                #    optional, and demanding all five was this check's first,
+                #    wrong version.
+                import re as _re2
+                adp = (ROOT_ / "adapters" / "github-projects").read_text()
+                env_ = m["providers"]["roadmap_authority"].get("env", {})
+                for var, why in (("REPO_GOVERNOR_GH_REPO",
+                                  "an adapter that cannot tell which repository it "
+                                  "reads must not answer (ADR-028)"),
+                                 ("REPO_GOVERNOR_GH_ADMISSION",
+                                  "the admission signal is declared, never assumed "
+                                  "(ADR-018)")):
+                    rep.add("proposal-e2e", f"the manifest supplies {var}",
+                            bool(env_.get(var)), why)
+
+                # 2. and nothing the adapter does not read -- generic drift catch
+                #    in the other direction: a key nobody consumes is dead config
+                #    that looks like configuration.
+                known = set(_re2.findall(
+                    r'os\.environ\.get\(\s*"(REPO_GOVERNOR_GH_[A-Z_]+)"', adp))
+                stray = sorted(set(env_) - known)
+                rep.add("proposal-e2e", "the manifest sets no env the adapter ignores",
+                        not stray, f"{stray} is dead config that reads as configuration")
+
                 rep.add("proposal-e2e", "it reads the repository id from the remote",
                                m["repository"]["id"] == "acme/widget",
                                f"got {m['repository']['id']!r}")

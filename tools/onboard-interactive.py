@@ -149,8 +149,25 @@ def main(argv):
     }
     if admission:
         prov["roadmap_authority"]["admission"] = {"signal": admission}
-    if choice in ("github-projects",):
+    if choice == "github-projects":
         prov["roadmap_authority"]["transport"] = {"kind": "cli", "command": "gh"}
+        # The adapter reads its configuration from this env block, not from the
+        # fields above. Omitting it produced a manifest that validated as
+        # READY_FOR_GOVERNANCE and then answered PROVIDER_UNAVAILABLE for every
+        # id: "no repository declared ... an adapter that cannot tell which
+        # repository it is reading must not answer" (ADR-028). That refusal is
+        # correct; generating a manifest without the field was the defect.
+        env = {"REPO_GOVERNOR_GH_REPO": rid}
+        if admission:
+            env["REPO_GOVERNOR_GH_ADMISSION"] = admission
+        if admission == "label":
+            label = input("Which label means admitted? ").strip()
+            if not label:
+                print("A label signal needs the label named; it is never assumed "
+                      "(ADR-018).", file=sys.stderr)
+                return 1
+            env["REPO_GOVERNOR_GH_ADMISSION_LABEL"] = label
+        prov["roadmap_authority"]["env"] = env
 
     # Deny by default (ADR-005). Every bound role gets read, nothing gets write.
     # The engine rules; it does not act. A proposal that granted write would be
