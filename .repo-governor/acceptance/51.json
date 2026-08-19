@@ -1,0 +1,8 @@
+{
+  "$comment": "Acceptance criteria for issue 51. --validate must stop reporting READY_FOR_GOVERNANCE for a binding that can answer nothing. WHAT THIS CANNOT EXPRESS: whether the wording helps. A command_exit sees the code, not whether an operator understands why their binding is useless.",
+  "authority_id": "51",
+  "criteria": [
+    {"check": "command_exit", "target": "./tools/run-conformance.sh manifest"},
+    {"check": "command_exit", "target": "python3 engine/manifest.py --validate"}
+  ]
+}

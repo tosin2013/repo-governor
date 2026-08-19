@@ -50,7 +50,19 @@ def _item(fn, kw):
     wid = kw.get("id")
     if not wid:
         return None, None, fail(ROLE, fn, "BAD_REQUEST", "missing required argument: id=<work-id>")
-    item = data["items"].get(wid)
+    # Structure is validated before it is used. `items` must be a MAPPING
+    # keyed by id; given a list -- the shape most people write first -- this
+    # raised AttributeError, the traceback reached the engine as reason
+    # NON_JSON, and a reader went looking for a syntax error in a file that is
+    # perfectly valid JSON. ADR-008 requires a typed failure, and a traceback
+    # in a detail field is not one.
+    items = data.get("items")
+    if not isinstance(items, dict):
+        return None, None, fail(ROLE, fn, "MALFORMED_SOURCE",
+                                f"{str(SRC)!r}: 'items' must be an object keyed by work id, "
+                                f"got {type(items).__name__}. The file parses as JSON; its "
+                                "shape is wrong, which is a different failure from unreadable.")
+    item = items.get(wid)
     if item is None:
         return None, None, fail(ROLE, fn, "NOT_FOUND", f"no work item {wid!r} in {str(SRC)!r}")
     return data, item, None

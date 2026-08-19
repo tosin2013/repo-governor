@@ -1,0 +1,7 @@
+{
+  "$comment": "Acceptance criteria for issue 59. Must REUSE the derivation the suite-count check already uses rather than adding a second one -- two implementations of 'recount ground truth, then check prose' would themselves eventually disagree, which is the defect both exist to catch.",
+  "authority_id": "59",
+  "criteria": [
+    {"check": "command_exit", "target": "./tools/run-conformance.sh skill"}
+  ]
+}
