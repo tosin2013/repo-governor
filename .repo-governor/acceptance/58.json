@@ -1,0 +1,9 @@
+{
+  "$comment": "Acceptance criteria for issue 58 (acceptance-criteria templates). Declared before the work. The load-bearing condition is the second suite entry: an EMPTY criteria list must keep reading NO_CRITERIA_DECLARED and must never report satisfied by vacuous quantification. A template that silently satisfies itself would turn the completion firewall into a rubber stamp on first contact, so that check is mutation-tested and its mutation is recorded in the pull request rather than asserted here.",
+  "authority_id": "58",
+  "criteria": [
+    {"check": "file_exists",  "target": "engine/acceptance.py"},
+    {"check": "command_exit", "target": "python3 conformance/acceptance.py"},
+    {"check": "command_exit", "target": "python3 conformance/envelope.py"}
+  ]
+}

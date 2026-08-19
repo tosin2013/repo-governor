@@ -161,6 +161,21 @@ SUITE = {
         "readonly_env": {"REPO_GOVERNOR_DECISIONS_DB": "conformance/fixtures/readonly-db"},
         "unknown_fn": ("get_disposition", {"id": "NEVER-DECIDED"}),
     },
+    "adapters/decision-history-file": {
+        "role": "decision_history",
+        "probe": {"id": "RBAC-1"},
+        "capability_fn": {
+            "decisions": ("get_decisions", {"id": "RBAC-1"}),
+            "disposition": ("get_disposition", {"id": "RBAC-1"}),
+            "reversal_condition": ("get_reversal_condition", {"id": "RBAC-1"}),
+            "provenance": ("get_provenance", {}),
+            "revision_history": ("get_history", {"id": "RBAC-1"}),
+        },
+        "env": {"REPO_GOVERNOR_DECISIONS_DIR": "conformance/fixtures/decisions-file"},
+        "break_env": {"REPO_GOVERNOR_DECISIONS_DIR": "/nonexistent-path-xyz"},
+        "readonly_env": {"REPO_GOVERNOR_DECISIONS_DIR": "conformance/fixtures/readonly-decisions"},
+        "unknown_fn": ("get_disposition", {"id": "NEVER-DECIDED"}),
+    },
     "adapters/decision-history-github": {
         "role": "decision_history",
         "probe": {"id": "901"},

@@ -16,7 +16,7 @@ These are two different claims and were previously reported as one.
 
 | | | |
 | --- | --- | --- |
-| **Implementation architecture** | **READY** | 12 adapters, a deterministic engine, 12 conformance suites. `RG-SIM-ONBOARDING-v0.1` passes; all 7 gate conditions ([§61](docs/reference/onboarding.md)) are engine-verified against live GitHub issues. |
+| **Implementation architecture** | **READY** | 13 adapters, a deterministic engine, 12 conformance suites. `RG-SIM-ONBOARDING-v0.1` passes; all 7 gate conditions ([§61](docs/reference/onboarding.md)) are engine-verified against live GitHub issues. |
 | **Core product thesis** | **UNDER VALIDATION** | Whether one governance layer can rule identically across genuinely different trackers. Not shown yet. |
 
 The thesis bar is stated in [#1](https://github.com/tosin2013/repo-governor/issues/1) and is **not met**: Layer 2 has never run against two *live* providers. `github-projects` and `linear` both run on recorded fixtures there, so what it currently proves is that the normalizers are self-consistent — not that they agree about a real system. The one genuinely live pairing is `decision_history`, a Dolt database against a GitHub fixture.
@@ -112,7 +112,7 @@ If it scores below 3/3: add an `AGENTS.md` saying the repository is governed and
 ## Repository layout
 
 ```text
-adapters/      12 provider adapters, subprocess protocol, any language
+adapters/      13 provider adapters, subprocess protocol, any language
 engine/        deterministic policy engine, Python stdlib only
 conformance/   12 suites — the evidence behind every gate claim
 schemas/       manifest v1 JSON Schema
@@ -124,7 +124,7 @@ docs/
 
 | Suite | Asserts |
 | --- | --- |
-| `layer1.py` | 136 contract checks across 12 adapters |
+| `layer1.py` | 149 contract checks across 13 adapters |
 | `layer2.py` | cross-provider equivalence — **the thesis test** |
 | `transport.py` | agent-as-transport produces byte-identical results (70 comparisons) |
 | `bindings.py` | the engine holds no adapter knowledge, and the permission gate is a gate |
