@@ -90,3 +90,26 @@ echo "  pruned: AGENTS.md, CLAUDE.md, .claude/, .repo-governor.json, .repo-gover
 echo
 echo "Next: start a NEW session in the host, and confirm it lists 'repo-governor'."
 echo "Skills are discovered at session start; one added mid-session is invisible."
+
+# Activation advice, tailored to what is actually in the target. Deliberately
+# ADVICE and not configuration: this script never writes to the user's
+# settings.json. It prunes AGENTS.md and CLAUDE.md from every install precisely
+# because shipping our house rules into someone else's repository is wrong, and
+# writing executable hook config into a file they own is that same error with
+# higher stakes. See ADR-029 and docs/research/hook-validation-results.md.
+echo
+if [ -f "$TARGET/AGENTS.md" ] || [ -f "$TARGET/CLAUDE.md" ]; then
+  echo "This repository has AGENTS.md/CLAUDE.md. Governance should activate from it."
+  echo "Measured: with such a file present, adding a hook changed nothing (ADR-029)."
+else
+  echo "WARNING: this repository has no AGENTS.md or CLAUDE.md."
+  echo
+  echo "  The skill description ALONE did not activate governance under measurement:"
+  echo "  an agent asked to add a CLI flag went straight to editing source, and a"
+  echo "  controlled run in a governed repository did the same. Installing this skill"
+  echo "  and stopping here is likely to leave governance unused while looking present."
+  echo
+  echo "  Fix it with EITHER (an AGENTS.md is simpler and vendor-neutral):"
+  echo "    1. an AGENTS.md saying the repository is governed and how to run the engine"
+  echo "    2. the hook surface -- see docs/installation.md, section 'Hooks'"
+fi

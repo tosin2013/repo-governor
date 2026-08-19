@@ -270,6 +270,22 @@ def main():
     fails += check("the hook section calls the surface optional",
                    "optional" in hook_sec.lower())
 
+    # --- the installer advises, and must never configure ---------------------
+    # Writing hook config into a user's settings.json is the same error the
+    # prune exists to prevent (d8a21a4), with executable config instead of
+    # prose. The installer may warn; it may not write.
+    inst_sh = (ROOT / "tools" / "install-skill.sh").read_text()
+    fails += check("installer warns when the target has no AGENTS.md",
+                   "no AGENTS.md" in inst_sh)
+    # Comments are stripped first: the comment explaining WHY we do not write
+    # settings.json naturally names it, and the first version of this check
+    # failed on the clean file because of that. A guard that fires on its own
+    # rationale is worse than none.
+    code = "\n".join(l for l in inst_sh.splitlines() if not l.strip().startswith("#"))
+    fails += check("installer never writes to a host settings.json",
+                   "settings.json" not in code,
+                   "advice only -- configuring the user's host is the prune's own error")
+
     # --- stdlib only (ADR-011) ----------------------------------------------
     # Tested against sys.stdlib_module_names, not a hand-maintained allowlist.
     # The first version was an allowlist and failed on `hashlib` -- which is
