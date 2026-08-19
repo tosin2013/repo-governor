@@ -1,0 +1,38 @@
+{
+  "$comment": "Acceptance criteria for GitHub issue 52 (CI and release pipelines). Declared at admission so STOP_COMPLETE is reachable -- without criteria the engine can never say this work is finished, and the completion firewall (section 40) has nothing to fire on. NOTE what these checks CANNOT express: acceptance condition 1 in the issue is 'the runner exits non-zero when a suite fails, proven by mutation', and a passing command_exit only shows the green half. The mutation proof is a human act recorded in the PR, not a predicate here. Criteria that quietly assert less than the issue does are how a completion bar goes vacuous.",
+  "authority_id": "52",
+  "criteria": [
+    {
+      "check": "file_exists",
+      "target": "tools/run-conformance.sh"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh"
+    },
+    {
+      "check": "file_exists",
+      "target": "conformance/imports.py"
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/imports.py"
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/skill.py"
+    },
+    {
+      "check": "file_exists",
+      "target": ".github/workflows/conformance.yml"
+    },
+    {
+      "check": "file_exists",
+      "target": ".github/workflows/conformance-live.yml"
+    },
+    {
+      "check": "file_exists",
+      "target": ".github/workflows/release.yml"
+    }
+  ]
+}

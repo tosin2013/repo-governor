@@ -19,16 +19,14 @@ python3 engine/completion.py <issue-number>
 
 ## Conformance
 
-All eleven suites, from a clean checkout:
+Every suite, from a clean checkout:
 
 ```bash
 ./tools/bootstrap-decisions.sh
-for s in layer1 layer2 transport manifest onboarding vocabulary bindings \
-         skill envelope execution hooks; do
-  printf '%-12s ' $s; python3 conformance/$s.py >/dev/null 2>&1 && echo PASS || echo FAIL; done
+./tools/run-conformance.sh
 ```
 
-- [ ] 11/11 pass
+- [ ] 12/12 pass
 - [ ] If any suite needs `dolt`, I installed it rather than unbinding the provider
 
 ## If you added or changed a test: did you break the code and watch it fail?

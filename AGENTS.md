@@ -69,11 +69,13 @@ python3 engine/retirement.py <path>
 ## Before you commit
 
 ```bash
-for s in layer1 layer2 transport manifest onboarding vocabulary bindings skill envelope execution; do python3 conformance/$s.py; done
+./tools/run-conformance.sh
 python3 engine/manifest.py --validate
 ```
 
-All suites pass on `main`. A suite that fails is a defect in your change, not a flaky test — none of them touch the network except by explicit fixture.
+All suites pass on `main`. A suite that fails is a defect in your change, not a flaky test.
+
+All of them are hermetic **except `hooks`**, which runs `engine/completion.py` against the live board and therefore depends on issue state no commit controls. Offline, or when you want a result that only your change can move, run `./tools/run-conformance.sh --hermetic`. This file previously claimed none of them touched the network; that was wrong for `hooks` and the claim is now checked by `conformance/skill.py`.
 
 ## Decisions
 

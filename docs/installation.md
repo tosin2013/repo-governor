@@ -9,7 +9,7 @@ Repo Governor ships as an [Agent Skill](https://platform.claude.com/docs/en/agen
 `.agents/skills/` is read by more than one vendor and is the closest thing to a neutral location. This repository already uses the same pattern one level up: `AGENTS.md` holds the content and `CLAUDE.md` is a one-line pointer to it, because [ADR-001](adrs/001-agent-skill-as-primary-delivery-surface.md) makes tool-independence the thesis rather than a preference.
 
 ```bash
-git clone https://github.com/tosin2013/repo-governor /tmp/repo-governor
+git clone --branch v0.1.0 https://github.com/tosin2013/repo-governor /tmp/repo-governor
 /tmp/repo-governor/tools/install-skill.sh <target-repo>
 ```
 
@@ -82,21 +82,19 @@ The engine is Python stdlib only ([ADR-011](adrs/011-python-stdlib-only-engine-w
 
 | Tool | Needed for | If absent |
 |---|---|---|
-| `python3` | the engine | nothing works |
+| `python3` **3.11+** | the engine ([ADR-011](adrs/011-python-stdlib-only-engine-with-language-agnostic-adapters.md) declares the floor) | nothing works |
 | `git` | provider resolution, target detection | nothing works |
-| `dolt` | `decision_history` via `adapters/dolt-decisions` | **4 of 10 conformance suites fail** |
+| `dolt` | `decision_history` via `adapters/dolt-decisions` | **4 of 12 conformance suites fail** |
 | `gh`, authenticated | the GitHub roadmap provider | live GitHub queries fail; offline suites are unaffected |
 
 **`dolt` is the one that misleads.** Without it, `layer1`, `layer2`, `bindings` and `execution` all fail — including the portability thesis test, which reports `NOT EQUIVALENT`. That reads like a real result and is not one. The suites print a preflight line naming the missing binary, and `tools/bootstrap-decisions.sh` refuses before you reach them, but never report a red verdict from a box without `dolt`.
 
 ```bash
 ./tools/bootstrap-decisions.sh
-for s in layer1 layer2 transport manifest onboarding vocabulary bindings skill envelope execution; do
-  printf '%-12s ' "$s"; python3 conformance/$s.py >/dev/null 2>&1 && echo PASS || echo FAIL
-done
+./tools/run-conformance.sh
 ```
 
-Expect 10/10 from a fresh clone.
+Expect 12/12 from a fresh clone.
 
 ## Governing a repository other than this one
 

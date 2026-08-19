@@ -26,12 +26,10 @@ See [`docs/installation.md`](docs/installation.md) for the per-host skill paths 
 ```bash
 git clone https://github.com/tosin2013/repo-governor && cd repo-governor
 ./tools/bootstrap-decisions.sh
-for s in layer1 layer2 transport manifest onboarding vocabulary bindings skill envelope execution; do
-  printf '%-12s ' "$s"; python3 conformance/$s.py >/dev/null 2>&1 && echo PASS || echo FAIL
-done
+./tools/run-conformance.sh
 ```
 
-Expect **10/10**. If you see four failures, check whether `dolt` is on your PATH before reporting anything — its absence breaks `layer1`, `layer2`, `bindings` and `execution`, including the portability test, which then reports `NOT EQUIVALENT`. That reads like a real result and is not one. The suites print a preflight line naming the missing binary.
+Expect **12/12**. If you see four failures, check whether `dolt` is on your PATH before reporting anything — its absence breaks `layer1`, `layer2`, `bindings` and `execution`, including the portability test, which then reports `NOT EQUIVALENT`. That reads like a real result and is not one. The suites print a preflight line naming the missing binary.
 
 ## Reporting measurements from your own repositories — read this one
 
