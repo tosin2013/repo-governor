@@ -451,6 +451,36 @@ def main():
         B.HOSTS.clear(); B.HOSTS.update(real_hosts)
         B.install_into = real_install2
 
+    # Issue 117. There used to be two paths through run_once, and the one
+    # WITHOUT --debug lost the transcript on a timeout: subprocess.run raises
+    # before the write. Persistence exists so a run cannot be lost, and it was
+    # gated on a flag about display. The run behind this repository's first
+    # calibration survived only because it happened to carry that flag.
+    real_hosts4 = dict(B.HOSTS)
+    real_install4 = B.install_into
+    try:
+        B.HOSTS["_slow"] = {"cmd": "sh", "argv": ["-c", "echo kept-anyway; sleep 30"],
+                            "model_flag": "--model", "skills_dir": ".claude/skills",
+                            "installer_host": "claude"}
+        B.install_into = lambda dst, spec: (True, "")
+        with _tf2.TemporaryDirectory() as td:
+            tgt = Path(td) / "repo"; tgt.mkdir(); (tgt / "f").write_text("x")
+            import contextlib as _cl4, io as _io4
+            with _cl4.redirect_stderr(_io4.StringIO()):
+                res, err = B.run_once("_slow", tgt, "p", timeout=2, debug=False)
+            fails += check("a timeout is still an error", res is None and "timed out" in (err or ""),
+                           f"got {err!r}")
+            kept = [w for w in (err or "").split() if w.endswith("transcript.jsonl")]
+            fails += check("...and it names the transcript it left behind", bool(kept),
+                           "without --debug nothing else ever prints the path, so a "
+                           "persisted file nobody can find is not persistence")
+            fails += check("...and that file holds what the host managed to emit",
+                           bool(kept) and "kept-anyway" in Path(kept[0]).read_text(),
+                           "this is the case that lost a real 900-second run")
+    finally:
+        B.HOSTS.clear(); B.HOSTS.update(real_hosts4)
+        B.install_into = real_install4
+
     print("\nProgress goes to stderr; stdout stays a JSON record\n")
     rc, out = run_main(transcript(ENGINE),
                        argv=("--host", "claude", "--target", ".",

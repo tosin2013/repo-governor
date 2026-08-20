@@ -54,7 +54,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import threading
 import time
 from pathlib import Path
 
@@ -77,6 +76,17 @@ def dbg(on, msg):
     caller that pipes it into jq must not have to filter our chatter out."""
     if on:
         print(f"[{time.monotonic() - _T0:7.1f}s] {msg}", file=sys.stderr, flush=True)
+
+
+def _echo_new(path, shown):
+    """Echo transcript lines that appeared since last call. Returns the count."""
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return shown
+    for line in lines[shown:]:
+        dbg(True, "  | " + _event_line(line))
+    return len(lines)
 
 
 def _event_line(line):
@@ -353,44 +363,52 @@ def run_once(host, target, prompt, model=None, timeout=900, debug=False):
     dbg(debug, f"workdir {dst}")
     dbg(debug, f"transcript {tpath}")
     dbg(debug, "exec " + " ".join(argv))
+    # ONE path, whatever --debug says. The child writes straight to the
+    # transcript and to a stderr file: no pipes, so nothing can deadlock on a
+    # full buffer, and no watchdog thread, because polling never blocks.
+    #
+    # It used to be two paths, and the one without --debug lost the transcript
+    # on a timeout -- subprocess.run raises before the write. Persistence was
+    # added by issue 109 so that a run could never be lost again, and it was
+    # conditional on a flag whose purpose is unrelated. The 900s run behind
+    # this repository's first calibration survived by that coincidence.
+    #
+    # --debug now decides only whether the file is echoed while it grows.
+    epath = tmp / "host-stderr.txt"
+    t0 = time.monotonic()
+    timed_out = False
     try:
-        if not debug:
-            p = subprocess.run(argv, capture_output=True, text=True, cwd=str(dst),
-                               stdin=subprocess.DEVNULL, timeout=timeout)
-            out, errtxt = p.stdout, p.stderr
-            tpath.write_text(out, encoding="utf-8")
-        else:
-            # Stream while accumulating, so a long session is legible in
-            # flight. The timer is not decoration: iterating a pipe blocks,
-            # so without it a host that emits nothing would hang past the
-            # timeout that subprocess.run would have enforced.
-            proc = subprocess.Popen(argv, stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE, text=True,
+        with open(tpath, "w", encoding="utf-8") as fh, \
+                open(epath, "w", encoding="utf-8") as efh:
+            proc = subprocess.Popen(argv, stdout=fh, stderr=efh, text=True,
                                     cwd=str(dst), stdin=subprocess.DEVNULL)
-            killed = []
-            watchdog = threading.Timer(timeout, lambda: (killed.append(True),
-                                                         proc.kill()))
-            watchdog.start()
-            try:
-                lines = []
-                with open(tpath, "w", encoding="utf-8") as fh:
-                    for line in proc.stdout:
-                        fh.write(line)
-                        fh.flush()          # survive a kill, not just an exit
-                        lines.append(line)
-                        dbg(True, "  | " + _event_line(line))
-                proc.wait()
-                errtxt = proc.stderr.read()
-            finally:
-                watchdog.cancel()
-            if killed:
-                raise subprocess.TimeoutExpired(argv, timeout)
-            out = "".join(lines)
+            shown = 0
+            while True:
+                rc = proc.poll()
+                if debug:
+                    shown = _echo_new(tpath, shown)
+                if rc is not None:
+                    break
+                if time.monotonic() - t0 > timeout:
+                    proc.kill()
+                    proc.wait()
+                    timed_out = True
+                    break
+                time.sleep(0.25)
+        out = tpath.read_text(encoding="utf-8")
+        errtxt = epath.read_text(encoding="utf-8")
+        if timed_out:
+            raise subprocess.TimeoutExpired(argv, timeout)
         dbg(debug, f"host exited; {len(out.splitlines())} transcript lines")
         return {"raw": out, "stderr": errtxt[-2000:], "workdir": str(dst),
                 "transcript": str(tpath), "argv": argv}, None
     except subprocess.TimeoutExpired:
-        return None, f"timed out after {timeout}s"
+        # The transcript is already on disk and is worth more than this
+        # message. Naming it is the minimum that makes persistence useful --
+        # without --debug nothing else would ever print the path. Returning a
+        # partial RECORD rather than an error is issue 111 and stays there.
+        return None, (f"timed out after {timeout}s -- the transcript up to that "
+                      f"point is at {tpath}")
 
 
 def measure(host, target, prompt, model=None, control=False, debug=False):
