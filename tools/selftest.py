@@ -27,6 +27,12 @@ from pathlib import Path
 
 SKILL = Path(__file__).resolve().parent.parent
 
+# Every host's hook config, from tools/hooks/. A hook here is not a defect --
+# it is the recommended thing for a repository being governed rather than
+# measured -- but it changes what an activation run is measuring.
+HOOK_CONFIGS = (".claude/settings.json", ".cursor/hooks.json", ".codex/hooks.json",
+                ".gemini/settings.json", ".github/hooks/repo-governor.json")
+
 
 def check(label, ok, detail=""):
     print(f"  [{'PASS' if ok else 'FAIL'}] {label}" + (f"\n         {detail}" if detail else ""))
@@ -53,6 +59,24 @@ def mechanical(repo: Path):
           "" if always_on else
           "NOT a failure, but the single strongest predictor in our data. With such "
           "a file the agent governed every time; without it, it edited immediately.")
+
+    # Neither a pass nor a fail: a fact that changes what the prompts below
+    # measure. A hook DELIVERS governance, so a hooked repository tests whether
+    # the agent obeys what it was told -- not whether it decided to ask. Both
+    # are worth measuring and they are different numbers. This was a
+    # precondition of every activation run and was written down nowhere, so it
+    # depended on the operator remembering (issue 86).
+    hooked = [h for h in HOOK_CONFIGS if (repo / h).exists()]
+    if hooked:
+        print(f"\n  [NOTE] a hook is installed: {', '.join(hooked)}")
+        print("         The prompts below then measure DELIVERY, not activation. The")
+        print("         agent is told; it does not decide to ask. That is a different")
+        print("         number, and grading it against the activation rubric produces")
+        print("         a result that looks like activation and is not.")
+        print("         Remove the hook, or record the run as a delivery measurement.")
+    else:
+        print("\n  [NOTE] no hook installed — these prompts measure ACTIVATION:")
+        print("         whether the agent consults governance without being told to.")
     return ok, governed
 
 

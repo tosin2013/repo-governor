@@ -26,6 +26,8 @@ This is a variable worth *using* rather than merely controlling: [the Cursor run
 
 ## Preconditions
 
+**A hook changes what this run measures.** It delivers governance deterministically, so a hooked repository tests whether the agent *obeys what it was told*, not whether it *decided to ask*. Both are worth measuring; they are different numbers, and grading a hooked run against the activation rubric produces a result that looks like activation and is not. `install-skill.sh` refuses to install one into an un-onboarded repository, so **Arm A is protected by construction and Arm B is not**.
+
 Every one of these must be confirmed **before prompt 1**. A run missing any of them is not a low rate, it is no measurement.
 
 | Check | Result |
@@ -34,6 +36,7 @@ Every one of these must be confirmed **before prompt 1**. A run missing any of t
 | Workspace is **single-root**, containing only the target | |
 | Applied-rules answer contains no governance content (Arm A) | |
 | Contamination check prints nothing | |
+| **No hook installed** — `ls .cursor/hooks.json .claude/settings.json .codex/hooks.json .gemini/settings.json .github/hooks/ 2>/dev/null` prints nothing | |
 | Both arms installed identically — only the root `AGENTS.md` differs | |
 
 ## Competing skills present
