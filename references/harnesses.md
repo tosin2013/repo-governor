@@ -174,6 +174,27 @@ installer's exit status is checked: it did not fail to measure, it failed to
 get as far as measuring, and reporting the two the same way sends an operator
 to inspect the skill when the cause was an install that never happened.
 
+## The transcript is kept, and may not crash the parser
+
+Every run writes its raw transcript to `transcript.jsonl` beside the workdir —
+under `--debug` as each line arrives — and `--suite --out` copies it next to
+each record. A record whose evidence exists only in memory is an assertion,
+and a parse defect that destroys a session is expensive: one cost a real
+228-second calibration run, whose crashing event could not afterwards even be
+examined.
+
+The transcript is an **external format that changes without notice** — the
+same premise the calibration refusal rests on. So the parser skips shapes it
+does not understand and counts them (`unparsed_lines`, `skipped_events`)
+rather than raising. A traceback is the one outcome with no vocabulary here:
+it is neither a grade nor a refusal, and this tool already knows how to say
+`UNPARSEABLE`, `VOID`, exit `3`.
+
+`conformance/fixtures/transcripts/` holds a **real** captured transcript
+alongside malformed shapes reconstructed from that crash. Its `README.md`
+records which is which, because the distinction decides what a passing suite
+proves.
+
 ## Calibrating a host
 
 ```sh

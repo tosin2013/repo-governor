@@ -1,0 +1,10 @@
+{
+  "$comment": "Acceptance criteria for issue 109, declared before the work. Criteria 1 and 2 were RUN and confirmed red at declaration: the one-liner reproduces the AttributeError through observe() with no --debug involved, proving the crash is not an artefact of the streaming path, and the fixture directory does not exist. WHAT THIS BAR CANNOT REACH: the actual event that crashed the real run. That transcript was destroyed by the crash -- which is itself one of the things being fixed -- so the malformed shapes in the fixture are reconstructed from the traceback, not captured. The next real run is the only thing that confirms this, and if it crashes again the fixture was wrong rather than the guard.",
+  "authority_id": "109",
+  "criteria": [
+    {"check": "command_exit", "target": "python3 -c \"import sys,json;sys.path.insert(0,'tools');import benchmark as B;B.observe(json.dumps({'type':'user','message':'oops'}));print('ok')\""},
+    {"check": "file_exists",  "target": "conformance/fixtures/transcripts/claude-stream-json.jsonl"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh benchmark"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh"}
+  ]
+}

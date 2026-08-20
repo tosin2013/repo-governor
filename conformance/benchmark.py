@@ -463,6 +463,85 @@ def main():
                    "a debug flag that prints nothing is worse than none, because "
                    "it answers 'is it hung?' with silence")
 
+    print("\nThe transcript is an external format; it may not crash the parser\n")
+    # Issue 109. A real calibration run died at 228s on AttributeError because
+    # `message` was a str and `or {}` defends only against None. The same
+    # expression sat in observe(), so the crash was never about --debug: any
+    # real run would have died at parse time. A traceback is the one outcome
+    # with no vocabulary here -- neither a grade nor a refusal -- and it
+    # destroyed the evidence too.
+    FIX = ROOT / "conformance" / "fixtures" / "transcripts"
+    fails += check("a fixture captured from a real host exists",
+                   (FIX / "claude-stream-json.jsonl").is_file(),
+                   "every other fixture is written by whoever wrote the parser, "
+                   "so only the shapes that person imagined get handled")
+    if (FIX / "claude-stream-json.jsonl").is_file():
+        real = (FIX / "claude-stream-json.jsonl").read_text(encoding="utf-8")
+        ro = B.observe(real)
+        fails += check("the real transcript parses", ro["parsed_events"] > 0)
+        fails += check("its model is read", bool(ro["model"]), f"got {ro['model']}")
+        fails += check("its skill listing is read and reported",
+                       ro["skills_reported"] and isinstance(ro["skills"], list))
+        fails += check("it is VOID, because that session had no repo-governor",
+                       len(B.void_reasons(ro)) == 1,
+                       "nothing was removed to make this true; it is what a real "
+                       "session in an uninstalled repository looks like")
+
+    fails += check("the malformed fixture exists", (FIX / "malformed.jsonl").is_file())
+    if (FIX / "malformed.jsonl").is_file():
+        bad = (FIX / "malformed.jsonl").read_text(encoding="utf-8")
+        try:
+            mo = B.observe(bad)
+            crashed = None
+        except Exception as exc:                      # noqa: BLE001 -- the point
+            mo, crashed = None, f"{type(exc).__name__}: {exc}"
+        fails += check("every malformed shape is survived", crashed is None,
+                       str(crashed))
+        if mo:
+            fails += check("skipped events are counted, not silently dropped",
+                           mo["skipped_events"] > 0 and mo["unparsed_lines"] > 0,
+                           f"skipped={mo['skipped_events']} "
+                           f"unparsed={mo['unparsed_lines']}; silent skipping "
+                           "becomes its own blind spot")
+            fails += check("a skills value of the wrong type is not a listing",
+                           mo["skills_reported"] is False,
+                           "claiming the precondition was checked when nothing "
+                           "checkable arrived is the UNVERIFIED confusion again")
+
+    for label, ev in (("message is a str", {"message": "x"}),
+                      ("content is a str", {"message": {"content": "x"}}),
+                      ("a block is a str", {"message": {"content": ["x"]}}),
+                      ("message is a list", {"message": []})):
+        fails += check(f"blocks(): {label} yields no blocks", B.blocks(ev) == [],
+                       f"got {B.blocks(ev)!r}")
+        fails += check(f"_event_line(): {label} does not raise",
+                       isinstance(B._event_line(json.dumps(ev)), str))
+
+    print("\nA crash must cost a re-parse, not a session\n")
+    real_hosts3 = dict(B.HOSTS)
+    real_install3 = B.install_into
+    try:
+        B.HOSTS["_echo"] = {"cmd": "echo", "argv": ["{prompt}"],
+                            "model_flag": "--model", "skills_dir": ".claude/skills",
+                            "installer_host": "claude"}
+        B.install_into = lambda dst, spec: (True, "")
+        with _tf2.TemporaryDirectory() as td:
+            tgt = Path(td) / "repo"; tgt.mkdir(); (tgt / "f.txt").write_text("hi\n")
+            for debug in (False, True):
+                import contextlib as _cl3, io as _io3
+                with _cl3.redirect_stderr(_io3.StringIO()):
+                    res, err = B.run_once("_echo", tgt, "kept-on-disk", debug=debug)
+                tp = (res or {}).get("transcript")
+                fails += check(f"the transcript is written to disk (debug={debug})",
+                               err is None and tp and Path(tp).is_file()
+                               and "kept-on-disk" in Path(tp).read_text(),
+                               f"err={err!r} path={tp!r}; a record whose evidence "
+                               "exists only in memory cannot be re-read after the "
+                               "defect that ate it")
+    finally:
+        B.HOSTS.clear(); B.HOSTS.update(real_hosts3)
+        B.install_into = real_install3
+
     print(f"\n{'BENCHMARK: CONFORMANT' if not fails else f'BENCHMARK: NON-CONFORMANT ({fails})'}")
     return 0 if not fails else 1
 
