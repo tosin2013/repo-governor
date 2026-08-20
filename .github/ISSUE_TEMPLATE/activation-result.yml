@@ -52,6 +52,25 @@ body:
         - label: I did not correct the agent mid-run — a miss is the finding
         - label: One prompt per session (batching measures persistence, not activation)
         - label: The target repository says nothing about governance in AGENTS.md/CLAUDE.md/README
+        - label: No hook was installed — a hook DELIVERS governance, so a hooked run measures whether the agent obeyed what it was told, not whether it decided to ask
+
+  - type: dropdown
+    id: instrument
+    attributes:
+      label: Which instrument did you run?
+      description: |
+        There are two, and they are not comparable. `tools/selftest.py` runs four
+        prompts, one of them a control, and its first prompt is parameterized to a
+        real admitted-but-unassigned issue in your repository. The protocol runs
+        twenty per arm with fixed wording. A 3/3 and a 3/20 are different
+        measurements and pooling them produces a rate that is not one.
+      options:
+        - "tools/selftest.py — the four-prompt self-test"
+        - "Protocol Arm A — 20 prompts, target un-onboarded"
+        - "Protocol Arm B — 20 prompts, target bound"
+        - "Something else — describe it under Anything notable"
+    validations:
+      required: true
 
   - type: input
     id: rate

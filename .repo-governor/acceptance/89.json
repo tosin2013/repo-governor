@@ -1,0 +1,9 @@
+{
+  "$comment": "Acceptance criteria for issue 89. WHAT THIS CANNOT EXPRESS: whether a reporter picks the right instrument. A required field makes the answer present; it cannot make it true. What it does prevent is the current state, where the question is not asked at all and two different measurements pool into one number.",
+  "authority_id": "89",
+  "criteria": [
+    {"check": "command_exit", "target": "./tools/run-conformance.sh skill"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh onboarding"},
+    {"check": "command_exit", "target": "python3 tools/selftest.py ."}
+  ]
+}
