@@ -251,6 +251,12 @@ def main():
             rep.add("proposal-e2e", "onboard-interactive writes a proposal", made_proposal,
                     r.stderr[:120])
             if prop.exists():
+                # The tool prints TWO steps: create the store, then rename. The
+                # store is created explicitly rather than by the tool -- same
+                # pattern as bootstrap-decisions.sh for Dolt, whose probe also
+                # requires the database to exist. Skipping it here would test a
+                # path the tool does not tell anyone to take.
+                (tgt / ".repo-governor" / "decisions").mkdir(parents=True, exist_ok=True)
                 prop.rename(tgt / ".repo-governor.json")
                 r = _sp.run([sys.executable, str(ROOT_ / "engine" / "manifest.py"), "--validate"],
                             capture_output=True, text=True, cwd=str(tgt))
@@ -258,15 +264,53 @@ def main():
                                "READY_FOR_GOVERNANCE" in r.stdout,
                                r.stdout.strip()[:160])
                 m = json.loads((tgt / ".repo-governor.json").read_text())
+                # Issue 56 shipped a zero-dependency decision store and nothing
+                # proposed it, so CAPTURE_ONLY -- the default disposition --
+                # still had nowhere to record on the path a user actually
+                # takes. The adapter passing Layer 1 proved nothing about that.
+                _dh = m["providers"].get("decision_history")
+                rep.add("proposal-e2e", "the proposal binds decision_history",
+                        bool(_dh),
+                        "without it CAPTURE_ONLY has nowhere to record, which is the "
+                        "state adapters/decision-history-file was built to end")
+                rep.add("proposal-e2e", "bound to the backend that needs no binary",
+                        bool(_dh) and "decision-history-file" in json.dumps(_dh),
+                        "a default that requires dolt on PATH is not a default")
+                rep.add("proposal-e2e", "and as a list, since the role is multi-valued",
+                        isinstance(_dh, list),
+                        "ADR-013: a second backend may bind alongside")
+                _w = (m.get("permissions") or {}).get("decision_history", {})
+                rep.add("proposal-e2e", "decision_history is the only write granted",
+                        _w.get("write") is True
+                        and not any(v.get("write") for k, v in m["permissions"].items()
+                                    if isinstance(v, dict) and k != "decision_history"),
+                        "recording a capture needs it; nothing else does, and a broader "
+                        "grant would be an escalation buried in generated JSON")
+                rep.add("proposal-e2e", "the write grant is explained where a reviewer meets it",
+                        "write=true" in json.dumps(m["permissions"].get("$comment", "")),
+                        "the schema closes `permission` to a verb set, so the reason "
+                        "cannot sit beside the entry and must lead the block")
+
                 rep.add("proposal-e2e", "it declares an admission signal (ADR-018)",
                                bool(m["providers"]["roadmap_authority"].get("admission", {}).get("signal")))
                 perms = m.get("permissions") or {}
                 rep.add("proposal-e2e", "it declares a permissions block at all",
                                bool(perms),
                                "manifest.py rejects a manifest without one")
-                rep.add("proposal-e2e", "it grants no write anywhere (ADR-005 deny by default)",
-                               not any(v.get("write") for v in perms.values()
-                                       if isinstance(v, dict)))
+                # Was "no write anywhere", written when the proposal bound no
+                # role that needs one. decision_history does: CAPTURE_ONLY
+                # cannot record without it (issue 94). Narrowed rather than
+                # dropped, and narrowed in the strict direction -- the concern
+                # was never write itself but an UNEXPLAINED escalation in
+                # generated JSON, so this asserts the grant is confined to one
+                # role and the checks above assert it is explained.
+                stray = [k for k, v in perms.items()
+                         if isinstance(v, dict) and v.get("write") and k != "decision_history"]
+                rep.add("proposal-e2e",
+                        "no write is granted outside decision_history (ADR-005)",
+                        not stray,
+                        f"{stray} -- a proposal that grants write asks a reviewer to "
+                        "notice an escalation buried in generated JSON")
                 # Two checks, because the generator emitted admission.signal --
                 # which the adapter ignores -- and no env block at all,
                 # producing a manifest that validated as READY_FOR_GOVERNANCE

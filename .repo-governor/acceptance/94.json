@@ -1,0 +1,8 @@
+{
+  "$comment": "Acceptance criteria for issue 94. WHAT THESE CANNOT EXPRESS: that the L4 note is worded usefully. A command_exit sees the exit code, not whether an operator acts on a capability-framed suggestion. The conformance check asserts the note appears and changes no binding; whether it helps is a human read.",
+  "authority_id": "94",
+  "criteria": [
+    {"check": "command_exit", "target": "./tools/run-conformance.sh onboarding"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh hooks"}
+  ]
+}
