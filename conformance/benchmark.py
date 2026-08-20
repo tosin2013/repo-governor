@@ -167,12 +167,13 @@ def main():
         real_run = B.run_once
         B.run_once = lambda *a, **k: ({"raw": raw, "stderr": "",
                                        "workdir": "/t", "argv": []}, None)
-        buf = io.StringIO()
+        buf, ebuf = io.StringIO(), io.StringIO()
         try:
-            with contextlib.redirect_stdout(buf):
+            with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(ebuf):
                 rc = B.main(list(argv))
         finally:
             B.run_once = real_run
+        run_main.stderr = ebuf.getvalue()
         try:
             return rc, json.loads(buf.getvalue())
         except json.JSONDecodeError:
@@ -276,7 +277,7 @@ def main():
     def stub_measure(grades):
         """grades: id -> (grade, warnings). Never spawns anything."""
         it = iter(grades)
-        def _m(host, target, prompt, model=None, control=False):
+        def _m(host, target, prompt, model=None, control=False, debug=False):
             g, ws = next(it)
             if g == "ERROR":
                 return None, "host is not on PATH"
@@ -341,6 +342,126 @@ def main():
                            "all to one timeout is a real cost")
         finally:
             B.measure, B.CALIB = real_measure, real_calib
+
+    print("\nSetup that failed is not a measurement that failed\n")
+    # Issue 107. install_into's exit status used to be discarded, so a failed
+    # install produced VOID -- "the host did not list repo-governor" -- and
+    # sent the operator to look at the skill. The cause was an install that
+    # never happened. Same misattribution issue 104 was about, one function
+    # away from the fix.
+    # install_into itself, driven against a real installer script that fails.
+    # Stubbing install_into -- which the check below does, deliberately, to
+    # test the plumbing -- leaves its OWN return-code test unexercised, and a
+    # mutation reverting that test to `if False` survived until this existed.
+    real_skill = B.SKILL
+    try:
+        with _tf2.TemporaryDirectory() as td:
+            fake_skill = Path(td); (fake_skill / "tools").mkdir()
+            script = fake_skill / "tools" / "install-skill.sh"
+            spec = {"skills_dir": ".claude/skills", "installer_host": "claude"}
+            B.SKILL = fake_skill
+
+            script.write_text("#!/bin/sh\necho 'clone refused' >&2\nexit 1\n")
+            ok, detail = B.install_into(Path(td), spec)
+            fails += check("a non-zero installer is a failed install",
+                           ok is False and "clone refused" in detail,
+                           f"got ok={ok} detail={detail!r}")
+
+            script.write_text("#!/bin/sh\nexit 0\n")
+            ok, _ = B.install_into(Path(td), spec)
+            fails += check("a clean installer is a successful install", ok is True,
+                           "otherwise the check above passes however the code behaves")
+    finally:
+        B.SKILL = real_skill
+
+    real_install = B.install_into
+    try:
+        B.install_into = lambda dst, spec: (False, "clone refused")
+        with _tf2.TemporaryDirectory() as td:
+            fake_target = Path(td) / "repo"
+            (fake_target / "src").mkdir(parents=True)
+            (fake_target / "src" / "a.py").write_text("x = 1\n")
+            _tmp, _dst, err = B.prepare(fake_target, "claude")
+            fails += check("a failed install is reported, not swallowed",
+                           err is not None and "clone refused" in err,
+                           f"got {err!r}")
+    finally:
+        B.install_into = real_install
+
+    # run_once's own mapping of a setup failure to an error. The main() check
+    # below stubs run_once, so it never reaches this line; a mutation making
+    # run_once return a fake success on a prepare error survived until here.
+    real_prep = B.prepare
+    real_hosts0 = dict(B.HOSTS)
+    try:
+        B.HOSTS["_echo"] = {"cmd": "echo", "argv": ["{prompt}"],
+                            "model_flag": "--model", "skills_dir": ".claude/skills",
+                            "installer_host": "claude"}
+        B.prepare = lambda target, host, debug=False: (Path("/t"), Path("/t/r"),
+                                                       "the skill did not install: boom")
+        res, err = B.run_once("_echo", "/t", "p")
+        fails += check("run_once refuses to proceed past a failed setup",
+                       res is None and err and "boom" in err,
+                       f"got res={res!r} err={err!r}; proceeding would spawn the "
+                       "host into a copy with no skill in it and grade the result")
+    finally:
+        B.prepare = real_prep
+        B.HOSTS.clear(); B.HOSTS.update(real_hosts0)
+
+    real_run2 = B.run_once
+    try:
+        B.run_once = lambda *a, **k: (None, "the skill did not install: clone refused")
+        import contextlib as _cl
+        import io as _io
+        _b, _e = _io.StringIO(), _io.StringIO()
+        with _cl.redirect_stdout(_b), _cl.redirect_stderr(_e):
+            rc = B.main(["--host", "claude", "--target", ".", "--prompt", "p"])
+        fails += check("...and exits as a RUN ERROR, not as a void measurement",
+                       rc == getattr(B, "EXIT_ERROR", None),
+                       f"got {rc}; VOID would say the session measured nothing, "
+                       "when it never got as far as a session")
+    finally:
+        B.run_once = real_run2
+
+    # The streaming branch is the risky new code -- a watchdog thread and a
+    # blocking pipe iteration -- and stubbing run_once skips all of it. Drive
+    # it with a trivial host so it is exercised without needing a real CLI.
+    real_hosts = dict(B.HOSTS)
+    real_install2 = B.install_into
+    try:
+        B.HOSTS["_echo"] = {"cmd": "echo", "argv": ["{prompt}"],
+                            "model_flag": "--model", "skills_dir": ".claude/skills",
+                            "installer_host": "claude"}
+        B.install_into = lambda dst, spec: (True, "")
+        with _tf2.TemporaryDirectory() as td:
+            tgt = Path(td) / "repo"; tgt.mkdir()
+            (tgt / "f.txt").write_text("hi\n")
+            import contextlib as _cl2, io as _io2
+            _e2 = _io2.StringIO()
+            with _cl2.redirect_stderr(_e2):
+                res, err = B.run_once("_echo", tgt, "hello-stream", debug=True)
+            fails += check("the streaming path returns the transcript it streamed",
+                           err is None and res and "hello-stream" in res["raw"],
+                           f"err={err!r}")
+            fails += check("...and streamed it to stderr as it arrived",
+                           "|" in _e2.getvalue(),
+                           "the branch that only runs under --debug is the branch "
+                           "no other check reaches")
+    finally:
+        B.HOSTS.clear(); B.HOSTS.update(real_hosts)
+        B.install_into = real_install2
+
+    print("\nProgress goes to stderr; stdout stays a JSON record\n")
+    rc, out = run_main(transcript(ENGINE),
+                       argv=("--host", "claude", "--target", ".",
+                             "--prompt", "p", "--debug"))
+    fails += check("--debug leaves stdout parseable", out.get("grade") == "FULL",
+                   "a caller piping this into jq must not have to filter "
+                   "progress chatter out of it")
+    fails += check("...and the progress actually went somewhere",
+                   "s]" in getattr(run_main, "stderr", ""),
+                   "a debug flag that prints nothing is worse than none, because "
+                   "it answers 'is it hung?' with silence")
 
     print(f"\n{'BENCHMARK: CONFORMANT' if not fails else f'BENCHMARK: NON-CONFORMANT ({fails})'}")
     return 0 if not fails else 1

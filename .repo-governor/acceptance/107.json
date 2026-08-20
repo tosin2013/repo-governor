@@ -1,0 +1,9 @@
+{
+  "$comment": "Acceptance criteria for issue 107, declared before the work and CHECKED RED at declaration rather than assumed -- criterion 1 fails today because argparse rejects an unknown --debug, which was verified by running it, not by reasoning about it. Issue 104's bar read STOP_COMPLETE the moment it was written; that is the mistake this ordering exists to avoid. WHAT THESE CANNOT EXPRESS: that the output is legible to a human mid-run. A machine can check that stage markers go to stderr and that stdout stays parseable JSON; whether an operator watching a twenty-three-session arm can tell working from hung is a judgement, and the honest test for it is the operator who filed this issue running it again.",
+  "authority_id": "107",
+  "criteria": [
+    {"check": "command_exit", "target": "python3 tools/benchmark.py --host claude --suite docs/research/prompts/arm-a.json --dry-run --debug"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh benchmark"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh"}
+  ]
+}

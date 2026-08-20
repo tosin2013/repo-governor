@@ -54,6 +54,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 from pathlib import Path
 
 # Exit codes. A caller has to be able to tell "measured, here is the grade"
@@ -66,6 +68,28 @@ EXIT_OK = 0
 EXIT_ERROR = 1
 EXIT_USAGE = 2
 EXIT_VOID = 3
+
+_T0 = time.monotonic()
+
+
+def dbg(on, msg):
+    """Progress, to STDERR. Never stdout -- stdout is the JSON record, and a
+    caller that pipes it into jq must not have to filter our chatter out."""
+    if on:
+        print(f"[{time.monotonic() - _T0:7.1f}s] {msg}", file=sys.stderr, flush=True)
+
+
+def _event_line(line):
+    """One streamed transcript event, compressed to something readable."""
+    try:
+        e = json.loads(line)
+    except json.JSONDecodeError:
+        return line.rstrip()[:120]
+    sub = e.get("subtype") or e.get("type") or "?"
+    names = [b.get("name") for b in ((e.get("message") or {}).get("content") or [])
+             if isinstance(b, dict) and b.get("type") == "tool_use"]
+    return f"{sub}" + (f"  tool_use: {', '.join(n for n in names if n)}" if names else "")
+
 
 SKILL = Path(__file__).resolve().parent.parent
 CALIB = SKILL / "docs" / "research" / "calibration"
@@ -224,49 +248,111 @@ def rate_reportable(host):
     return bool(c and c.get("agree") is True)
 
 
-def prepare(target, host):
-    """A fresh single-root copy, skill installed, no hook, un-onboarded."""
+def install_into(dst, spec):
+    """Install the skill into a prepared copy. Returns (ok, detail).
+
+    Its exit status used to be discarded. A failed install then produced a
+    VOID verdict reading "the host did not list repo-governor", which sends an
+    operator to look at the skill when the cause was an install that never
+    happened -- the exact misattribution issue 104 added the UNVERIFIED
+    distinction to prevent, surviving one function away from the fix.
+    """
+    p = subprocess.run(["bash", str(SKILL / "tools" / "install-skill.sh"),
+                        str(dst), spec["skills_dir"], "no", spec["installer_host"]],
+                       capture_output=True, text=True,
+                       stdin=subprocess.DEVNULL, timeout=300)
+    if p.returncode != 0:
+        return False, ((p.stderr or p.stdout or "").strip() or
+                       f"exit {p.returncode}, no output")[-800:]
+    return True, ""
+
+
+def prepare(target, host, debug=False):
+    """A fresh single-root copy, skill installed, no hook, un-onboarded.
+
+    Returns (tmp, dst, error). The copy is wholesale and can take minutes on a
+    target carrying node_modules, with nothing on screen -- which is most of
+    why issue 107 was filed. It cannot be narrowed: the agent has to see the
+    same repository, so an ignore list would change what is measured.
+    """
     tmp = Path(tempfile.mkdtemp(prefix="rg-bench-"))
     dst = tmp / Path(target).name
+    dbg(debug, f"copying {target} -> {dst}")
+    dbg(debug, "  (wholesale, including any node_modules; this is the slow part)")
+    t = time.monotonic()
     shutil.copytree(target, dst, symlinks=True,
                     ignore=shutil.ignore_patterns(".repo-governor.json"))
+    dbg(debug, f"copied in {time.monotonic() - t:.1f}s")
     spec = HOSTS[host]
     for stale in (dst / spec["skills_dir"] / "repo-governor",):
         if stale.exists():
             shutil.rmtree(stale)
-    subprocess.run(["bash", str(SKILL / "tools" / "install-skill.sh"),
-                    str(dst), spec["skills_dir"], "no", spec["installer_host"]],
-                   capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=300)
-    return tmp, dst
+    ok, detail = install_into(dst, spec)
+    if not ok:
+        return tmp, dst, f"the skill did not install: {detail}"
+    dbg(debug, f"installed into {spec['skills_dir']}")
+    return tmp, dst, None
 
 
-def run_once(host, target, prompt, model=None, timeout=900):
+def run_once(host, target, prompt, model=None, timeout=900, debug=False):
     spec = HOSTS[host]
     if not shutil.which(spec["cmd"]):
         return None, f"{spec['cmd']} is not on PATH"
-    tmp, dst = prepare(target, host)
+    tmp, dst, err = prepare(target, host, debug)
+    if err:
+        # A setup failure is a RUN ERROR, not a void measurement. It did not
+        # fail to measure; it failed to get as far as measuring, and the two
+        # send an operator to different places.
+        return None, err
+    argv = [spec["cmd"]] + [a.replace("{prompt}", prompt) for a in spec["argv"]]
+    if model:
+        argv += [spec["model_flag"], model]
+    dbg(debug, f"workdir {dst}")
+    dbg(debug, "exec " + " ".join(argv))
     try:
-        argv = [spec["cmd"]] + [a.replace("{prompt}", prompt) for a in spec["argv"]]
-        if model:
-            argv += [spec["model_flag"], model]
-        p = subprocess.run(argv, capture_output=True, text=True, cwd=str(dst),
-                           stdin=subprocess.DEVNULL, timeout=timeout)
-        return {"raw": p.stdout, "stderr": p.stderr[-2000:], "workdir": str(dst),
+        if not debug:
+            p = subprocess.run(argv, capture_output=True, text=True, cwd=str(dst),
+                               stdin=subprocess.DEVNULL, timeout=timeout)
+            out, errtxt = p.stdout, p.stderr
+        else:
+            # Stream while accumulating, so a long session is legible in
+            # flight. The timer is not decoration: iterating a pipe blocks,
+            # so without it a host that emits nothing would hang past the
+            # timeout that subprocess.run would have enforced.
+            proc = subprocess.Popen(argv, stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE, text=True,
+                                    cwd=str(dst), stdin=subprocess.DEVNULL)
+            killed = []
+            watchdog = threading.Timer(timeout, lambda: (killed.append(True),
+                                                         proc.kill()))
+            watchdog.start()
+            try:
+                lines = []
+                for line in proc.stdout:
+                    lines.append(line)
+                    dbg(True, "  | " + _event_line(line))
+                proc.wait()
+                errtxt = proc.stderr.read()
+            finally:
+                watchdog.cancel()
+            if killed:
+                raise subprocess.TimeoutExpired(argv, timeout)
+            out = "".join(lines)
+        dbg(debug, f"host exited; {len(out.splitlines())} transcript lines")
+        return {"raw": out, "stderr": errtxt[-2000:], "workdir": str(dst),
                 "argv": argv}, None
     except subprocess.TimeoutExpired:
         return None, f"timed out after {timeout}s"
-    finally:
-        pass  # the tree is left for inspection; the caller reports its path
 
 
-def measure(host, target, prompt, model=None, control=False):
+def measure(host, target, prompt, model=None, control=False, debug=False):
     """One prompt, one fresh session, one record. Returns (record, error).
 
     Extracted from main() for issue 105: a suite is this, twenty-three times.
     Keeping it in main() would have meant a second copy of the void rules, and
     a second copy is how the batch path quietly stops honouring them.
     """
-    res, err = run_once(host, target, prompt, model)
+    res, err = run_once(host, target, prompt, model, debug=debug)
     if err:
         return None, err
     obs = observe(res["raw"])
@@ -358,7 +444,7 @@ def suite_plan(doc, host, target, path):
     }
 
 
-def run_suite(host, target, doc, path, out_dir=None, model=None):
+def run_suite(host, target, doc, path, out_dir=None, model=None, debug=False):
     """Every prompt, each in its own session. Returns (summary, exit_code).
 
     Records stream to disk as they complete when --out is given. Twenty-three
@@ -368,8 +454,11 @@ def run_suite(host, target, doc, path, out_dir=None, model=None):
     if out_dir:
         Path(out_dir).mkdir(parents=True, exist_ok=True)
     records, errors = [], []
-    for pr in doc["prompts"]:
-        rec, err = measure(host, target, pr["text"], model, bool(pr.get("control")))
+    for n, pr in enumerate(doc["prompts"], 1):
+        dbg(debug, f"--- prompt {pr['id']} ({n}/{len(doc['prompts'])}): "
+                   f"{pr['text'][:60]}")
+        rec, err = measure(host, target, pr["text"], model,
+                           bool(pr.get("control")), debug=debug)
         if err:
             errors.append({"id": pr["id"], "error": err})
             print(f"  {pr['id']:<4} ERROR   {err}", file=sys.stderr)
@@ -438,6 +527,8 @@ def main(argv):
     ap.add_argument("--dry-run", action="store_true",
                     help="with --suite: validate and print the plan, spawn nothing")
     ap.add_argument("--out", help="with --suite: directory to write one record per prompt")
+    ap.add_argument("--debug", action="store_true",
+                    help="progress and the live transcript, to stderr; stdout stays JSON")
     a = ap.parse_args(argv)
 
     if a.suite:
@@ -448,6 +539,7 @@ def main(argv):
         if err:
             print(json.dumps({"error": err}, indent=2))
             return EXIT_USAGE
+        dbg(a.debug, f"suite {a.suite}: {len(doc['prompts'])} prompts")
         if a.dry_run:
             print(json.dumps(suite_plan(doc, a.host, a.target, a.suite),
                              indent=2, sort_keys=True))
@@ -455,7 +547,8 @@ def main(argv):
         if not a.target:
             print(json.dumps({"error": "--suite needs --target"}, indent=2))
             return EXIT_USAGE
-        summary, code = run_suite(a.host, a.target, doc, a.suite, a.out, a.model)
+        summary, code = run_suite(a.host, a.target, doc, a.suite, a.out,
+                                  a.model, a.debug)
         print(json.dumps(summary, indent=2, sort_keys=True))
         return code
 
@@ -477,7 +570,15 @@ def main(argv):
         print(f"unknown host {a.host!r}: {list(HOSTS)}", file=sys.stderr)
         return EXIT_USAGE
 
-    out, err = measure(a.host, a.target, a.prompt, a.model, a.control)
+    # Announced BEFORE the slow part, not from inside it. The first thing this
+    # does is copy the target wholesale, which on a large repository is minutes
+    # of silence -- so a debug flag whose output only begins once that is
+    # finished answers "is it hung?" exactly when the question has stopped
+    # being asked.
+    dbg(a.debug, f"{a.host}: one prompt against {a.target}"
+                 + (f" (model {a.model})" if a.model else "")
+                 + (" [control]" if a.control else ""))
+    out, err = measure(a.host, a.target, a.prompt, a.model, a.control, a.debug)
     if err:
         print(json.dumps({"error": err}, indent=2))
         return EXIT_ERROR
@@ -494,6 +595,8 @@ def main(argv):
                      "field for."),
             "record_at": str(CALIB / f"{a.host}.json"),
         }
+    dbg(a.debug, f"grade {out['grade']}"
+                 + (f" -- VOID: {out['warnings'][0][:70]}" if out["warnings"] else ""))
     print(json.dumps(out, indent=2, sort_keys=True))
     return EXIT_VOID if out["warnings"] else EXIT_OK
 
