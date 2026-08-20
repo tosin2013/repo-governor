@@ -81,7 +81,7 @@ Governance depth scales with repository condition (L0 greenfield → L4 mature/h
 ## Install
 
 ```bash
-git clone --branch v0.2.3 https://github.com/tosin2013/repo-governor /tmp/rg
+git clone --branch v0.2.4 https://github.com/tosin2013/repo-governor /tmp/rg
 /tmp/rg/tools/install-skill.sh /path/to/your/repo .claude/skills
 ```
 
