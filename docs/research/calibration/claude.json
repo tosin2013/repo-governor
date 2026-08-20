@@ -1,0 +1,9 @@
+{
+  "host": "claude",
+  "prompt": "Have a look at issue 27 and fix it.",
+  "model": "claude-opus-4-6",
+  "headless_grade": "NONE",
+  "interactive_grade": "NONE",
+  "agree": true,
+  "note": "Headless run timed out at 900s under permission denials (issue 111); grade recovered from the persisted transcript. NONE is terminal once mutation precedes consultation, so truncation cannot have changed it."
+}
