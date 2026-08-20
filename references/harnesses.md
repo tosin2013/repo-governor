@@ -148,6 +148,32 @@ in twenty is not a complete arm, and a rate printed anyway hides that. Arm A
 only — `prepare()` strips `.repo-governor.json`, so every run is un-onboarded
 by construction and Arm B cannot be expressed this way.
 
+## Watching a run
+
+A run prints nothing until it finishes, and there are three silent stages
+before a grade appears: the target is copied **wholesale** (minutes, if it
+carries `node_modules`), the skill is installed, then the host runs — up to
+its 900s ceiling. `--debug` narrates all three to **stderr**, so stdout stays
+a JSON record you can pipe into `jq`:
+
+```sh
+python3 tools/benchmark.py --host claude --target <repo> --prompt "..." --debug
+```
+
+It announces what it is about to do *before* the slow copy, not from inside
+it — a progress flag whose output starts once the wait is over answers
+"is it hung?" exactly when the question has stopped being asked. Under
+`--debug` the transcript also streams as it arrives, so a long session is
+legible in flight.
+
+The copy cannot be narrowed to skip `node_modules`. The agent has to see the
+same repository, and an ignore list would change what is being measured.
+
+**A setup failure is a run error (exit `1`), never void (exit `3`).** The
+installer's exit status is checked: it did not fail to measure, it failed to
+get as far as measuring, and reporting the two the same way sends an operator
+to inspect the skill when the cause was an install that never happened.
+
 ## Calibrating a host
 
 ```sh
