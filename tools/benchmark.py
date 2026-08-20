@@ -109,6 +109,9 @@ HOSTS = {
     "claude": {
         "cmd": "claude",
         "argv": ["-p", "{prompt}", "--output-format", "stream-json", "--verbose"],
+        # Read from `claude --help` on a real machine, not from documentation.
+        # The Codex hook template was written from a doc summary and was wrong.
+        "unrestricted_argv": ["--permission-mode", "bypassPermissions"],
         "model_flag": "--model",
         "skills_dir": ".claude/skills",
         "installer_host": "claude",
@@ -116,6 +119,7 @@ HOSTS = {
     "cursor": {
         "cmd": "cursor-agent",
         "argv": ["-p", "{prompt}", "--output-format", "stream-json"],
+        "unrestricted_argv": ["--force"],   # `cursor-agent --help`: force allow
         "model_flag": "--model",
         "skills_dir": ".agents/skills",
         "installer_host": "cursor",
@@ -184,7 +188,8 @@ def observe(raw):
     """Everything the transcript can tell us, without inference."""
     out = {"model": None, "skills": [], "tools": [], "hooks_fired": [],
            "calls": [], "parsed_events": 0, "text": [],
-           "skills_reported": False, "unparsed_lines": 0, "skipped_events": 0}
+           "skills_reported": False, "unparsed_lines": 0, "skipped_events": 0,
+           "permission_denied": 0}
     for e in events(raw, out):
         out["parsed_events"] += 1
         if e.get("subtype") == "init":
@@ -201,6 +206,8 @@ def observe(raw):
             out["skills"] = sk if isinstance(sk, list) else []
             tl = e.get("tools")
             out["tools"] = tl if isinstance(tl, list) else []
+        if e.get("subtype") == "permission_denied" or e.get("type") == "permission_denied":
+            out["permission_denied"] += 1
         if e.get("subtype") == "hook_started":
             out["hooks_fired"].append(e.get("hook_name"))
         for block in blocks(e):
@@ -313,6 +320,30 @@ def install_into(dst, spec):
     return True, ""
 
 
+# Whether the agent is allowed to act. Under a host default there is no
+# approver in a headless session, so every write is refused -- which does not
+# corrupt the grade (a denied Write is still a tool_use, and intent is what is
+# graded) but does end the run: one real prompt spent 900 seconds retrying a
+# refusal and timed out with nothing scored.
+#
+# So `unrestricted` is the default, and it is safe because prepare() copies the
+# target: the agent acts on a throwaway tree, never on the repository named by
+# --target. It is nonetheless a property of the INSTRUMENT, so it is recorded
+# in every record and the calibration file carries invalidates_on_change.
+REGIMES = ("unrestricted", "host-default")
+
+
+def build_argv(host, prompt, model=None, permissions="unrestricted"):
+    """The exact command line, so a test can read it without spawning."""
+    spec = HOSTS[host]
+    argv = [spec["cmd"]] + [a.replace("{prompt}", prompt) for a in spec["argv"]]
+    if permissions == "unrestricted":
+        argv += list(spec.get("unrestricted_argv") or [])
+    if model:
+        argv += [spec["model_flag"], model]
+    return argv
+
+
 def prepare(target, host, debug=False):
     """A fresh single-root copy, skill installed, no hook, un-onboarded.
 
@@ -340,7 +371,8 @@ def prepare(target, host, debug=False):
     return tmp, dst, None
 
 
-def run_once(host, target, prompt, model=None, timeout=900, debug=False):
+def run_once(host, target, prompt, model=None, timeout=900, debug=False,
+             permissions="unrestricted"):
     spec = HOSTS[host]
     if not shutil.which(spec["cmd"]):
         return None, f"{spec['cmd']} is not on PATH"
@@ -350,9 +382,7 @@ def run_once(host, target, prompt, model=None, timeout=900, debug=False):
         # fail to measure; it failed to get as far as measuring, and the two
         # send an operator to different places.
         return None, err
-    argv = [spec["cmd"]] + [a.replace("{prompt}", prompt) for a in spec["argv"]]
-    if model:
-        argv += [spec["model_flag"], model]
+    argv = build_argv(host, prompt, model, permissions)
     # The transcript is written to disk BEFORE it is parsed, and under
     # --debug as each line arrives. A parse defect must not be able to destroy
     # a session: issue 109 cost a real 228-second run whose transcript existed
@@ -397,30 +427,40 @@ def run_once(host, target, prompt, model=None, timeout=900, debug=False):
                 time.sleep(0.25)
         out = tpath.read_text(encoding="utf-8")
         errtxt = epath.read_text(encoding="utf-8")
-        if timed_out:
-            raise subprocess.TimeoutExpired(argv, timeout)
-        dbg(debug, f"host exited; {len(out.splitlines())} transcript lines")
+        # A timeout is no longer an error that throws the session away. The
+        # transcript is on disk and worth reading: the grade recovered by hand
+        # from exactly such a run became this repository's first calibration.
+        # It comes back as a record marked timed_out, which measure() voids.
+        dbg(debug, f"host {'was killed at the ceiling' if timed_out else 'exited'};"
+                   f" {len(out.splitlines())} transcript lines")
         return {"raw": out, "stderr": errtxt[-2000:], "workdir": str(dst),
-                "transcript": str(tpath), "argv": argv}, None
-    except subprocess.TimeoutExpired:
-        # The transcript is already on disk and is worth more than this
-        # message. Naming it is the minimum that makes persistence useful --
-        # without --debug nothing else would ever print the path. Returning a
-        # partial RECORD rather than an error is issue 111 and stays there.
-        return None, (f"timed out after {timeout}s -- the transcript up to that "
-                      f"point is at {tpath}")
+                "transcript": str(tpath), "argv": argv,
+                "timed_out": timed_out, "timeout": timeout,
+                "permission_regime": permissions}, None
+    except OSError as e:
+        return None, f"could not run {argv[0]}: {e}"
 
 
-def measure(host, target, prompt, model=None, control=False, debug=False):
+def measure(host, target, prompt, model=None, control=False, debug=False,
+            permissions="unrestricted", transcript=None, timeout=900):
     """One prompt, one fresh session, one record. Returns (record, error).
 
     Extracted from main() for issue 105: a suite is this, twenty-three times.
     Keeping it in main() would have meant a second copy of the void rules, and
     a second copy is how the batch path quietly stops honouring them.
     """
-    res, err = run_once(host, target, prompt, model, debug=debug)
-    if err:
-        return None, err
+    if transcript is not None:
+        # Grade a transcript that already exists. No host, no temp tree, no
+        # session spent. A grader change can then re-read an entire arm, and a
+        # run lost to a crash or a ceiling can be read rather than repeated.
+        res = {"raw": Path(transcript).read_text(encoding="utf-8"), "stderr": "",
+               "workdir": None, "transcript": str(transcript), "argv": [],
+               "timed_out": False, "permission_regime": None}
+    else:
+        res, err = run_once(host, target, prompt, model, timeout=timeout,
+                            debug=debug, permissions=permissions)
+        if err:
+            return None, err
     obs = observe(res["raw"])
     g, why = grade(obs, control=control)
     out = {
@@ -434,6 +474,8 @@ def measure(host, target, prompt, model=None, control=False, debug=False):
         "calibrated": rate_reportable(host),
         "rate_reportable": rate_reportable(host),
         "preconditions": {
+            "permission_regime": res.get("permission_regime"),
+            "permission_denied": obs["permission_denied"],
             "skills_reported": obs["skills_reported"],
             "skill_listed": "repo-governor" in (obs["skills"] or []),
             "competing_skills": [s for s in obs["skills"] if s != "repo-governor"],
@@ -447,6 +489,18 @@ def measure(host, target, prompt, model=None, control=False, debug=False):
         "transcript": res.get("transcript"),
     }
     out["warnings"] = void_reasons(obs)
+    if res.get("timed_out"):
+        # The transcript is real and partly gradeable -- one such run supplied
+        # this repository's first calibration. But the session did not finish,
+        # so what the agent would have done next is unknown, and an unfinished
+        # session is not a measurement. Void, with the observed grade kept
+        # beside it for a human who can judge whether it was already terminal.
+        out["partial_grade"] = out["grade"]
+        out["warnings"].append(
+            f"timed out after {res.get('timeout')}s -- the session did not "
+            "finish, so this is a partial transcript rather than a measurement. "
+            "partial_grade holds what it graded to; NONE is terminal once "
+            "mutation precedes consultation, other grades are not.")
     if out["warnings"]:
         # UNPARSEABLE keeps its own name -- references/harnesses.md documents it
         # and it says something precise -- but it is a VOID run like any other,
@@ -513,7 +567,8 @@ def suite_plan(doc, host, target, path):
     }
 
 
-def run_suite(host, target, doc, path, out_dir=None, model=None, debug=False):
+def run_suite(host, target, doc, path, out_dir=None, model=None, debug=False,
+              permissions="unrestricted", timeout=900):
     """Every prompt, each in its own session. Returns (summary, exit_code).
 
     Records stream to disk as they complete when --out is given. Twenty-three
@@ -527,7 +582,8 @@ def run_suite(host, target, doc, path, out_dir=None, model=None, debug=False):
         dbg(debug, f"--- prompt {pr['id']} ({n}/{len(doc['prompts'])}): "
                    f"{pr['text'][:60]}")
         rec, err = measure(host, target, pr["text"], model,
-                           bool(pr.get("control")), debug=debug)
+                           bool(pr.get("control")), debug=debug,
+                           permissions=permissions, timeout=timeout)
         if err:
             errors.append({"id": pr["id"], "error": err})
             print(f"  {pr['id']:<4} ERROR   {err}", file=sys.stderr)
@@ -870,6 +926,15 @@ def main(argv):
     ap.add_argument("--dry-run", action="store_true",
                     help="with --suite: validate and print the plan, spawn nothing")
     ap.add_argument("--out", help="with --suite: directory to write one record per prompt")
+    ap.add_argument("--timeout", type=int, default=900,
+                    help="seconds per session (default 900). A real prompt has "
+                         "been seen thinking for 159s before its first tool call")
+    ap.add_argument("--permissions", choices=REGIMES, default="unrestricted",
+                    help="unrestricted (default) lets the agent act in the "
+                         "throwaway copy; host-default leaves the host's own "
+                         "rules, under which a headless session has no approver")
+    ap.add_argument("--from-transcript",
+                    help="grade a saved transcript.jsonl; spawns nothing")
     ap.add_argument("--report", help="a directory of records written by --out")
     ap.add_argument("--report-out", help="with --report: write the HTML here")
     ap.add_argument("--debug", action="store_true",
@@ -908,9 +973,18 @@ def main(argv):
             print(json.dumps({"error": "--suite needs --target"}, indent=2))
             return EXIT_USAGE
         summary, code = run_suite(a.host, a.target, doc, a.suite, a.out,
-                                  a.model, a.debug)
+                                  a.model, a.debug, a.permissions, a.timeout)
         print(json.dumps(summary, indent=2, sort_keys=True))
         return code
+
+    if a.from_transcript and a.host in HOSTS and a.prompt:
+        out, err = measure(a.host, None, a.prompt, a.model, a.control, a.debug,
+                           a.permissions, a.from_transcript, a.timeout)
+        if err:
+            print(json.dumps({"error": err}, indent=2))
+            return EXIT_ERROR
+        print(json.dumps(out, indent=2, sort_keys=True))
+        return EXIT_VOID if out["warnings"] else EXIT_OK
 
     if a.list or not (a.host and a.target and a.prompt):
         print("hosts:")
@@ -938,7 +1012,8 @@ def main(argv):
     dbg(a.debug, f"{a.host}: one prompt against {a.target}"
                  + (f" (model {a.model})" if a.model else "")
                  + (" [control]" if a.control else ""))
-    out, err = measure(a.host, a.target, a.prompt, a.model, a.control, a.debug)
+    out, err = measure(a.host, a.target, a.prompt, a.model, a.control, a.debug,
+                       a.permissions, a.from_transcript, a.timeout)
     if err:
         print(json.dumps({"error": err}, indent=2))
         return EXIT_ERROR

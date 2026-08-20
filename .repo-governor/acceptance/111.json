@@ -1,0 +1,9 @@
+{
+  "$comment": "Acceptance criteria for issue 111, declared before the work. Criterion 1 is red at declaration: build_argv does not exist, so the one-liner raises. SCOPE: items 1, 3, 4 and 5 of the issue -- the permission regime, a timeout that returns a partial record instead of discarding the session, --from-transcript, and observing permission_denied. Item 2 needed no work; it was a statement that grading survives denial, which the calibration already demonstrated. WHAT NO CRITERION CAN CHECK: whether granting permissions makes the instrument more like an interactive session or merely different. That is what re-calibration answers, and the regime change invalidates the record on file by its own invalidates_on_change flag. The bar cannot assert the answer, only that nothing silently inherits the old one.",
+  "authority_id": "111",
+  "criteria": [
+    {"check": "command_exit", "target": "python3 -c \"import sys;sys.path.insert(0,'tools');import benchmark as B;sys.exit(0 if '--permission-mode' in B.build_argv('claude','p') else 1)\""},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh benchmark"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh"}
+  ]
+}

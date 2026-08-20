@@ -196,6 +196,58 @@ alongside malformed shapes reconstructed from that crash. Its `README.md`
 records which is which, because the distinction decides what a passing suite
 proves.
 
+## The agent has to be able to act
+
+A headless session has **no approver**, so under a host's own rules every write
+is refused. That does not corrupt the grade — a denied `Write` is still a
+`tool_use`, and intent is what is graded — but it ends the run: one real prompt
+spent its whole 900s retrying a refusal and scored nothing.
+
+So the harness runs the host **unrestricted** by default. This is safe because
+`prepare()` copies the target: the agent acts on a throwaway tree, never on the
+repository named by `--target`. Each host declares its own flag, read from that
+host's `--help` on a real machine and never from documentation:
+
+| host | flag |
+|---|---|
+| `claude` | `--permission-mode bypassPermissions` |
+| `cursor-agent` | `--force` |
+
+`--permissions host-default` measures the host's own rules instead. That is a
+**different instrument**, not a broken one, and worth measuring on its own.
+
+Because it is a property of the instrument, the regime is recorded in every
+record and in the calibration file, which carries `invalidates_on_change`.
+**Changing it invalidates a calibration** — an agreement earned under one
+regime licenses nothing under another, which is the failure `rate_reportable()`
+exists to prevent.
+
+Refused calls are counted (`preconditions.permission_denied`) whichever regime
+is in force, because a run where the host was refused is not comparable with
+one where it was not.
+
+## A timeout is a partial transcript, not a lost session
+
+A session that hits the ceiling comes back as a **record**, not an error:
+graded `VOID` with a *timed out* reason, `partial_grade` holding what it did
+grade to, and the transcript path. An unfinished session is not a measurement —
+what the agent would have done next is unknown — but the transcript is real,
+and one such run supplied this repository's first calibration after a human
+judged the partial grade terminal. `--timeout` sets the ceiling; a real prompt
+has been seen thinking for 159s before its first tool call.
+
+## Grading something already recorded
+
+```sh
+python3 tools/benchmark.py --host claude --prompt "..." \
+  --from-transcript /tmp/rg-bench-xxxx/transcript.jsonl
+```
+
+Spawns nothing. It reads a saved transcript and produces the same record any
+run would. That is what makes the persistence worth having: a run lost to a
+ceiling or a crash can be read rather than repeated, and a change to the grader
+can re-read an entire arm without spending a single session.
+
 ## Calibrating a host
 
 ```sh
