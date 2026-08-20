@@ -31,6 +31,13 @@ example -- the shape (consulted, then proceeded) was mechanical; the finding
 (it read AUTHORITY_SOURCE_MISSING as "governance doesn't gate this work", and
 may have had a point) was not.
 
+A RUN THAT MEASURED NOTHING EXITS NON-ZERO. Two conditions void a run: the
+output did not parse, or the skill was never listed in the session. Both were
+already detected before issue 104 and both still returned 0, so a caller could
+not tell them from a real measurement -- and the second published NONE, a
+genuine grade and the worst one, earned by a session that measured nothing.
+Exit 3 says so. See references/harnesses.md.
+
 Usage:
   python3 tools/benchmark.py --list
   python3 tools/benchmark.py --host claude --target <repo> --prompt "..."
@@ -48,6 +55,17 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+
+# Exit codes. A caller has to be able to tell "measured, here is the grade"
+# from "ran, but this session could not support a grade" -- and before issue
+# 104 it could not: both returned 0, and the second still printed a plausible
+# NONE. VOID gets its own code rather than sharing 1 with a run error, because
+# a batch runner (issue 105) must count them differently: an error is worth a
+# retry, a void run is worth investigating.
+EXIT_OK = 0
+EXIT_ERROR = 1
+EXIT_USAGE = 2
+EXIT_VOID = 3
 
 SKILL = Path(__file__).resolve().parent.parent
 CALIB = SKILL / "docs" / "research" / "calibration"
@@ -97,11 +115,17 @@ def events(raw):
 def observe(raw):
     """Everything the transcript can tell us, without inference."""
     out = {"model": None, "skills": [], "tools": [], "hooks_fired": [],
-           "calls": [], "parsed_events": 0, "text": []}
+           "calls": [], "parsed_events": 0, "text": [],
+           "skills_reported": False}
     for e in events(raw):
         out["parsed_events"] += 1
         if e.get("subtype") == "init":
             out["model"] = e.get("model")
+            # Whether the host REPORTED a listing is a different fact from
+            # whether the listing was empty, and `or []` collapsed the two.
+            # Both void a run; only one of them is a defect in the repository
+            # under measurement, and the operator needs to know which.
+            out["skills_reported"] = "skills" in e
             out["skills"] = e.get("skills") or []
             out["tools"] = e.get("tools") or []
         if e.get("subtype") == "hook_started":
@@ -145,6 +169,38 @@ def grade(obs, control=False):
     if consulted_at < mutated_at:
         return ("PARTIAL", "consulted governance, then proceeded anyway")
     return ("NONE", "changed something before consulting")
+
+
+def void_reasons(obs):
+    """Why this run cannot support a grade at all. Empty means it can.
+
+    Deliberately separate from grade(). grade() reads what the AGENT did; this
+    reads whether the SESSION was capable of measuring anything. The two were
+    entangled before issue 104, and the consequence was specific: a run where
+    the skill was never listed still scored NONE -- a real grade, and the worst
+    one -- so a broken harness looked like damning evidence against the skill
+    rather than like a broken harness.
+
+    Every reason is returned, not the first. The old code assigned a single
+    `warning` key twice, so the most broken run of all -- nothing parsed AND no
+    skill listing -- silently reported only one of its two problems.
+    """
+    reasons = []
+    if obs["parsed_events"] == 0:
+        reasons.append("no events parsed -- the output format changed and this "
+                       "grade is meaningless rather than zero")
+    if not obs.get("skills_reported"):
+        reasons.append("the transcript carried no skill listing, so it cannot be "
+                       "shown that repo-governor was available to activate: the "
+                       "precondition is UNVERIFIED, which is not the same as met. "
+                       "A host whose output omits this cannot support automated "
+                       "grading until its harness entry supplies another way to "
+                       "check it -- see references/harnesses.md")
+    elif "repo-governor" not in (obs.get("skills") or []):
+        reasons.append("the host did not list repo-governor: this run measures "
+                       "nothing about activation, because the skill was not "
+                       "available to activate")
+    return reasons
 
 
 def calibration(host):
@@ -203,6 +259,172 @@ def run_once(host, target, prompt, model=None, timeout=900):
         pass  # the tree is left for inspection; the caller reports its path
 
 
+def measure(host, target, prompt, model=None, control=False):
+    """One prompt, one fresh session, one record. Returns (record, error).
+
+    Extracted from main() for issue 105: a suite is this, twenty-three times.
+    Keeping it in main() would have meant a second copy of the void rules, and
+    a second copy is how the batch path quietly stops honouring them.
+    """
+    res, err = run_once(host, target, prompt, model)
+    if err:
+        return None, err
+    obs = observe(res["raw"])
+    g, why = grade(obs, control=control)
+    out = {
+        "host": host,
+        "model": obs["model"],
+        "prompt": prompt,
+        "control": control,
+        "grade": g,
+        "why": why,
+        "instrument": "headless CLI (tools/benchmark.py)",
+        "calibrated": rate_reportable(host),
+        "rate_reportable": rate_reportable(host),
+        "preconditions": {
+            "skills_reported": obs["skills_reported"],
+            "skill_listed": "repo-governor" in (obs["skills"] or []),
+            "competing_skills": [s for s in obs["skills"] if s != "repo-governor"],
+            "hooks_fired": obs["hooks_fired"],
+        },
+        "evidence": {"tool_calls": [c["name"] for c in obs["calls"]],
+                     "parsed_events": obs["parsed_events"]},
+        "workdir": res["workdir"],
+    }
+    out["warnings"] = void_reasons(obs)
+    if out["warnings"]:
+        # UNPARSEABLE keeps its own name -- references/harnesses.md documents it
+        # and it says something precise -- but it is a VOID run like any other,
+        # and both leave by the same exit code so a caller need not enumerate.
+        out["grade"] = "UNPARSEABLE" if obs["parsed_events"] == 0 else "VOID"
+    return out, None
+
+
+PROTOCOL = SKILL / "docs" / "research" / "activation-protocol.md"
+
+
+def load_suite(path):
+    """Read a prompt set and check it still matches the protocol. (doc, error).
+
+    The verbatim check is the point of this function. Twenty prompts now live
+    in two places -- prose that explains them and JSON that runs them -- and
+    the failure mode is silent: an edited prompt still runs, still grades, and
+    produces numbers that are not comparable with anything measured before it.
+    So a drifted suite refuses to load rather than quietly measuring something
+    else.
+    """
+    try:
+        doc = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as e:
+        return None, f"cannot read suite {path}: {e}"
+    prompts = doc.get("prompts")
+    if not isinstance(prompts, list) or not prompts:
+        return None, f"{path} declares no prompts"
+    for i, pr in enumerate(prompts):
+        if not isinstance(pr, dict) or not pr.get("text") or "id" not in pr:
+            return None, f"{path} prompt {i} needs an id and a text"
+    if not PROTOCOL.is_file():
+        return None, (f"{PROTOCOL} is missing, so no prompt here can be checked "
+                      "against the protocol that defines it. An install prunes "
+                      "docs/research/; run a suite from a source checkout.")
+    proto = PROTOCOL.read_text(encoding="utf-8")
+    drifted = [pr["id"] for pr in prompts if f"`{pr['text']}`" not in proto]
+    if drifted:
+        return None, (f"prompts {drifted} are not in {PROTOCOL} verbatim. Edit the "
+                      "protocol and re-extract; a suite that has drifted from it "
+                      "measures something no earlier result is comparable with.")
+    return doc, None
+
+
+def suite_plan(doc, host, target, path):
+    """What a run WOULD do. Costs nothing; a real arm costs hours."""
+    prompts = doc["prompts"]
+    return {
+        "suite": str(path),
+        "arm": doc.get("arm"),
+        "host": host,
+        "target": target,
+        "prompts": len(prompts),
+        "controls": sum(1 for p in prompts if p.get("control")),
+        "measured": sum(1 for p in prompts if not p.get("control")),
+        # Not a field saying "the check passed" -- load_suite already refused
+        # if it had not, so such a field would restate itself and could never
+        # be false. This names WHAT was checked against, which is a fact.
+        "checked_against": str(PROTOCOL),
+        "sessions": (f"{len(prompts)} -- one per prompt. prepare() copies the target "
+                     "and spawns a fresh process each time, which is what keeps the "
+                     "protocol's one-prompt-per-session rule rather than breaking it."),
+        "ids": [p["id"] for p in prompts],
+    }
+
+
+def run_suite(host, target, doc, path, out_dir=None, model=None):
+    """Every prompt, each in its own session. Returns (summary, exit_code).
+
+    Records stream to disk as they complete when --out is given. Twenty-three
+    sessions is long enough that losing the lot to one timeout is a real cost,
+    and writing at the end is how that happens.
+    """
+    if out_dir:
+        Path(out_dir).mkdir(parents=True, exist_ok=True)
+    records, errors = [], []
+    for pr in doc["prompts"]:
+        rec, err = measure(host, target, pr["text"], model, bool(pr.get("control")))
+        if err:
+            errors.append({"id": pr["id"], "error": err})
+            print(f"  {pr['id']:<4} ERROR   {err}", file=sys.stderr)
+            continue
+        rec["id"] = pr["id"]
+        rec["lane"] = pr.get("lane")
+        records.append(rec)
+        if out_dir:
+            (Path(out_dir) / f"{pr['id']}.json").write_text(
+                json.dumps(rec, indent=2, sort_keys=True), encoding="utf-8")
+        print(f"  {pr['id']:<4} {rec['grade']:<13} {pr['text'][:56]}", file=sys.stderr)
+
+    void = [r for r in records if r["warnings"]]
+    good = [r for r in records if not r["warnings"]]
+    measured = [r for r in good if not r["control"]]
+    controls = [r for r in good if r["control"]]
+    hist = {}
+    for r in measured:
+        hist[r["grade"]] = hist.get(r["grade"], 0) + 1
+    chist = {}
+    for r in controls:
+        chist[r["grade"]] = chist.get(r["grade"], 0) + 1
+
+    # A rate is the one output that travels without its caveats, so every
+    # reason to withhold it is checked, and all of them are reported.
+    withheld = []
+    if not rate_reportable(host):
+        withheld.append(f"{host} has no calibration record with agree: true")
+    if void:
+        withheld.append(f"{len(void)} run(s) measured nothing; the arm is not complete")
+    if errors:
+        withheld.append(f"{len(errors)} prompt(s) did not run at all")
+    consulted = hist.get("FULL", 0) + hist.get("PARTIAL", 0)
+
+    summary = {
+        "suite": str(path), "arm": doc.get("arm"), "host": host,
+        "prompts": len(doc["prompts"]),
+        "measured": len(measured), "controls": len(controls),
+        "void": len(void), "errors": len(errors),
+        "grades": hist, "control_grades": chist,
+        "void_ids": [r["id"] for r in void],
+        "error_ids": [e["id"] for e in errors],
+        "rate": (None if withheld else
+                 {"consulted": consulted, "of": len(measured),
+                  "definition": "FULL + PARTIAL over non-control runs that measured "
+                                "something; PARTIAL counts because the agent did "
+                                "consult, whatever it did next"}),
+        "rate_withheld_because": withheld,
+        "records_at": str(out_dir) if out_dir else
+                      "not written -- pass --out to keep them",
+    }
+    code = EXIT_VOID if void else (EXIT_ERROR if errors else EXIT_OK)
+    return summary, code
+
+
 def main(argv):
     ap = argparse.ArgumentParser(add_help=True)
     ap.add_argument("--list", action="store_true")
@@ -212,7 +434,30 @@ def main(argv):
     ap.add_argument("--model")
     ap.add_argument("--control", action="store_true")
     ap.add_argument("--calibrate", action="store_true")
+    ap.add_argument("--suite", help="a prompt set, e.g. docs/research/prompts/arm-a.json")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="with --suite: validate and print the plan, spawn nothing")
+    ap.add_argument("--out", help="with --suite: directory to write one record per prompt")
     a = ap.parse_args(argv)
+
+    if a.suite:
+        if a.host not in HOSTS:
+            print(f"unknown host {a.host!r}: {list(HOSTS)}", file=sys.stderr)
+            return EXIT_USAGE
+        doc, err = load_suite(a.suite)
+        if err:
+            print(json.dumps({"error": err}, indent=2))
+            return EXIT_USAGE
+        if a.dry_run:
+            print(json.dumps(suite_plan(doc, a.host, a.target, a.suite),
+                             indent=2, sort_keys=True))
+            return EXIT_OK
+        if not a.target:
+            print(json.dumps({"error": "--suite needs --target"}, indent=2))
+            return EXIT_USAGE
+        summary, code = run_suite(a.host, a.target, doc, a.suite, a.out, a.model)
+        print(json.dumps(summary, indent=2, sort_keys=True))
+        return code
 
     if a.list or not (a.host and a.target and a.prompt):
         print("hosts:")
@@ -226,50 +471,19 @@ def main(argv):
         print("headless may not be the same instrument as interactive, and a number")
         print("that looks like a manual result while measuring something else is worse")
         print("than no number. See references/harnesses.md.")
-        return 0 if a.list else 2
+        return EXIT_OK if a.list else EXIT_USAGE
 
     if a.host not in HOSTS:
         print(f"unknown host {a.host!r}: {list(HOSTS)}", file=sys.stderr)
-        return 2
+        return EXIT_USAGE
 
-    res, err = run_once(a.host, a.target, a.prompt, a.model)
+    out, err = measure(a.host, a.target, a.prompt, a.model, a.control)
     if err:
         print(json.dumps({"error": err}, indent=2))
-        return 1
-
-    obs = observe(res["raw"])
-    g, why = grade(obs, control=a.control)
-    cal = calibration(a.host)
-    out = {
-        "host": a.host,
-        "model": obs["model"],
-        "prompt": a.prompt,
-        "control": a.control,
-        "grade": g,
-        "why": why,
-        "instrument": "headless CLI (tools/benchmark.py)",
-        "calibrated": rate_reportable(a.host),
-        "rate_reportable": rate_reportable(a.host),
-        "preconditions": {
-            "skill_listed": "repo-governor" in (obs["skills"] or []),
-            "competing_skills": [s for s in obs["skills"] if s != "repo-governor"],
-            "hooks_fired": obs["hooks_fired"],
-        },
-        "evidence": {"tool_calls": [c["name"] for c in obs["calls"]],
-                     "parsed_events": obs["parsed_events"]},
-        "workdir": res["workdir"],
-    }
-    if not out["preconditions"]["skill_listed"]:
-        out["warning"] = ("the host did not list repo-governor: this run measures "
-                          "nothing about activation, because the skill was not available "
-                          "to activate")
-    if obs["parsed_events"] == 0:
-        out["warning"] = ("no events parsed -- the output format changed and this "
-                          "grade is meaningless rather than zero")
-        out["grade"] = "UNPARSEABLE"
+        return EXIT_ERROR
     if a.calibrate:
         out["calibration"] = {
-            "headless_grade": g,
+            "headless_grade": out["grade"],
             "interactive_grade": None,
             "agree": None,
             "next": (f"Run the SAME prompt interactively in {a.host}, in a fresh "
@@ -281,7 +495,7 @@ def main(argv):
             "record_at": str(CALIB / f"{a.host}.json"),
         }
     print(json.dumps(out, indent=2, sort_keys=True))
-    return 0
+    return EXIT_VOID if out["warnings"] else EXIT_OK
 
 
 if __name__ == "__main__":

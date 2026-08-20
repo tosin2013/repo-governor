@@ -1,0 +1,8 @@
+{
+  "$comment": "Acceptance criteria for issue 104. DECLARED BEFORE THE WORK, unlike issue 100. WHAT WENT WRONG ANYWAY, recorded rather than edited away: at the moment of declaration these two criteria already read STOP_COMPLETE, because both suites passed against the unfixed tool. A bar satisfied before the work starts is the confident-wrong STOP_COMPLETE engine/acceptance.py warns about, and it happened here on the first attempt. It is genuinely discriminating only because of what was done next, and only that sequence makes it evidence: the new assertions in conformance/benchmark.py were run against UNFIXED tools/benchmark.py and observed to FAIL 7 of 34 while the two healthy-path controls PASSED -- so they discriminate rather than merely fail -- at which point completion.py read CONTINUE. The fix then turned it green. Without that RED observation these criteria assert nothing. THE STANDING WEAKNESS: a criterion pointing at a suite the same author writes can always be weakened by weakening the suite, and no check in this repository would notice.",
+  "authority_id": "104",
+  "criteria": [
+    {"check": "command_exit", "target": "./tools/run-conformance.sh benchmark"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh"}
+  ]
+}

@@ -81,8 +81,72 @@ Four things that were manual, and one that was missed:
 - **whether a hook fired**, which is a precondition of every activation run and
   went unwritten until issue 86
 
-A run where the host did not list the skill is reported with a warning: it
-measures nothing about activation, because nothing was there to activate.
+## A void run must fail, not publish a grade
+
+Some runs cannot support a grade at all, and the harness **exits `3`** for
+them rather than `0` (issue 104). The distinction is not cosmetic: `NONE` is a
+real grade and the worst one, so a session where the skill was never present
+would otherwise read as damning evidence against the skill instead of as a
+broken harness — and a batch runner would collect twenty of them and call it a
+clean sweep.
+
+| | |
+|---|---|
+| **UNPARSEABLE** | nothing parsed; the output format changed |
+| **VOID** | the run parsed, but the precondition was not met |
+
+A run is void when the transcript **reports a skill listing that omits
+`repo-governor`** — the skill was not there to activate — or when it **carries
+no skill listing at all**. The second is not the repository's fault: the
+precondition is *unverified*, which is not the same as unmet, and blaming the
+repository sends an operator to fix the wrong thing. A host whose output omits
+the listing cannot support automated grading until its harness entry supplies
+another way to check the precondition.
+
+Every reason is reported. `warnings` is a **list**, because a run can be void
+more than once and the earlier scalar field lost a signal in exactly the most
+broken run.
+
+| exit | meaning |
+|---|---|
+| `0` | measured; the grade stands |
+| `1` | the run failed — host missing, timeout. Worth a retry |
+| `2` | bad arguments |
+| `3` | **void** — it ran, and measured nothing. Worth investigating, never counted |
+
+## Running a whole arm
+
+```sh
+python3 tools/benchmark.py --host claude --target <repo> \
+  --suite docs/research/prompts/arm-a.json --dry-run          # costs nothing
+python3 tools/benchmark.py --host claude --target <repo> \
+  --suite docs/research/prompts/arm-a.json --out results/     # twenty-three sessions
+```
+
+**Batching is safe here and nowhere else.** The protocol's first rule is *one
+prompt per session*, because once prompt 1 activates governance every later
+prompt in that chat measures persistence instead — four Cursor prompts were
+discarded to exactly that. A runner does not break the rule, it enforces it:
+`prepare()` gives every prompt a fresh copy of the target and a fresh process,
+so twenty-three prompts are twenty-three sessions. The thing a person must not
+do by hand is precisely the thing a loop does correctly.
+
+The prompts live in **two** places — prose that explains them, JSON that runs
+them — so a suite whose text has drifted from
+`docs/research/activation-protocol.md` **refuses to load**. Edit the protocol
+and re-extract; a drifted prompt still runs and still grades, and only the
+comparability quietly dies. Both files are pruned from an install, so a suite
+runs from a source checkout.
+
+`--out` writes one record per prompt **as each completes**, not at the end.
+Twenty-three sessions is long enough that losing them all to one timeout is a
+real cost. Without `--out` nothing is written.
+
+A summary withholds the rate for **every** reason it has, not the first: an
+uncalibrated host, any void run, any prompt that failed to run. One void run
+in twenty is not a complete arm, and a rate printed anyway hides that. Arm A
+only — `prepare()` strips `.repo-governor.json`, so every run is un-onboarded
+by construction and Arm B cannot be expressed this way.
 
 ## Calibrating a host
 

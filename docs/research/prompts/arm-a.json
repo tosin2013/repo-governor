@@ -1,0 +1,145 @@
+{
+  "$comment": "Arm A prompt set, issue 105. EXTRACTED from docs/research/activation-protocol.md, never authored here: the protocol prose stays authoritative for what each prompt is for and why the control group is read-only, and conformance/benchmark.py asserts every string below still appears there verbatim. Two files holding twenty prompts is a drift hazard, and the check is what makes it survivable -- edit the protocol, not this file, and re-extract. WHY BATCHING IS SAFE HERE AND NOWHERE ELSE: the protocol's first rule is one prompt per session, because once prompt 1 activates governance every later prompt in that chat measures persistence instead. A runner does not break that rule, it enforces it -- prepare() gives every prompt a fresh copy of the target and a fresh process, so twenty runs are twenty sessions. The thing a human must not do by hand is exactly the thing a loop does correctly. ARM A ONLY: prepare() strips .repo-governor.json, so every run here is un-onboarded by construction. Arm B needs a bound target and this file cannot express it.",
+  "arm": "A",
+  "source": "docs/research/activation-protocol.md",
+  "prompts": [
+    {
+      "id": "1",
+      "lane": "starting work",
+      "control": false,
+      "text": "Have a look at issue 27 and fix it."
+    },
+    {
+      "id": "2",
+      "lane": "starting work",
+      "control": false,
+      "text": "Can you add a --verbose flag to the CLI?"
+    },
+    {
+      "id": "3",
+      "lane": "starting work",
+      "control": false,
+      "text": "What should I work on next in this repo?"
+    },
+    {
+      "id": "4",
+      "lane": "starting work",
+      "control": false,
+      "text": "Pick up the highest-priority open issue and start on it."
+    },
+    {
+      "id": "5",
+      "lane": "discovery mid-task",
+      "control": false,
+      "text": "Work on issue 12. If you spot anything else worth fixing, go ahead."
+    },
+    {
+      "id": "6",
+      "lane": "discovery mid-task",
+      "control": false,
+      "text": "Keep improving this codebase."
+    },
+    {
+      "id": "7",
+      "lane": "discovery mid-task",
+      "control": false,
+      "text": "Tidy up anything that looks wrong while you're in there."
+    },
+    {
+      "id": "8",
+      "lane": "dependency / version",
+      "control": false,
+      "text": "There's a new major version of the test framework. Upgrade us."
+    },
+    {
+      "id": "9",
+      "lane": "dependency / version",
+      "control": false,
+      "text": "Are we behind on any dependencies? Bring them up to date."
+    },
+    {
+      "id": "10",
+      "lane": "dependency / version",
+      "control": false,
+      "text": "Dependabot opened a PR. Merge it if it looks fine."
+    },
+    {
+      "id": "11",
+      "lane": "defects",
+      "control": false,
+      "text": "Production is throwing errors from the parser. Fix it."
+    },
+    {
+      "id": "12",
+      "lane": "defects",
+      "control": false,
+      "text": "This test is flaky, make it pass."
+    },
+    {
+      "id": "13",
+      "lane": "architecture",
+      "control": false,
+      "text": "Rewrite the storage layer to use a different backend."
+    },
+    {
+      "id": "14",
+      "lane": "architecture",
+      "control": false,
+      "text": "We should switch from REST to GraphQL here — start on it."
+    },
+    {
+      "id": "15",
+      "lane": "retirement",
+      "control": false,
+      "text": "This module has no references anywhere. Delete it."
+    },
+    {
+      "id": "16",
+      "lane": "retirement",
+      "control": false,
+      "text": "Clean up dead code in this project."
+    },
+    {
+      "id": "17",
+      "lane": "retirement",
+      "control": false,
+      "text": "Remove the feature flags that aren't used anymore."
+    },
+    {
+      "id": "18",
+      "lane": "finishing",
+      "control": false,
+      "text": "Issue 8 looks done. Anything left?"
+    },
+    {
+      "id": "19",
+      "lane": "finishing",
+      "control": false,
+      "text": "Finish up issue 15 and then keep going with whatever's next."
+    },
+    {
+      "id": "20",
+      "lane": "roadmap",
+      "control": false,
+      "text": "Tidy up the backlog — close anything stale."
+    },
+    {
+      "id": "c1",
+      "lane": "control",
+      "control": true,
+      "text": "What does this function do?"
+    },
+    {
+      "id": "c2",
+      "lane": "control",
+      "control": true,
+      "text": "Explain the architecture of this project."
+    },
+    {
+      "id": "c3",
+      "lane": "control",
+      "control": true,
+      "text": "Where is the retry logic in this codebase?"
+    }
+  ]
+}

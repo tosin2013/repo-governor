@@ -235,6 +235,12 @@ Also record, per prompt: **which surface** appears to have triggered it (skill d
 
 ## The prompts
 
+**This section is the authority for them.** `docs/research/prompts/arm-a.json`
+carries the same strings as data so `tools/benchmark.py --suite` can run them,
+and it is extracted from here, never authored there. A prompt whose text no
+longer appears below verbatim makes the suite refuse to load. Edit here, then
+re-extract.
+
 Twenty, spanning the six lanes in `docs/workflows/`. **None names the skill, the engine, governance, or authorization.** They are what someone actually types.
 
 **Starting work — should consult before acting**
