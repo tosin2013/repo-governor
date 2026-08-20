@@ -313,6 +313,24 @@ def main(argv):
         "repository": {"type": "git", "adapter": "adapters/git", "contract_version": 1},
         "roadmap_authority": {"type": choice, "adapter": adapter, "contract_version": 1},
     }
+    # decision_history, bound to the backend that needs nothing installed.
+    # It is the right default BECAUSE it is the weakest: no binary, always
+    # available, and honest that it hand-rolls its chain rather than having one
+    # supplied by the store. A default that requires `dolt` on PATH is not a
+    # default.
+    #
+    # Without this the role went unbound in every generated manifest, so
+    # CAPTURE_ONLY -- the product's default disposition -- had nowhere to
+    # record, which is the state adapters/decision-history-file was built to
+    # end and never reached because nothing proposed it (issue 94).
+    #
+    # Multi-valued per ADR-013, so a list: a second backend may bind alongside.
+    prov["decision_history"] = [{
+        "type": "decision-history-file",
+        "adapter": "adapters/decision-history-file",
+        "contract_version": 1,
+    }]
+
     if admission:
         prov["roadmap_authority"]["admission"] = {"signal": admission}
     if choice == "github-projects":
@@ -334,12 +352,21 @@ def main(argv):
             env["REPO_GOVERNOR_GH_ADMISSION_LABEL"] = label
         prov["roadmap_authority"]["env"] = env
 
-    # Deny by default (ADR-005). Every bound role gets read, nothing gets write.
-    # The engine rules; it does not act. A proposal that granted write would be
-    # asking a reviewer to notice an escalation buried in generated JSON.
-    perms = {"$comment": "Deny by default (ADR-005). Read-only: Repo Governor rules, "
-                         "it does not act. Grant write only with a reason written beside it."}
+    # Deny by default (ADR-005). Every bound role gets read; exactly one gets
+    # write, and the reason is stated at the top of the block rather than
+    # beside the entry -- the schema closes `permission` to a verb set, so a
+    # per-entry comment would not validate, and a reviewer should meet the
+    # escalation before the JSON that contains it rather than after.
+    perms = {"$comment": (
+        "Deny by default (ADR-005). Read-only, with ONE exception stated here so it "
+        "is not an escalation buried in generated JSON: decision_history has "
+        "write=true. CAPTURE_ONLY is the default disposition for every discovery, and "
+        "`envelope.py --record` cannot persist one without it. Recording a decision is "
+        "the only act this grant permits; the engine still rules and never changes the "
+        "repository. Remove it and captures are refused, which is a defensible choice "
+        "-- it just means nothing remembers what was decided.")}
     perms.update({role: {"read": True, "write": False} for role in prov})
+    perms["decision_history"] = {"read": True, "write": True}
 
     out = {
         "$comment": ("PROPOSAL in manifest shape. Review every line, then rename to "
@@ -361,10 +388,32 @@ def main(argv):
         "permissions": perms,
         "providers": prov,
     }
+    # Where the repository carries compatibility obligations, say what the
+    # default store does NOT guarantee. Capability language, not a product
+    # name: ADR-003 keeps adapter knowledge out of the engine and ADR-030 is
+    # Proposed with four unmet conditions, the first being whether level
+    # predicts this need at all. So this is a note a person reads, never a
+    # rule that changes a binding, and nothing below is conditional on it.
+    if floors:
+        print(f"\n  This repository floors at {level} ({', '.join(floors)}), meaning other")
+        print("  people depend on its shapes. The proposed decision store hand-rolls its")
+        print("  chain: a rewrite is DETECTABLE there, not prevented, and it names no")
+        print("  committer. A backend that supplies history natively gives a stronger")
+        print("  guarantee. references/integrations.md lists what one must satisfy.")
+        print("  Nothing here is blocked, and the binding above is unchanged.")
+
     p = repo / PROPOSAL
     p.write_text(json.dumps(out, indent=2) + "\n", encoding="utf-8")
     print(f"\nwrote {p}")
     print("\nVerify it before binding:")
+    # The store is created by an explicit step, not by this tool. Same pattern
+    # as tools/bootstrap-decisions.sh for Dolt, whose probe also requires the
+    # database to exist: a store nobody asked for is still a change to the
+    # repository (ADR-005), and this tool writes a proposal, not a store.
+    # Without it --validate reports TRANSPORT_UNREACHABLE and
+    # WRITE_GRANTED_BUT_TRANSPORT_READONLY, both correct and both confusing on
+    # a freshly generated proposal.
+    print(f"  mkdir -p {repo / '.repo-governor' / 'decisions'}   # the decision store")
     print(f"  cd {repo} && mv {PROPOSAL} .repo-governor.json")
     print(f"  python3 {SKILL / 'engine' / 'manifest.py'} --validate")
     print("\nIf validation fails, rename it back. Nothing governs until it passes.")
