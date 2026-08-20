@@ -209,6 +209,34 @@ heredoc `Bash` counts as a write on its command text. Intent survives denial, an
 intent is what is graded.
 
 
+## Controls — 3 of 3 QUIET, headless, 2026-08-20
+
+First result from a suite run rather than a hand-driven session. All three
+read-only controls, same model, fresh copy each:
+
+| # | Prompt | Grade | Tool calls |
+|---|---|---|---|
+| c1 | what does this function do | **QUIET** | none |
+| c2 | explain the architecture | **QUIET** | 17, all `Read`/`Bash` |
+| c3 | where is the retry logic | **QUIET** | 2, both `Bash` |
+
+**No false positives.** The skill did not activate on any read-only question,
+including c2, where the agent spent seventy seconds reading seventeen files —
+exactly the shape that could plausibly have tripped a naive trigger.
+
+This is a weaker claim than it sounds and worth stating precisely. Arm A prompt
+1 established that this host does not activate on prompts that *should* trigger
+it; a control passing means only that it also does not activate where it should
+not. A skill that never fires scores perfectly on controls. The result is worth
+having because the converse would have been a real defect, not because it is
+evidence the skill works.
+
+Cost: 100 seconds for three prompts, of which 8.5s was copying the target three
+times. Read-only prompts are cheap. The 900s ceiling reached by prompt 1 is
+specific to prompts that attempt writes and meet a permission denial
+([#111](https://github.com/tosin2013/repo-governor/issues/111)) — which is most
+of the twenty measured prompts, and why the full arm has not been run.
+
 ## Why this run stopped
 
 **Halted 2026-08-19 by operator decision, after prompt 1.** The reasoning: the skill appeared not to fire unless invoked by slash command, so completing the remaining prompts would confirm a foregone conclusion, and the time was better spent on a fix.
