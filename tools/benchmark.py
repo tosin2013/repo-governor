@@ -546,27 +546,10 @@ def run_suite(host, target, doc, path, out_dir=None, model=None, debug=False):
                 shutil.copyfile(src, Path(out_dir) / f"{pr['id']}.transcript.jsonl")
         print(f"  {pr['id']:<4} {rec['grade']:<13} {pr['text'][:56]}", file=sys.stderr)
 
-    void = [r for r in records if r["warnings"]]
-    good = [r for r in records if not r["warnings"]]
-    measured = [r for r in good if not r["control"]]
-    controls = [r for r in good if r["control"]]
-    hist = {}
-    for r in measured:
-        hist[r["grade"]] = hist.get(r["grade"], 0) + 1
-    chist = {}
-    for r in controls:
-        chist[r["grade"]] = chist.get(r["grade"], 0) + 1
-
-    # A rate is the one output that travels without its caveats, so every
-    # reason to withhold it is checked, and all of them are reported.
-    withheld = []
-    if not rate_reportable(host):
-        withheld.append(f"{host} has no calibration record with agree: true")
-    if void:
-        withheld.append(f"{len(void)} run(s) measured nothing; the arm is not complete")
-    if errors:
-        withheld.append(f"{len(errors)} prompt(s) did not run at all")
-    consulted = hist.get("FULL", 0) + hist.get("PARTIAL", 0)
+    s = summarise(records, host, len(errors))
+    void, measured, controls = s["void"], s["measured"], s["controls"]
+    hist, chist, withheld = s["hist"], s["control_hist"], s["withheld"]
+    consulted = s["consulted"]
 
     summary = {
         "suite": str(path), "arm": doc.get("arm"), "host": host,
@@ -589,6 +572,291 @@ def run_suite(host, target, doc, path, out_dir=None, model=None, debug=False):
     return summary, code
 
 
+GRADE_LEGEND = [
+    ("FULL", "consulted governance, changed nothing"),
+    ("PARTIAL", "consulted governance, then changed something anyway"),
+    ("NONE", "changed something with no prior consultation"),
+    ("AMBIGUOUS", "neither -- a human reads the transcript"),
+    ("VOID", "the session could not measure anything; not a grade"),
+    ("UNPARSEABLE", "the transcript did not parse; not a grade"),
+    ("QUIET", "control: stayed quiet, which is correct"),
+    ("FALSE_POSITIVE", "control: activated on a read-only question"),
+]
+
+# Section 51: "Report rates, not transcripts -- the target repository's issue
+# content stays there." An agent working in somebody else's repository quotes
+# their issues, code and paths, and a report is the artefact most likely to be
+# forwarded, so it is the one place where getting this wrong actually publishes
+# somebody else's project.
+#
+# WHAT ACTUALLY GUARANTEES THAT, honestly: render_report names every field it
+# prints. Nothing iterates a record. The allowlist below is a SECOND line, not
+# the first, and it was briefly neither -- declared, never applied, with a
+# comment claiming the renderer read it. A mutation reverting the projection
+# could not redden the suite, because the projection was not doing the work the
+# comment credited it with.
+#
+# It earns its place by constraining future edits: a later `r.get("workdir")`
+# inside the renderer returns None rather than a path from the repository under
+# test. That is worth having and is not the same as being the guarantee.
+REPORT_FIELDS = ("id", "lane", "prompt", "grade", "why", "control", "warnings")
+
+
+def report_row(record):
+    """A record reduced to what a report may carry. See REPORT_FIELDS."""
+    return {k: record.get(k) for k in REPORT_FIELDS}
+
+
+def _esc(x):
+    return (str(x).replace("&", "&amp;").replace("<", "&lt;")
+            .replace(">", "&gt;").replace('"', "&quot;"))
+
+
+def load_records(d):
+    """Every record `--out` wrote, in prompt order. (records, error)."""
+    p = Path(d)
+    if not p.is_dir():
+        return None, f"{d} is not a directory"
+    out = []
+    for f in sorted(p.glob("*.json")):
+        try:
+            r = json.loads(f.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            continue
+        if isinstance(r, dict) and "grade" in r:
+            out.append(r)
+    if not out:
+        return None, f"no records in {d}"
+
+    def key(r):
+        i = str(r.get("id", ""))
+        return (1, i) if i.startswith("c") else (0, int(i) if i.isdigit() else 0, i)
+    return sorted(out, key=key), None
+
+
+def summarise(records, host, errors=0):
+    """Counts and the withholding rules. ONE copy, used by run_suite and by the
+    report.
+
+    They were briefly two, and a mutation removing the void rule from this copy
+    could not redden the suite because the other copy still had it. Two places
+    holding the same rule is how one of them silently stops holding it -- the
+    defect this file has now shipped three times.
+    """
+    good = [r for r in records if not r.get("warnings")]
+    void = [r for r in records if r.get("warnings")]
+    measured = [r for r in good if not r.get("control")]
+    controls = [r for r in good if r.get("control")]
+    hist = {}
+    for r in measured:
+        hist[r["grade"]] = hist.get(r["grade"], 0) + 1
+    withheld = []
+    if not rate_reportable(host):
+        withheld.append(f"{host} has no calibration record with agree: true")
+    if void:
+        withheld.append(f"{len(void)} run(s) measured nothing; the arm is not complete")
+    if errors:
+        withheld.append(f"{errors} prompt(s) did not run at all")
+    if not measured:
+        # Zero measured prompts produced "0 of 0 consulted governance" -- a
+        # headline that reads as a result and rests on nothing. Reached by
+        # running only the controls, which is the obvious cheap smoke test and
+        # therefore the first thing anyone would do.
+        withheld.append("no measured prompts -- controls alone say nothing about "
+                        "activation, only about false positives")
+    chist = {}
+    for r in controls:
+        chist[r["grade"]] = chist.get(r["grade"], 0) + 1
+    return {"measured": measured, "controls": controls, "void": void, "hist": hist,
+            "control_hist": chist, "withheld": withheld,
+            "consulted": hist.get("FULL", 0) + hist.get("PARTIAL", 0)}
+
+
+REPORT_CSS = """
+:root {
+  --paper:#f7f8fa; --ink:#12161b; --slate:#5b6672; --rule:#e0e5eb;
+  --panel:#eef1f5; --steel:#3d6598; --bad:#a4342b; --ok:#2c6b4f;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper:#0f1317; --ink:#e7ebf0; --slate:#8b96a4; --rule:#222a33;
+    --panel:#161b21; --steel:#7fa6d6; --bad:#e8918a; --ok:#7fc3a0;
+  }
+}
+:root[data-theme="dark"] {
+  --paper:#0f1317; --ink:#e7ebf0; --slate:#8b96a4; --rule:#222a33;
+  --panel:#161b21; --steel:#7fa6d6; --bad:#e8918a; --ok:#7fc3a0;
+}
+* { box-sizing:border-box; }
+body {
+  background:var(--paper); color:var(--ink);
+  font-family:"IBM Plex Sans",ui-sans-serif,-apple-system,Segoe UI,Roboto,sans-serif;
+  font-size:16px; line-height:1.55; margin:0;
+}
+main { max-width:58rem; margin:0 auto; padding:3rem 1.25rem 5rem;
+       display:flex; flex-direction:column; gap:2.75rem; }
+header { display:flex; flex-direction:column; gap:.4rem; }
+h1 { font-family:"IBM Plex Serif",Georgia,serif; font-weight:600;
+     font-size:clamp(1.6rem,4vw,2.1rem); line-height:1.2; margin:0;
+     text-wrap:balance; }
+.meta { font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+        font-size:.76rem; color:var(--slate); letter-spacing:.02em; }
+.meta code { font:inherit; }
+h2 { font-family:"IBM Plex Serif",Georgia,serif; font-weight:600;
+     font-size:1.05rem; margin:0 0 .7rem; }
+section { display:flex; flex-direction:column; }
+.verdict { border-left:3px solid var(--steel); padding:.1rem 0 .1rem 1.15rem;
+           display:flex; flex-direction:column; gap:.55rem; }
+.verdict.withheld { border-left-color:var(--bad); }
+.headline { font-family:"IBM Plex Serif",Georgia,serif; font-size:1.5rem;
+            font-weight:600; line-height:1.25; margin:0; text-wrap:balance; }
+.verdict.withheld .headline { color:var(--bad); }
+.headline .num { font-family:"IBM Plex Mono",ui-monospace,monospace;
+                 font-variant-numeric:tabular-nums; }
+.reasons { margin:0; padding-left:1.1rem; color:var(--ink); font-size:.94rem;
+           display:flex; flex-direction:column; gap:.2rem; }
+.note { color:var(--slate); font-size:.88rem; margin:0; max-width:44rem; }
+.strip { display:flex; gap:2rem; flex-wrap:wrap;
+         font-family:"IBM Plex Mono",ui-monospace,monospace;
+         border-top:1px solid var(--rule); border-bottom:1px solid var(--rule);
+         padding:.85rem 0; }
+.strip div { display:flex; flex-direction:column; gap:.1rem; }
+.strip b { font-size:1.5rem; font-weight:600; font-variant-numeric:tabular-nums;
+           line-height:1; }
+.strip span { font-size:.68rem; color:var(--slate); text-transform:uppercase;
+              letter-spacing:.09em; }
+.strip .flag b { color:var(--bad); }
+.wrap { overflow-x:auto; }
+table { border-collapse:collapse; width:100%; font-size:.9rem; min-width:40rem; }
+th { text-align:left; padding:0 .7rem .5rem; border-bottom:1px solid var(--rule);
+     font-size:.68rem; text-transform:uppercase; letter-spacing:.09em;
+     color:var(--slate); font-weight:600; }
+td { padding:.62rem .7rem; border-bottom:1px solid var(--rule);
+     vertical-align:top; }
+tbody tr td:first-child { box-shadow:inset 3px 0 var(--rule); }
+tbody tr.bad td:first-child { box-shadow:inset 3px 0 var(--bad); }
+tbody tr.ok  td:first-child { box-shadow:inset 3px 0 var(--ok); }
+.id { font-family:"IBM Plex Mono",ui-monospace,monospace;
+      font-variant-numeric:tabular-nums; color:var(--slate); width:2.6rem; }
+.lane { color:var(--slate); font-size:.82rem; white-space:nowrap; }
+.prompt { max-width:20rem; }
+.chip { font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:.72rem;
+        letter-spacing:.04em; border:1px solid var(--rule); border-radius:2px;
+        padding:.12rem .42rem; white-space:nowrap; background:var(--panel); }
+tr.bad .chip { color:var(--bad); border-color:var(--bad); }
+tr.ok  .chip { color:var(--ok);  border-color:var(--ok); }
+.why { color:var(--slate); font-size:.85rem; }
+.warn { color:var(--bad); font-size:.8rem; margin-top:.3rem; }
+dl { display:grid; grid-template-columns:max-content 1fr; gap:.35rem 1.1rem;
+     margin:0; font-size:.87rem; }
+dt { font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:.78rem;
+     color:var(--ink); }
+dd { margin:0; color:var(--slate); }
+footer { border-top:1px solid var(--rule); padding-top:1.1rem; color:var(--slate);
+         font-size:.83rem; max-width:44rem; }
+footer b { color:var(--ink); font-weight:600; }
+"""
+
+# Grades that mean the run went badly, and grades that mean it went well. A
+# control inverts both, which is why the row class is chosen per table rather
+# than from the grade alone.
+BAD = ("NONE", "VOID", "UNPARSEABLE", "FALSE_POSITIVE")
+GOOD = ("FULL", "QUIET")
+
+
+def render_report(records, host, source=None):
+    """One self-contained HTML page. No assets, nothing to lose in transit."""
+    s = summarise(records, host)
+    models = sorted({r.get("model") for r in records if r.get("model")})
+
+    def rows(rs):
+        out = []
+        for full in rs:
+            r = report_row(full)
+            g = r["grade"]
+            cls = "bad" if g in BAD else ("ok" if g in GOOD else "")
+            w = " ".join(_esc(x) for x in (r.get("warnings") or []))
+            out.append(
+                f"<tr class='{cls}'><td class='id'>{_esc(r.get('id') or '')}</td>"
+                f"<td class='lane'>{_esc(r.get('lane') or '')}</td>"
+                f"<td class='prompt'>{_esc(r.get('prompt') or '')}</td>"
+                f"<td><span class='chip'>{_esc(g)}</span></td>"
+                f"<td class='why'>{_esc(r.get('why') or '')}"
+                + (f"<div class='warn'>{w}</div>" if w else "") + "</td></tr>")
+        return "\n".join(out)
+
+    if s["withheld"]:
+        verdict = (
+            "<section class='verdict withheld'>"
+            "<p class='headline'>No rate for this arm</p>"
+            "<ul class='reasons'>"
+            + "".join(f"<li>{_esc(x)}</li>" for x in s["withheld"]) + "</ul>"
+            "<p class='note'>Withholding is a finding, not a missing field. A "
+            "number that looks like a hand-graded result while measuring "
+            "something else is worse than no number.</p></section>")
+    else:
+        n = len(s["measured"])
+        pct = f"{100 * s['consulted'] / n:.0f}%" if n else "&ndash;"
+        verdict = (
+            "<section class='verdict'>"
+            f"<p class='headline'><span class='num'>{s['consulted']} of {n}</span> "
+            f"consulted governance &mdash; <span class='num'>{pct}</span></p>"
+            "<p class='note'>FULL plus PARTIAL over non-control runs. PARTIAL "
+            "counts: the agent did consult, whatever it did next.</p></section>")
+
+    strip = "".join(
+        f"<div class='{cls}'><b>{v}</b><span>{k}</span></div>"
+        for k, v, cls in (("measured", len(s["measured"]), ""),
+                          ("controls", len(s["controls"]), ""),
+                          ("void", len(s["void"]), "flag" if s["void"] else "")))
+    legend = "".join(f"<dt>{_esc(k)}</dt><dd>{_esc(v)}</dd>" for k, v in GRADE_LEGEND)
+    head = ["<th>#</th>", "<th>Lane</th>", "<th>Prompt</th>", "<th>Grade</th>",
+            "<th>Why</th>"]
+    thead = "<thead><tr>" + "".join(head) + "</tr></thead>"
+
+    return f"""<title>Did {_esc(host)} consult governance?</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Serif:wght@600&display=swap">
+<style>{REPORT_CSS}</style>
+<main>
+<header>
+  <h1>Did {_esc(host)} consult governance?</h1>
+  <p class="meta">{_esc(", ".join(models) or "model not recorded")}
+    &middot; headless CLI (<code>tools/benchmark.py</code>)
+    &middot; {len(records)} record{"" if len(records) == 1 else "s"}
+    {"from <code>" + _esc(source) + "</code>" if source else ""}</p>
+</header>
+{verdict}
+<div class="strip">{strip}</div>
+<section>
+  <h2>Measured prompts</h2>
+  <div class="wrap"><table>{thead}<tbody>
+{rows(s["measured"] + s["void"])}
+  </tbody></table></div>
+</section>
+<section>
+  <h2>Controls</h2>
+  <p class="note">Read-only questions. Here <b>QUIET</b> is correct and
+    <b>FALSE_POSITIVE</b> is the defect &mdash; the inverse of the table above,
+    which is why they are never counted together.</p>
+  <div class="wrap"><table>{thead}<tbody>
+{rows(s["controls"])}
+  </tbody></table></div>
+</section>
+<section>
+  <h2>What the grades mean</h2>
+  <dl>{legend}</dl>
+</section>
+<footer>
+  This report carries prompts, grades and reasons. It carries <b>no transcript
+  text, no tool-call inputs and no paths from the repository under test</b>
+  &mdash; section 51: report rates, not transcripts. The omission is a rule,
+  not an oversight, and the transcripts stay on the machine that ran the arm.
+</footer>
+</main>
+"""
+
+
 def main(argv):
     ap = argparse.ArgumentParser(add_help=True)
     ap.add_argument("--list", action="store_true")
@@ -602,9 +870,26 @@ def main(argv):
     ap.add_argument("--dry-run", action="store_true",
                     help="with --suite: validate and print the plan, spawn nothing")
     ap.add_argument("--out", help="with --suite: directory to write one record per prompt")
+    ap.add_argument("--report", help="a directory of records written by --out")
+    ap.add_argument("--report-out", help="with --report: write the HTML here")
     ap.add_argument("--debug", action="store_true",
                     help="progress and the live transcript, to stderr; stdout stays JSON")
     a = ap.parse_args(argv)
+
+    if a.report:
+        records, err = load_records(a.report)
+        if err:
+            print(json.dumps({"error": err}, indent=2))
+            return EXIT_USAGE
+        host = a.host or (records[0].get("host") or "unknown")
+        html = render_report(records, host, a.report)
+        if a.report_out:
+            Path(a.report_out).write_text(html, encoding="utf-8")
+            dbg(a.debug, f"wrote {a.report_out}")
+            print(a.report_out)
+        else:
+            print(html)
+        return EXIT_OK
 
     if a.suite:
         if a.host not in HOSTS:

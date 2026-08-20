@@ -1,0 +1,10 @@
+{
+  "$comment": "Acceptance criteria for issue 119, declared before the work and confirmed red: --report is not a flag today, so criterion 2 exits 2 on an unknown argument. WHAT THE BAR CANNOT CHECK is whether the report is easy to READ -- that is a judgement, and the honest test is the operator who asked for it opening one. What it CAN check, and what matters more, is that the report never carries what section 51 forbids: a rendered report must contain no transcript text, no tool-call inputs and no target-repository paths, and the fixture deliberately includes a record carrying all three so the check is not vacuous.",
+  "authority_id": "119",
+  "criteria": [
+    {"check": "file_exists",  "target": "conformance/fixtures/reports/arm/1.json"},
+    {"check": "command_exit", "target": "python3 tools/benchmark.py --report conformance/fixtures/reports/arm --report-out /tmp/rg-report-check.html"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh benchmark"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh"}
+  ]
+}
