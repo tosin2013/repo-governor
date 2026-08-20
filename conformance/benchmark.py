@@ -230,6 +230,118 @@ def main():
                    "one scalar key meant the second assignment overwrote the "
                    "first, losing a signal in the most broken run of all")
 
+    print("\nA suite is twenty-three sessions, not one session of twenty-three\n")
+    # Issue 105. The protocol's first rule -- one prompt per session -- is the
+    # one most often broken, because batching is the natural way to work and
+    # produces confident answers that measure PERSISTENCE rather than
+    # activation. A runner does not break it; prepare() gives every prompt a
+    # fresh tree and a fresh process. What a runner CAN break is the link
+    # between the prompts it runs and the protocol that defines them, so that
+    # is what these checks defend.
+    import tempfile as _tf2
+    suite_path = ROOT / "docs" / "research" / "prompts" / "arm-a.json"
+    fails += check("the Arm A prompt set exists", suite_path.is_file())
+    doc, err = B.load_suite(suite_path)
+    fails += check("it loads and matches the protocol verbatim", err is None, str(err))
+    if doc:
+        fails += check("twenty measured prompts and three controls",
+                       sum(1 for p in doc["prompts"] if not p.get("control")) == 20
+                       and sum(1 for p in doc["prompts"] if p.get("control")) == 3,
+                       "the protocol says twenty plus three; a suite that has "
+                       "quietly lost one still produces a plausible rate")
+
+    with _tf2.TemporaryDirectory() as td:
+        drift = Path(td) / "drift.json"
+        drift.write_text(json.dumps({"arm": "A", "prompts": [
+            {"id": "1", "text": "Have a look at issue 27 and fix it, please."}]}))
+        _, err = B.load_suite(drift)
+        fails += check("a prompt that has drifted from the protocol refuses to load",
+                       err is not None and "verbatim" in err,
+                       "an edited prompt still runs and still grades; the numbers "
+                       "just stop being comparable with anything measured before")
+
+        empty = Path(td) / "empty.json"
+        empty.write_text(json.dumps({"arm": "A", "prompts": []}))
+        _, err = B.load_suite(empty)
+        fails += check("a suite with no prompts refuses to load", err is not None,
+                       "zero prompts would report a clean sweep of nothing")
+
+    print("\nThe summary refuses a rate for every reason it has\n")
+    def fake_suite(n=4, controls=1):
+        ps = [{"id": str(i + 1), "text": f"p{i}", "control": False} for i in range(n)]
+        ps += [{"id": f"c{i + 1}", "text": f"c{i}", "control": True}
+               for i in range(controls)]
+        return {"arm": "A", "prompts": ps}
+
+    def stub_measure(grades):
+        """grades: id -> (grade, warnings). Never spawns anything."""
+        it = iter(grades)
+        def _m(host, target, prompt, model=None, control=False):
+            g, ws = next(it)
+            if g == "ERROR":
+                return None, "host is not on PATH"
+            return {"host": host, "prompt": prompt, "control": control, "grade": g,
+                    "warnings": list(ws), "why": "", "model": "m"}, None
+        return _m
+
+    real_measure, real_calib = B.measure, B.CALIB
+    with _tf2.TemporaryDirectory() as td:
+        try:
+            B.CALIB = Path(td)          # uncalibrated by construction
+            B.measure = stub_measure([("FULL", []), ("NONE", []), ("PARTIAL", []),
+                                      ("NONE", []), ("QUIET", [])])
+            summ, code = B.run_suite("claude", "/t", fake_suite(), "s.json")
+            fails += check("an uncalibrated host reports no rate", summ["rate"] is None)
+            fails += check("...and says why", any("calibration" in w for w in
+                                                  summ["rate_withheld_because"]))
+            fails += check("a clean uncalibrated run still exits 0", code == 0,
+                           f"got {code}; withholding a rate is not a failure")
+            fails += check("controls are counted apart from the measured prompts",
+                           summ["measured"] == 4 and summ["controls"] == 1,
+                           "a control folded into the rate would score the skill "
+                           "for staying quiet on a question it should ignore")
+
+            (Path(td) / "claude.json").write_text(json.dumps({"agree": True}))
+            B.measure = stub_measure([("FULL", []), ("NONE", []), ("PARTIAL", []),
+                                      ("NONE", []), ("QUIET", [])])
+            summ, code = B.run_suite("claude", "/t", fake_suite(), "s.json")
+            fails += check("a calibrated host with a clean sweep reports a rate",
+                           summ["rate"] is not None,
+                           "otherwise every check above passes trivially")
+            fails += check("the rate counts FULL and PARTIAL over the measured runs",
+                           summ["rate"]["consulted"] == 2 and summ["rate"]["of"] == 4,
+                           f"got {summ['rate']}")
+
+            B.measure = stub_measure([("FULL", []), ("VOID", ["no skill listing"]),
+                                      ("NONE", []), ("NONE", []), ("QUIET", [])])
+            summ, code = B.run_suite("claude", "/t", fake_suite(), "s.json")
+            fails += check("one void run withholds the rate for the whole arm",
+                           summ["rate"] is None and summ["void"] == 1,
+                           "nineteen good runs and one that measured nothing is not "
+                           "a complete arm, and a rate printed anyway hides that")
+            fails += check("...and the suite exits VOID", code == getattr(B, "EXIT_VOID", None),
+                           f"got {code}")
+            fails += check("...and names which prompt was void", summ["void_ids"] == ["2"],
+                           f"got {summ['void_ids']}")
+
+            B.measure = stub_measure([("FULL", []), ("ERROR", []), ("NONE", []),
+                                      ("NONE", []), ("QUIET", [])])
+            summ, code = B.run_suite("claude", "/t", fake_suite(), "s.json")
+            fails += check("a prompt that never ran withholds the rate too",
+                           summ["rate"] is None and summ["errors"] == 1)
+            fails += check("...and exits non-zero", code != 0, f"got {code}")
+
+            out_dir = Path(td) / "recs"
+            B.measure = stub_measure([("FULL", []), ("NONE", []), ("PARTIAL", []),
+                                      ("NONE", []), ("QUIET", [])])
+            B.run_suite("claude", "/t", fake_suite(), "s.json", out_dir=out_dir)
+            fails += check("records are written per prompt, not at the end",
+                           len(list(out_dir.glob("*.json"))) == 5,
+                           "twenty-three sessions is long enough that losing them "
+                           "all to one timeout is a real cost")
+        finally:
+            B.measure, B.CALIB = real_measure, real_calib
+
     print(f"\n{'BENCHMARK: CONFORMANT' if not fails else f'BENCHMARK: NON-CONFORMANT ({fails})'}")
     return 0 if not fails else 1
 

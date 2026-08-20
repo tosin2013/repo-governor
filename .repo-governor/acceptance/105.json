@@ -1,0 +1,10 @@
+{
+  "$comment": "Acceptance criteria for issue 105, declared before the work. Learning from 104: two of these must FAIL AT DECLARATION or the bar asserts nothing, and that was checked rather than assumed -- the file does not exist and the flag does not exist, so criteria 1 and 2 are red the moment this lands. WHAT THEY DELIBERATELY DO NOT ASSERT: that running the suite produces a correct activation rate. That needs twenty real sessions on a real host, takes hours, and cannot be a completion condition for the code that drives them -- the rate is the OUTPUT of the instrument, not evidence the instrument is built. The dry run is the substitute: it proves the suite is loadable, that every prompt matches the protocol verbatim, and that the plan is what an operator expects, without spending a single session.",
+  "authority_id": "105",
+  "criteria": [
+    {"check": "file_exists",  "target": "docs/research/prompts/arm-a.json"},
+    {"check": "command_exit", "target": "python3 tools/benchmark.py --suite docs/research/prompts/arm-a.json --host claude --dry-run"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh benchmark"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh"}
+  ]
+}

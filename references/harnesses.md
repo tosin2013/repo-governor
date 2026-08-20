@@ -114,6 +114,40 @@ broken run.
 | `2` | bad arguments |
 | `3` | **void** — it ran, and measured nothing. Worth investigating, never counted |
 
+## Running a whole arm
+
+```sh
+python3 tools/benchmark.py --host claude --target <repo> \
+  --suite docs/research/prompts/arm-a.json --dry-run          # costs nothing
+python3 tools/benchmark.py --host claude --target <repo> \
+  --suite docs/research/prompts/arm-a.json --out results/     # twenty-three sessions
+```
+
+**Batching is safe here and nowhere else.** The protocol's first rule is *one
+prompt per session*, because once prompt 1 activates governance every later
+prompt in that chat measures persistence instead — four Cursor prompts were
+discarded to exactly that. A runner does not break the rule, it enforces it:
+`prepare()` gives every prompt a fresh copy of the target and a fresh process,
+so twenty-three prompts are twenty-three sessions. The thing a person must not
+do by hand is precisely the thing a loop does correctly.
+
+The prompts live in **two** places — prose that explains them, JSON that runs
+them — so a suite whose text has drifted from
+`docs/research/activation-protocol.md` **refuses to load**. Edit the protocol
+and re-extract; a drifted prompt still runs and still grades, and only the
+comparability quietly dies. Both files are pruned from an install, so a suite
+runs from a source checkout.
+
+`--out` writes one record per prompt **as each completes**, not at the end.
+Twenty-three sessions is long enough that losing them all to one timeout is a
+real cost. Without `--out` nothing is written.
+
+A summary withholds the rate for **every** reason it has, not the first: an
+uncalibrated host, any void run, any prompt that failed to run. One void run
+in twenty is not a complete arm, and a rate printed anyway hides that. Arm A
+only — `prepare()` strips `.repo-governor.json`, so every run is un-onboarded
+by construction and Arm B cannot be expressed this way.
+
 ## Calibrating a host
 
 ```sh
