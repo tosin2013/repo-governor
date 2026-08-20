@@ -2,7 +2,7 @@
 
 Generated 2026-08-17 from PRD v0.2 (provider-oriented draft) using the MCP ADR Analysis Server's PRD-to-ADR protocol, informed by the external landscape research in [`../research/2026-08-17-external-landscape.md`](../research/2026-08-17-external-landscape.md).
 
-**23 of 28 ADRs are Accepted** as of 2026-08-17, ratified under [RATIFICATION-v0.1.0.md](RATIFICATION-v0.1.0.md). ADR-020, ADR-024, ADR-029 and ADR-030 are held `Proposed` — neither is referenced by the runtime; ADR-014 is `Superseded` by the 023/024 split. Per §61, the project cannot reach `IMPLEMENTATION_READY` until the `RG-SIM-ONBOARDING-v0.1` simulation passes.
+**23 of 29 ADRs are Accepted** as of 2026-08-17, ratified under [RATIFICATION-v0.1.0.md](RATIFICATION-v0.1.0.md). ADR-020, ADR-024, ADR-029, ADR-030 and ADR-031 are held `Proposed` — neither is referenced by the runtime; ADR-014 is `Superseded` by the 023/024 split. Per §61, the project cannot reach `IMPLEMENTATION_READY` until the `RG-SIM-ONBOARDING-v0.1` simulation passes.
 
 > **`PRD.md` no longer exists.** Its normative content was extracted into [`../reference/`](../reference/) on 2026-08-17, with original § numbering preserved so every citation below still resolves. Start at the [section map](../reference/README.md#section-map).
 
@@ -39,6 +39,7 @@ Generated 2026-08-17 from PRD v0.2 (provider-oriented draft) using the MCP ADR A
 | [028](028-provider-identity-is-never-defaulted.md) | Provider identity is never defaulted | Safety | Adapters named the author's repository as a fallback |
 | [029](029-hooks-as-deterministic-delivery-surface.md) | Hooks as a deterministic delivery surface | Distribution | The skill description was understood, and lost to a legible task anyway |
 | [030](030-backend-recommendation-from-declared-capability.md) | Backend recommendation from declared capability | Providers | A level-to-product table would put adapter names in the engine and break on the third backend |
+| [031](031-authority-source-missing-obliges-disclosure-not-refusal.md) | AUTHORITY_SOURCE_MISSING obliges disclosure, not refusal | Agent surface | A measured run reasoned past a bare imperative, and may have been right |
 
 ## Dependency order
 
