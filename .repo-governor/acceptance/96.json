@@ -1,0 +1,10 @@
+{
+  "$comment": "Acceptance criteria for issue 96. WHAT THESE CANNOT EXPRESS: the calibration itself. Whether headless behaves like interactive is a run somebody makes on a host, not something a command_exit can settle -- which is why the harness REFUSES to report a rate for an uncalibrated host, and why that refusal is what is asserted here instead.",
+  "authority_id": "96",
+  "criteria": [
+    {"check": "file_exists",  "target": "tools/benchmark.py"},
+    {"check": "file_exists",  "target": "references/harnesses.md"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh benchmark"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh skill"}
+  ]
+}
