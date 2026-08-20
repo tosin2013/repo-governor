@@ -243,6 +243,39 @@ def main():
     for tool in ("onboard-interactive.py", "selftest.py"):
         fails += check(f"README points at {tool}", tool in rd)
 
+    print("\nThe two activation instruments cannot be reported as one number\n")
+
+    # selftest runs four prompts with a parameterized first; the protocol runs
+    # twenty per arm with fixed wording. The intake form asked only for "the
+    # rate", so a 3/3 and a 3/20 landed in the same field and nothing
+    # downstream could tell them apart -- while those results ARE the evidence
+    # base for issues 5, 42 and the model comparison (issue 89).
+    form = ROOT / ".github" / "ISSUE_TEMPLATE" / "activation-result.yml"
+    fails += check("the activation-result form exists", form.is_file())
+    if form.is_file():
+        f = form.read_text(encoding="utf-8")
+        fails += check("the form asks which instrument was run",
+                       "id: instrument" in f,
+                       "without it a self-test score and a protocol rate pool into "
+                       "one field and the difference is unrecoverable")
+        fails += check("and requires it",
+                       f.split("id: instrument", 1)[1].split("- type:", 1)[0].count("required: true") == 1,
+                       "an optional instrument field is the same defect with extra steps")
+        fails += check("it offers both instruments as choices",
+                       "selftest.py" in f and "Arm A" in f and "Arm B" in f)
+        # The surface issue 86 missed: the hook precondition reached the
+        # recording sheet, the protocol and selftest, but not the form -- which
+        # is the intake for the people least likely to know the rule exists.
+        fails += check("the form carries the no-hook precondition",
+                       "No hook was installed" in f,
+                       "issue 86 fixed the surfaces the maintainer reads and missed "
+                       "the one strangers read")
+
+    st = (ROOT / "tools" / "selftest.py").read_text(encoding="utf-8")
+    fails += check("selftest says its score is not a protocol rate",
+                   "NOT A PROTOCOL RATE" in st,
+                   "a user scoring 3/3 has every reason to report it as one")
+
     print("\nAn integration contract exists, and leads with the rule that matters\n")
 
     # The product is tool-independent by thesis, which only holds if somebody

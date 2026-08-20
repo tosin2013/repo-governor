@@ -155,6 +155,12 @@ def main(argv):
     print("       but it changed NOTHING where an AGENTS.md already existed.")
     print("    3. If neither helps, your model may not follow the description at")
     print("       all. That is a real result and we want it.\n")
+    print("  THIS IS A SELF-TEST SCORE, NOT A PROTOCOL RATE. Four prompts, one of")
+    print("  them a control, and the first is built from a real issue in YOUR")
+    print("  repository. The activation protocol runs twenty per arm with fixed")
+    print("  wording. The two are not comparable and must not be pooled -- say")
+    print("  which you ran when you report it. The twenty-prompt arms are in")
+    print("  docs/research/activation-protocol.md.\n")
     print("  Report it either way -- a low score from a model nobody here can run")
     print("  is worth more than another high score from one we already have:")
     print("    https://github.com/tosin2013/repo-governor/issues/new"
