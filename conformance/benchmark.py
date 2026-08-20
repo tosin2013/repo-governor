@@ -149,6 +149,87 @@ def main():
         fails += check("providers.md points at it",
                        "harnesses.md" in (ROOT / "references" / "providers.md").read_text(encoding="utf-8"))
 
+    print("\nA void run must FAIL, not publish a plausible grade\n")
+    # Issue 104. Both conditions below were already DETECTED -- each set a
+    # warning -- and each still returned 0. So a caller could not tell a real
+    # measurement from a session where the skill was never available to
+    # activate, and the second publishes "NONE": a genuine grade, the worst
+    # one, earned by a run that measured nothing. Batching that (issue 105)
+    # turns one silent failure into twenty and reports them as a clean sweep.
+    #
+    # Driven through main() with a stubbed run_once, so the EXIT CODE is the
+    # thing under test. Everything above this line tests grading and would
+    # pass unchanged while main() returned 0 for all of it -- which is exactly
+    # how this shipped.
+    def run_main(raw, argv=("--host", "claude", "--target", ".", "--prompt", "p")):
+        import contextlib
+        import io
+        real_run = B.run_once
+        B.run_once = lambda *a, **k: ({"raw": raw, "stderr": "",
+                                       "workdir": "/t", "argv": []}, None)
+        buf = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(buf):
+                rc = B.main(list(argv))
+        finally:
+            B.run_once = real_run
+        try:
+            return rc, json.loads(buf.getvalue())
+        except json.JSONDecodeError:
+            return rc, {}
+
+    rc, out = run_main(transcript(ENGINE))
+    fails += check("a healthy run still exits 0", rc == 0, f"got {rc}")
+    fails += check("...and still reports its grade", out.get("grade") == "FULL",
+                   f"got {out.get('grade')}")
+
+    rc, out = run_main("not json at all\nnor is this\n")
+    fails += check("unparseable output exits non-zero", rc != 0,
+                   "output-format drift that exits 0 reads as clean data")
+    fails += check("unparseable exits VOID, not the usage or error code",
+                   rc == getattr(B, "EXIT_VOID", None),
+                   f"got {rc}; a run error is 1 and bad arguments are 2, so void "
+                   "needs its own code or a caller cannot tell the three apart")
+
+    rc, out = run_main(transcript(EDIT, skills=("simplify",)))
+    fails += check("the skill absent from the listing exits VOID",
+                   rc == getattr(B, "EXIT_VOID", None),
+                   f"got {rc}; this is the run that otherwise publishes NONE")
+    fails += check("...and it is not awarded a publishable grade",
+                   out.get("grade") == "VOID",
+                   f"got {out.get('grade')}; NONE is the worst activation result "
+                   "and handing it to a session where the skill was never present "
+                   "inflates the measured miss rate")
+
+    rc, out = run_main(transcript(ENGINE, skills=()))
+    fails += check("an EMPTY skill listing is the skill being absent",
+                   rc == getattr(B, "EXIT_VOID", None), f"got {rc}")
+
+    # The other branch, and the one that nearly shipped untested: a host whose
+    # init event omits `skills` altogether. `or []` used to collapse it into
+    # "listed nothing", which reads as a defect in the repository under test
+    # when it is really a limit of the harness. Unverified is not unmet.
+    no_listing = json.dumps({"type": "system", "subtype": "init", "model": "m-1"})
+    rc, out = run_main(no_listing)
+    fails += check("a host that never reports a listing exits VOID too",
+                   rc == getattr(B, "EXIT_VOID", None),
+                   f"got {rc}; a grade whose precondition is unverifiable is the "
+                   "row above wearing a better disguise")
+    fails += check("...and says the precondition is UNVERIFIED, not unmet",
+                   any("UNVERIFIED" in w for w in (out.get("warnings") or [])),
+                   "blaming the repository for a gap in the harness sends an "
+                   "operator to fix the wrong thing")
+
+    print("\nEvery void reason survives; none clobbers another\n")
+    rc, out = run_main("")          # no init event AND nothing parses: void twice
+    ws = out.get("warnings")
+    fails += check("warnings is a list", isinstance(ws, list),
+                   f"got {type(ws).__name__}")
+    fails += check("a run that is void twice reports both reasons",
+                   isinstance(ws, list) and len(ws) >= 2,
+                   "one scalar key meant the second assignment overwrote the "
+                   "first, losing a signal in the most broken run of all")
+
     print(f"\n{'BENCHMARK: CONFORMANT' if not fails else f'BENCHMARK: NON-CONFORMANT ({fails})'}")
     return 0 if not fails else 1
 

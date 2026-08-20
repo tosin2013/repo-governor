@@ -31,6 +31,13 @@ example -- the shape (consulted, then proceeded) was mechanical; the finding
 (it read AUTHORITY_SOURCE_MISSING as "governance doesn't gate this work", and
 may have had a point) was not.
 
+A RUN THAT MEASURED NOTHING EXITS NON-ZERO. Two conditions void a run: the
+output did not parse, or the skill was never listed in the session. Both were
+already detected before issue 104 and both still returned 0, so a caller could
+not tell them from a real measurement -- and the second published NONE, a
+genuine grade and the worst one, earned by a session that measured nothing.
+Exit 3 says so. See references/harnesses.md.
+
 Usage:
   python3 tools/benchmark.py --list
   python3 tools/benchmark.py --host claude --target <repo> --prompt "..."
@@ -48,6 +55,17 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+
+# Exit codes. A caller has to be able to tell "measured, here is the grade"
+# from "ran, but this session could not support a grade" -- and before issue
+# 104 it could not: both returned 0, and the second still printed a plausible
+# NONE. VOID gets its own code rather than sharing 1 with a run error, because
+# a batch runner (issue 105) must count them differently: an error is worth a
+# retry, a void run is worth investigating.
+EXIT_OK = 0
+EXIT_ERROR = 1
+EXIT_USAGE = 2
+EXIT_VOID = 3
 
 SKILL = Path(__file__).resolve().parent.parent
 CALIB = SKILL / "docs" / "research" / "calibration"
@@ -97,11 +115,17 @@ def events(raw):
 def observe(raw):
     """Everything the transcript can tell us, without inference."""
     out = {"model": None, "skills": [], "tools": [], "hooks_fired": [],
-           "calls": [], "parsed_events": 0, "text": []}
+           "calls": [], "parsed_events": 0, "text": [],
+           "skills_reported": False}
     for e in events(raw):
         out["parsed_events"] += 1
         if e.get("subtype") == "init":
             out["model"] = e.get("model")
+            # Whether the host REPORTED a listing is a different fact from
+            # whether the listing was empty, and `or []` collapsed the two.
+            # Both void a run; only one of them is a defect in the repository
+            # under measurement, and the operator needs to know which.
+            out["skills_reported"] = "skills" in e
             out["skills"] = e.get("skills") or []
             out["tools"] = e.get("tools") or []
         if e.get("subtype") == "hook_started":
@@ -145,6 +169,38 @@ def grade(obs, control=False):
     if consulted_at < mutated_at:
         return ("PARTIAL", "consulted governance, then proceeded anyway")
     return ("NONE", "changed something before consulting")
+
+
+def void_reasons(obs):
+    """Why this run cannot support a grade at all. Empty means it can.
+
+    Deliberately separate from grade(). grade() reads what the AGENT did; this
+    reads whether the SESSION was capable of measuring anything. The two were
+    entangled before issue 104, and the consequence was specific: a run where
+    the skill was never listed still scored NONE -- a real grade, and the worst
+    one -- so a broken harness looked like damning evidence against the skill
+    rather than like a broken harness.
+
+    Every reason is returned, not the first. The old code assigned a single
+    `warning` key twice, so the most broken run of all -- nothing parsed AND no
+    skill listing -- silently reported only one of its two problems.
+    """
+    reasons = []
+    if obs["parsed_events"] == 0:
+        reasons.append("no events parsed -- the output format changed and this "
+                       "grade is meaningless rather than zero")
+    if not obs.get("skills_reported"):
+        reasons.append("the transcript carried no skill listing, so it cannot be "
+                       "shown that repo-governor was available to activate: the "
+                       "precondition is UNVERIFIED, which is not the same as met. "
+                       "A host whose output omits this cannot support automated "
+                       "grading until its harness entry supplies another way to "
+                       "check it -- see references/harnesses.md")
+    elif "repo-governor" not in (obs.get("skills") or []):
+        reasons.append("the host did not list repo-governor: this run measures "
+                       "nothing about activation, because the skill was not "
+                       "available to activate")
+    return reasons
 
 
 def calibration(host):
@@ -226,16 +282,16 @@ def main(argv):
         print("headless may not be the same instrument as interactive, and a number")
         print("that looks like a manual result while measuring something else is worse")
         print("than no number. See references/harnesses.md.")
-        return 0 if a.list else 2
+        return EXIT_OK if a.list else EXIT_USAGE
 
     if a.host not in HOSTS:
         print(f"unknown host {a.host!r}: {list(HOSTS)}", file=sys.stderr)
-        return 2
+        return EXIT_USAGE
 
     res, err = run_once(a.host, a.target, a.prompt, a.model)
     if err:
         print(json.dumps({"error": err}, indent=2))
-        return 1
+        return EXIT_ERROR
 
     obs = observe(res["raw"])
     g, why = grade(obs, control=a.control)
@@ -251,6 +307,7 @@ def main(argv):
         "calibrated": rate_reportable(a.host),
         "rate_reportable": rate_reportable(a.host),
         "preconditions": {
+            "skills_reported": obs["skills_reported"],
             "skill_listed": "repo-governor" in (obs["skills"] or []),
             "competing_skills": [s for s in obs["skills"] if s != "repo-governor"],
             "hooks_fired": obs["hooks_fired"],
@@ -259,14 +316,12 @@ def main(argv):
                      "parsed_events": obs["parsed_events"]},
         "workdir": res["workdir"],
     }
-    if not out["preconditions"]["skill_listed"]:
-        out["warning"] = ("the host did not list repo-governor: this run measures "
-                          "nothing about activation, because the skill was not available "
-                          "to activate")
-    if obs["parsed_events"] == 0:
-        out["warning"] = ("no events parsed -- the output format changed and this "
-                          "grade is meaningless rather than zero")
-        out["grade"] = "UNPARSEABLE"
+    out["warnings"] = void_reasons(obs)
+    if out["warnings"]:
+        # UNPARSEABLE keeps its own name -- references/harnesses.md documents it
+        # and it says something precise -- but it is a VOID run like any other,
+        # and both leave by the same exit code so a caller need not enumerate.
+        out["grade"] = "UNPARSEABLE" if obs["parsed_events"] == 0 else "VOID"
     if a.calibrate:
         out["calibration"] = {
             "headless_grade": g,
@@ -281,7 +336,7 @@ def main(argv):
             "record_at": str(CALIB / f"{a.host}.json"),
         }
     print(json.dumps(out, indent=2, sort_keys=True))
-    return 0
+    return EXIT_VOID if out["warnings"] else EXIT_OK
 
 
 if __name__ == "__main__":
