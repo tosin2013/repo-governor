@@ -130,7 +130,56 @@ def _matches(text, patterns):
     return [p for p in patterns if p and p.lower() in low]
 
 
-def classify(envelope, dtype, target=None, claimed_necessary=False, completed=False):
+def discovery_id(authority_id, dtype, target):
+    """Stable identity for one discovery. Same authority, type and target => same id.
+
+    The target is hashed, never stored: §51 keeps repository content out of a
+    public evidence chain, and `record` redacts the target for that reason. A
+    hash is enough to recognise a rediscovery without recording what was
+    discovered.
+    """
+    # Imported here, not at module scope. conformance/imports.py uses this
+    # file's function-body `import hashlib` as its positive control that the
+    # dependency audit walks the AST rather than grepping for `^import`;
+    # hoisting it would make that control pass for the wrong reason.
+    import hashlib  # noqa: PLC0415
+    key = json.dumps([authority_id or "-", dtype, target or ""], sort_keys=True)
+    return "disc-" + hashlib.sha256(key.encode()).hexdigest()[:24]
+
+
+def prior_decision(authority_id, dtype, target, manifest=None):
+    """Has this exact discovery been decided before? (record, error) or (None, None).
+
+    §39: rediscovered work stays CAPTURE_ONLY unless its reversal condition is
+    met. The engine wrote decisions and never read one back, so every
+    rediscovery looked new -- an agent told no in one session could be told yes
+    in the next by the same engine (issue 95).
+
+    Absence is not an error. A repository with no decision_history bound, or
+    with nothing recorded, behaves exactly as it did before.
+    """
+    m = manifest
+    if m is None:
+        m, errs = MF.load()
+        if errs:
+            return None, None
+    if "decision_history" not in (m.get("providers") or {}):
+        return None, None
+    want = discovery_id(authority_id, dtype, target)
+    r = B.call("decision_history", "get_decisions", {"id": str(authority_id or "-")},
+               manifest=m)
+    if not r.get("ok") or r.get("unknown"):
+        # Unreadable or empty. Not an error, and deliberately not blocking: a
+        # store that cannot be read must not stop work it knows nothing about.
+        return None, None
+    for rec in (r.get("value") or {}).get("decisions") or []:
+        if rec.get("decision_id") == want:
+            return rec, None
+    return None, None
+
+
+def classify(envelope, dtype, target=None, claimed_necessary=False, completed=False,
+             prior=None):
     """Rule on one discovery against a compiled envelope. Deterministic.
 
     `claimed_necessary` is the agent's typed assertion that the authorized
@@ -159,6 +208,32 @@ def classify(envelope, dtype, target=None, claimed_necessary=False, completed=Fa
         return {"disposition": "CAPTURE_ONLY", "authority": "NONE",
                 "reasons": [f"matches a declared non-goal: {hit}"],
                 "discovery_type": dtype, "target": target}
+
+    # §39. A discovery decided before does not become executable by being
+    # discovered again. Checked BEFORE necessity, for the same reason §40 is
+    # checked before necessity: a rule with one door open is not a rule, and
+    # re-claiming necessity is exactly the door.
+    #
+    # `prior` is data, never a provider call -- classify stays deterministic
+    # and ADR-021 keeps spawning in bindings.py. main() reads it.
+    if prior and prior.get("disposition") in ("DEFERRED", "REJECTED"):
+        cond = prior.get("reversal_condition")
+        why = [f"already decided: {prior['disposition']} "
+               f"({prior.get('reason') or 'no reason recorded'})",
+               "§39: rediscovered work stays CAPTURE_ONLY; discovering it again is "
+               "not new evidence"]
+        why.append(f"reversal condition: {cond}" if cond else
+                   "no reversal condition was recorded, so nothing can establish that "
+                   "this may be revisited -- that is a gap in the earlier decision, "
+                   "not permission")
+        if claimed_necessary:
+            why.append("a necessity claim does not override a recorded decision; the "
+                       "reversal condition is what does")
+        return {"disposition": "CAPTURE_ONLY", "authority": "NONE", "reasons": why,
+                "discovery_type": dtype, "target": target,
+                "prior_decision": {"decision_id": prior.get("decision_id"),
+                                   "disposition": prior.get("disposition"),
+                                   "reversal_condition": cond}}
 
     if claimed_necessary:
         in_scope = _matches(target, envelope.get("in_scope") or [])
@@ -202,7 +277,14 @@ def record_discovery(result, manifest=None):
         return {"recorded": False, "why": err["error"]["message"]}
 
     body = json.dumps(result, sort_keys=True)
-    did = "disc-" + hashlib.sha256(body.encode()).hexdigest()[:24]
+    # IDENTITY, not content. This was a hash of the whole result, including
+    # `reasons` -- so the moment a reason changed, the same rediscovered target
+    # produced a different id and appended a second record, defeating the
+    # idempotency `--record` promises. Identity is what the discovery IS:
+    # authority, type, target. `snapshot_sha256` below still carries the full
+    # content, so what was decided remains recoverable; only the key changed.
+    did = discovery_id(result.get("authority_id"), result.get("discovery_type"),
+                       result.get("target"))
     facts = {k: result.get(k) for k in ("disposition", "discovery_type", "authority")
              if result.get(k) is not None}
     kw = {"decision_id": did,
@@ -230,8 +312,15 @@ def main(argv):
         spec = argv[argv.index("--discovery") + 1]
         dtype, _, target = spec.partition(":")
         completed = "--completed" in argv
+        # Read before ruling. The engine wrote decisions and never read one
+        # back, so §39 could not fire and every rediscovery looked new
+        # (issue 95). Absence is silent: no decision_history bound, nothing
+        # recorded, or an unreadable store all yield None and the verdict is
+        # exactly what it was before.
+        prior, _ = prior_decision(env["authority_id"], dtype, target or None)
         out = classify(env, dtype, target or None,
-                       claimed_necessary="--necessary" in argv, completed=completed)
+                       claimed_necessary="--necessary" in argv, completed=completed,
+                       prior=prior)
         out["authority_id"] = env["authority_id"]
         if "--record" in argv:
             out["record"] = record_discovery(out)

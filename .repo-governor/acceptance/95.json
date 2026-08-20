@@ -1,0 +1,9 @@
+{
+  "$comment": "Acceptance criteria for issue 95. WHAT THESE CANNOT EXPRESS: that the read is placed where it matters most. §39 is about rediscovery, and this puts the read in the discovery path; whether other paths also need it is a judgement no command_exit settles. The conformance suites cover two backends because a read that works only against Dolt is not a read against the role.",
+  "authority_id": "95",
+  "criteria": [
+    {"check": "command_exit", "target": "./tools/run-conformance.sh envelope"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh layer2"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh execution"}
+  ]
+}
