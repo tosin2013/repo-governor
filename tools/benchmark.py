@@ -86,8 +86,7 @@ def _event_line(line):
     except json.JSONDecodeError:
         return line.rstrip()[:120]
     sub = e.get("subtype") or e.get("type") or "?"
-    names = [b.get("name") for b in ((e.get("message") or {}).get("content") or [])
-             if isinstance(b, dict) and b.get("type") == "tool_use"]
+    names = [b.get("name") for b in blocks(e) if b.get("type") == "tool_use"]
     return f"{sub}" + (f"  tool_use: {', '.join(n for n in names if n)}" if names else "")
 
 
@@ -125,23 +124,58 @@ WRITE_SHELL = (">", ">>", "tee ", "sed -i", "git commit", "git apply",
                "npm install", "pip install", "mv ", "rm ")
 
 
-def events(raw):
+def events(raw, tally=None):
+    """Parsed events, skipping anything that is not a JSON object.
+
+    A transcript is an EXTERNAL format that changes without notice -- the same
+    premise the calibration refusal is built on -- and it can also be truncated
+    mid-write. Neither may raise: the tool already knows how to say a run
+    cannot be graded (UNPARSEABLE, VOID, exit 3), and a traceback is the one
+    outcome that produces neither a grade nor a refusal while destroying the
+    evidence as well (issue 109).
+    """
     for line in raw.splitlines():
         line = line.strip()
         if not line:
             continue
         try:
-            yield json.loads(line)
+            e = json.loads(line)
         except json.JSONDecodeError:
+            if tally is not None:
+                tally["unparsed_lines"] += 1
             continue
+        if not isinstance(e, dict):
+            # A bare string or number where an object was assumed. Skipping
+            # silently would make this its own blind spot, so it is counted.
+            if tally is not None:
+                tally["skipped_events"] += 1
+            continue
+        yield e
+
+
+def blocks(e):
+    """Content blocks of an event, or none. Never raises on an odd shape.
+
+    `message` was assumed to be a dict and `content` a list. Real transcripts
+    carry neither guarantee, and `or {}` defends only against None -- which is
+    why a `str` crashed a real 228-second run. The same expression existed in
+    two places, and the duplication is why only one of them was ever noticed.
+    """
+    msg = e.get("message")
+    if not isinstance(msg, dict):
+        return []
+    content = msg.get("content")
+    if not isinstance(content, list):
+        return []
+    return [b for b in content if isinstance(b, dict)]
 
 
 def observe(raw):
     """Everything the transcript can tell us, without inference."""
     out = {"model": None, "skills": [], "tools": [], "hooks_fired": [],
            "calls": [], "parsed_events": 0, "text": [],
-           "skills_reported": False}
-    for e in events(raw):
+           "skills_reported": False, "unparsed_lines": 0, "skipped_events": 0}
+    for e in events(raw, out):
         out["parsed_events"] += 1
         if e.get("subtype") == "init":
             out["model"] = e.get("model")
@@ -149,15 +183,17 @@ def observe(raw):
             # whether the listing was empty, and `or []` collapsed the two.
             # Both void a run; only one of them is a defect in the repository
             # under measurement, and the operator needs to know which.
-            out["skills_reported"] = "skills" in e
-            out["skills"] = e.get("skills") or []
-            out["tools"] = e.get("tools") or []
+            # A listing of the wrong type is not a listing. Treating
+            # "skills": "not-a-list" as reported would claim the precondition
+            # was checked when nothing checkable arrived.
+            sk = e.get("skills")
+            out["skills_reported"] = isinstance(sk, list)
+            out["skills"] = sk if isinstance(sk, list) else []
+            tl = e.get("tools")
+            out["tools"] = tl if isinstance(tl, list) else []
         if e.get("subtype") == "hook_started":
             out["hooks_fired"].append(e.get("hook_name"))
-        msg = e.get("message") or {}
-        for block in (msg.get("content") or []):
-            if not isinstance(block, dict):
-                continue
+        for block in blocks(e):
             if block.get("type") == "text":
                 out["text"].append(block.get("text", ""))
             if block.get("type") == "tool_use":
@@ -307,13 +343,22 @@ def run_once(host, target, prompt, model=None, timeout=900, debug=False):
     argv = [spec["cmd"]] + [a.replace("{prompt}", prompt) for a in spec["argv"]]
     if model:
         argv += [spec["model_flag"], model]
+    # The transcript is written to disk BEFORE it is parsed, and under
+    # --debug as each line arrives. A parse defect must not be able to destroy
+    # a session: issue 109 cost a real 228-second run whose transcript existed
+    # only in memory, so the event that crashed the parser could not even be
+    # examined afterwards. Re-parsing a saved file costs nothing, and a saved
+    # file is what a fixture is made from.
+    tpath = tmp / "transcript.jsonl"
     dbg(debug, f"workdir {dst}")
+    dbg(debug, f"transcript {tpath}")
     dbg(debug, "exec " + " ".join(argv))
     try:
         if not debug:
             p = subprocess.run(argv, capture_output=True, text=True, cwd=str(dst),
                                stdin=subprocess.DEVNULL, timeout=timeout)
             out, errtxt = p.stdout, p.stderr
+            tpath.write_text(out, encoding="utf-8")
         else:
             # Stream while accumulating, so a long session is legible in
             # flight. The timer is not decoration: iterating a pipe blocks,
@@ -328,9 +373,12 @@ def run_once(host, target, prompt, model=None, timeout=900, debug=False):
             watchdog.start()
             try:
                 lines = []
-                for line in proc.stdout:
-                    lines.append(line)
-                    dbg(True, "  | " + _event_line(line))
+                with open(tpath, "w", encoding="utf-8") as fh:
+                    for line in proc.stdout:
+                        fh.write(line)
+                        fh.flush()          # survive a kill, not just an exit
+                        lines.append(line)
+                        dbg(True, "  | " + _event_line(line))
                 proc.wait()
                 errtxt = proc.stderr.read()
             finally:
@@ -340,7 +388,7 @@ def run_once(host, target, prompt, model=None, timeout=900, debug=False):
             out = "".join(lines)
         dbg(debug, f"host exited; {len(out.splitlines())} transcript lines")
         return {"raw": out, "stderr": errtxt[-2000:], "workdir": str(dst),
-                "argv": argv}, None
+                "transcript": str(tpath), "argv": argv}, None
     except subprocess.TimeoutExpired:
         return None, f"timed out after {timeout}s"
 
@@ -374,8 +422,11 @@ def measure(host, target, prompt, model=None, control=False, debug=False):
             "hooks_fired": obs["hooks_fired"],
         },
         "evidence": {"tool_calls": [c["name"] for c in obs["calls"]],
-                     "parsed_events": obs["parsed_events"]},
+                     "parsed_events": obs["parsed_events"],
+                     "unparsed_lines": obs["unparsed_lines"],
+                     "skipped_events": obs["skipped_events"]},
         "workdir": res["workdir"],
+        "transcript": res.get("transcript"),
     }
     out["warnings"] = void_reasons(obs)
     if out["warnings"]:
@@ -469,6 +520,12 @@ def run_suite(host, target, doc, path, out_dir=None, model=None, debug=False):
         if out_dir:
             (Path(out_dir) / f"{pr['id']}.json").write_text(
                 json.dumps(rec, indent=2, sort_keys=True), encoding="utf-8")
+            # The transcript travels with the record. The temp trees are left
+            # for inspection but nothing promises how long they last, and a
+            # record whose evidence has been reaped is an assertion.
+            src = rec.get("transcript")
+            if src and Path(src).is_file():
+                shutil.copyfile(src, Path(out_dir) / f"{pr['id']}.transcript.jsonl")
         print(f"  {pr['id']:<4} {rec['grade']:<13} {pr['text'][:56]}", file=sys.stderr)
 
     void = [r for r in records if r["warnings"]]
