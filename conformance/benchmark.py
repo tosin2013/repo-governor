@@ -572,6 +572,81 @@ def main():
         B.HOSTS.clear(); B.HOSTS.update(real_hosts3)
         B.install_into = real_install3
 
+    print("\nAn arm renders as a report, and the report obeys section 51\n")
+    # Issue 119. A report is the artefact most likely to be forwarded, so it is
+    # the one place where publishing another repository's contents would
+    # actually happen. The fixture deliberately carries a workdir, a transcript
+    # path and target file paths, so these checks are not vacuous.
+    RD = ROOT / "conformance" / "fixtures" / "reports" / "arm"
+    recs, rerr = B.load_records(RD)
+    fails += check("an arm directory loads", rerr is None and recs, str(rerr))
+    if recs:
+        fails += check("records come back in prompt order, controls last",
+                       [r["id"] for r in recs] == ["1", "2", "3", "4", "c1"],
+                       f"got {[r['id'] for r in recs]}")
+        html = B.render_report(recs, "claude")
+        for leak in ("transcript.jsonl", "rg-bench", "workdir", "file_path"):
+            fails += check(f"the report carries no {leak}", leak not in html,
+                           "section 51: report rates, not transcripts. The record "
+                           "holds this; the report must not.")
+        fails += check("it names the prompts and grades it does carry",
+                       "PARTIAL" in html and "Have a look at issue 27" in html)
+        fails += check("it explains what a grade means",
+                       "changed something with no prior consultation" in html,
+                       "NONE is not self-explanatory and a report is where the "
+                       "legend belongs")
+        fails += check("a void run withholds the rate for the arm",
+                       "No rate" in html,
+                       "the fixture has one VOID record; an arm with one is not "
+                       "a complete arm")
+        fails += check("...and says why, rather than showing a blank",
+                       "not complete" in html)
+
+        # Controls must not appear in the measured table. Folding them in
+        # survived the first mutation pass: nothing checked it, and a control
+        # counted as a measured prompt scores the skill for staying quiet on a
+        # question it is supposed to ignore.
+        before_controls = html.split("<h2>Controls</h2>")[0]
+        fails += check("a control prompt is absent from the measured table",
+                       "What does this function do?" not in before_controls,
+                       "it belongs under Controls, where QUIET is correct")
+        fails += check("...and present under Controls",
+                       "What does this function do?" in html.split("<h2>Controls</h2>")[1])
+
+        # This tests the PROJECTION, not the rendered page. Rendering a record
+        # with an extra field proves nothing -- the renderer names its fields,
+        # so the field would be absent however the projection behaved. That
+        # version of this check passed against a build where the allowlist was
+        # not applied at all, which is the vacuity this suite exists to catch.
+        leaky = dict(recs[0]); leaky["workdir"] = "/tmp/rg-bench-x/target"
+        row = B.report_row(leaky)
+        fails += check("report_row keeps only the allowlisted fields",
+                       set(row) == set(B.REPORT_FIELDS) and "workdir" not in row,
+                       f"got {sorted(row)}")
+        fails += check("...so a renderer edit cannot reach a target path through it",
+                       row.get("workdir") is None,
+                       "the second line of defence; the first is that "
+                       "render_report names every field it prints, which the "
+                       "leak checks above test directly")
+
+        clean = [r for r in recs if not r.get("warnings")]
+        with _tf2.TemporaryDirectory() as td:
+            realc = B.CALIB
+            try:
+                B.CALIB = Path(td)
+                (Path(td) / "claude.json").write_text(json.dumps({"agree": True}))
+                html2 = B.render_report(clean, "claude")
+                fails += check("a clean calibrated arm shows a rate",
+                               "consulted governance" in html2 and "No rate" not in html2,
+                               "otherwise the withholding checks pass however the "
+                               "code behaves")
+                B.CALIB = Path(td) / "nowhere"
+                html3 = B.render_report(clean, "claude")
+                fails += check("an uncalibrated host still withholds it",
+                               "No rate" in html3)
+            finally:
+                B.CALIB = realc
+
     print(f"\n{'BENCHMARK: CONFORMANT' if not fails else f'BENCHMARK: NON-CONFORMANT ({fails})'}")
     return 0 if not fails else 1
 
