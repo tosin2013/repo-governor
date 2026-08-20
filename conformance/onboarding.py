@@ -369,6 +369,31 @@ def main():
                         '"GitHub"' in src_t and "GitHub issues / Projects" not in src_t,
                         "naming Projects there primed four consecutive operators to "
                         "pick 'Project column/status' at the NEXT question")
+                # Behavioural: drive selftest against a repository that HAS a
+                # hook. Grepping selftest for the word "hook" would pass on a
+                # file that merely mentions it, and this precondition already
+                # went unwritten once by depending on memory (issue 86).
+                _hooked = _pl.Path(td) / "hooked"
+                (_hooked / ".cursor").mkdir(parents=True)
+                _sp.run(["git", "init", "-q", str(_hooked)], capture_output=True)
+                (_hooked / ".cursor" / "hooks.json").write_text("{}")
+                _st = _sp.run([sys.executable, str(ROOT_ / "tools" / "selftest.py"),
+                               str(_hooked)], capture_output=True, text=True).stdout
+                rep.add("proposal-e2e", "selftest detects an installed hook",
+                        "hook is installed" in _st,
+                        "a hooked repository measures DELIVERY, not activation, and "
+                        "the operator must be told which number they are taking")
+                rep.add("proposal-e2e", "and names which measurement the prompts make",
+                        "DELIVERY, not activation" in _st)
+                _clean = _pl.Path(td) / "unhooked"
+                _clean.mkdir()
+                _sp.run(["git", "init", "-q", str(_clean)], capture_output=True)
+                _st2 = _sp.run([sys.executable, str(ROOT_ / "tools" / "selftest.py"),
+                                str(_clean)], capture_output=True, text=True).stdout
+                rep.add("proposal-e2e", "control: an unhooked repository measures activation",
+                        "measure ACTIVATION" in _st2,
+                        "otherwise the check above passes for any output at all")
+
                 rep.add("proposal-e2e",
                         "the contribution pointer is a URL, not a pruned filename",
                         "blob/main/CONTRIBUTING.md" in src_t

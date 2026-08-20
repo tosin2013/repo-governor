@@ -136,6 +136,25 @@ It is unrelated to governance, so it does not leak the Arm A signal — but it *
 rm -rf <skills-dir>/repo-governor/.claude
 ```
 
+### Neither arm may have a hook installed
+
+A hook delivers governance deterministically, so the agent is *told* rather than
+deciding to ask. That is a delivery measurement, not an activation one, and the
+two produce different numbers against the same rubric.
+
+`install-skill.sh` refuses to install a hook into an un-onboarded repository, so
+**Arm A is protected by construction**. **Arm B is not** — its target is bound,
+the refusal does not apply, and it is the arm where a hook is most likely to
+have been left installed from earlier work. Check before every Arm B session:
+
+```sh
+ls .cursor/hooks.json .claude/settings.json .codex/hooks.json \
+   .gemini/settings.json .github/hooks/ 2>/dev/null
+```
+
+Empty output is the passing state. `tools/selftest.py` reports the same thing
+and says which measurement the prompts are then making.
+
 ### The Arm A target must stay un-onboarded, which bounds what Arm A can measure
 
 Every Arm A prompt will return `AUTHORITY_SOURCE_MISSING`, because the target has no `.repo-governor.json`. That is not a gap to fix before running — **onboarding the target would end Arm A**. A manifest is a governance artifact sitting in the repository root; a repository carrying one is no longer silent about governance, and the arm collapses into Arm B.

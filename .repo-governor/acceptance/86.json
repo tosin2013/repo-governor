@@ -1,0 +1,9 @@
+{
+  "$comment": "Acceptance criteria for issue 86. WHAT THIS CANNOT EXPRESS: that an operator reads the precondition. Only the selftest half actually ships -- docs/research/ is pruned from installs -- which is why detection matters more than documentation here, and why the conformance check drives selftest against a repository that HAS a hook rather than grepping for the word.",
+  "authority_id": "86",
+  "criteria": [
+    {"check": "command_exit", "target": "./tools/run-conformance.sh onboarding"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh skill"},
+    {"check": "command_exit", "target": "python3 tools/selftest.py ."}
+  ]
+}
