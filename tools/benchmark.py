@@ -657,6 +657,13 @@ def summarise(records, host, errors=0):
         withheld.append(f"{len(void)} run(s) measured nothing; the arm is not complete")
     if errors:
         withheld.append(f"{errors} prompt(s) did not run at all")
+    if not measured:
+        # Zero measured prompts produced "0 of 0 consulted governance" -- a
+        # headline that reads as a result and rests on nothing. Reached by
+        # running only the controls, which is the obvious cheap smoke test and
+        # therefore the first thing anyone would do.
+        withheld.append("no measured prompts -- controls alone say nothing about "
+                        "activation, only about false positives")
     chist = {}
     for r in controls:
         chist[r["grade"]] = chist.get(r["grade"], 0) + 1

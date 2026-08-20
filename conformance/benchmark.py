@@ -640,6 +640,15 @@ def main():
                                "consulted governance" in html2 and "No rate" not in html2,
                                "otherwise the withholding checks pass however the "
                                "code behaves")
+                fails += check("an arm of controls alone reports no rate",
+                               "No rate" in B.render_report(
+                                   [r for r in recs if r.get("control")], "claude"),
+                               "it headlined '0 of 0 consulted governance' -- a "
+                               "rate resting on nothing, reached by the cheapest "
+                               "smoke test anyone would run first. Checked here, "
+                               "where calibration agrees, so having nothing to "
+                               "measure is the only reason left to withhold.")
+
                 B.CALIB = Path(td) / "nowhere"
                 html3 = B.render_report(clean, "claude")
                 fails += check("an uncalibrated host still withholds it",
