@@ -1,0 +1,10 @@
+{
+  "$comment": "Acceptance criteria for issue 100. DECLARED LATE -- after the work, not before it, which is the wrong order and is recorded rather than hidden. A bar written once the implementation exists can be shaped to fit it, which is the amendment failure engine/amendments.py exists to make visible. Nothing here was loosened to pass; the criteria are the issue's own, and the risk is noted so a reader can weigh it. WHAT THEY CANNOT EXPRESS: that a MODEL would answer the same way at both refs. The tool compares text, not behaviour -- models change independently of this repository, which is what the activation programme measures.",
+  "authority_id": "100",
+  "criteria": [
+    {"check": "file_exists",  "target": "tools/surface-diff.py"},
+    {"check": "file_exists",  "target": "tools/_surface.py"},
+    {"check": "command_exit", "target": "python3 tools/surface-diff.py v0.1.0 v0.2.3"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh skill"}
+  ]
+}

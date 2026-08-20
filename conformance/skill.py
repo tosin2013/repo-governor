@@ -185,11 +185,15 @@ def main():
 
     print("\nThe surface does not cite decisions that have moved\n")
 
-    surface = [("SKILL.md", skill), ("AGENTS.md", agents),
-               *[(f"references/{p.name}", p.read_text())
-                 for p in sorted((ROOT / "references").glob("*.md"))],
-               *[(f"docs/workflows/{p.name}", p.read_text())
-                 for p in sorted((ROOT / "docs" / "workflows").glob("*.md"))]]
+    # One definition, in tools/_surface.py, shared with tools/surface-diff.py.
+    # It was inline here and the diff needed the same list; a second copy of
+    # "the agent surface" would drift from the first, which is the defect three
+    # checks in this file already exist to catch.
+    import sys as _sys
+    _sys.path.insert(0, str(ROOT / "tools"))
+    import _surface as _S
+    surface = [(f, (ROOT / f).read_text(encoding="utf-8"))
+               for f in _S.files_at("HEAD") if (ROOT / f).is_file()]
 
     # The workflow pages teach humans what to ask, so they are agent surface too
     # (issue 29's lesson: the instructions ARE the product). Same rules: no bare
@@ -242,6 +246,70 @@ def main():
                    not bad, bad.group(0) if bad else "")
     for tool in ("onboard-interactive.py", "selftest.py"):
         fails += check(f"README points at {tool}", tool in rd)
+
+    print("\nA result can say whether it is still comparable\n")
+
+    # Every activation result carries a commit and nothing said whether it
+    # still counted after a release. The question was answered once by hashing
+    # trees by hand, which nobody repeats -- so the fallback was treating every
+    # result as stale on every release, discarding most of the evidence base
+    # (issue 100).
+    import sys as _sy
+    _sy.path.insert(0, str(ROOT / "tools"))
+    import _surface as _SF
+
+    fails += check("the surface is defined once and shared",
+                   (ROOT / "tools" / "_surface.py").is_file()
+                   and "_surface" in (ROOT / "conformance" / "skill.py").read_text(encoding="utf-8"),
+                   "a second copy of 'the agent surface' drifts from the first")
+    here = _SF.files_at("HEAD")
+    fails += check(f"it resolves to real files ({len(here)})",
+                   len(here) >= 4 and "SKILL.md" in here,
+                   f"{here[:5]} -- an empty surface would report every release comparable")
+    fails += check("it is glob-based, so a new workflow page is surface the day it lands",
+                   any("*" in g for g in _SF.SURFACE_GLOBS),
+                   "a hardcoded file list would be wrong exactly when it mattered")
+
+    # The distinction the tool exists for, driven through the real function on
+    # synthetic content rather than asserted about prose.
+    import tempfile as _tf, subprocess as _sp
+    with _tf.TemporaryDirectory() as td:
+        r = Path(td) / "r"
+        r.mkdir()
+        _sp.run(["git", "init", "-q", str(r)], capture_output=True)
+
+        def commit(desc, body, tag):
+            (r / "SKILL.md").write_text(f"---\nname: x\ndescription: {desc}\n---\n\n{body}\n")
+            _sp.run(["git", "-C", str(r), "add", "-A"], capture_output=True)
+            _sp.run(["git", "-C", str(r), "-c", "user.email=t@t", "-c", "user.name=t",
+                     "commit", "-q", "-m", tag], capture_output=True)
+            _sp.run(["git", "-C", str(r), "tag", tag], capture_output=True)
+
+        commit("decide authorization", "one", "t1")
+        commit("decide authorization", "two", "t2")     # body only
+        commit("something else entirely", "two", "t3")  # description
+
+        real = _SF._git
+        _SF._git = lambda *a, **k: _sp.run(["git", "-C", str(r), *a],
+                                           capture_output=True, text=True).stdout
+        try:
+            body_only = _SF.compare("t1", "t2")
+            fails += check("a body change leaves activation rates comparable",
+                           body_only["activation_comparable"] is True,
+                           "the description is the surface a model judges; the body is "
+                           "what it reads afterwards")
+            fails += check("and marks grades as possibly shifted",
+                           body_only["grades_comparable"] is False)
+            desc = _SF.compare("t2", "t3")
+            fails += check("a DESCRIPTION change makes activation results stale",
+                           desc["activation_comparable"] is False,
+                           "this is the case the whole tool exists to catch")
+            same = _SF.compare("t1", "t1")
+            fails += check("control: a ref against itself is comparable both ways",
+                           same["activation_comparable"] and same["grades_comparable"],
+                           "otherwise the checks above pass for any pair at all")
+        finally:
+            _SF._git = real
 
     print("\nThe two activation instruments cannot be reported as one number\n")
 
