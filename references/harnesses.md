@@ -160,6 +160,13 @@ a JSON record you can pipe into `jq`:
 python3 tools/benchmark.py --host claude --target <repo> --prompt "..." --debug
 ```
 
+Consecutive events that render identically are **collapsed** — `thinking_tokens
+x27  (to 10.0s)` rather than twenty-seven lines. The count and the span stay,
+because they are the one thing that distinguishes a slow model from a stuck
+harness. The rule is general rather than a list of noisy event names: lines
+that render identically can never carry differing information, and no list
+needs maintaining when a host adds an event nobody here has seen.
+
 It announces what it is about to do *before* the slow copy, not from inside
 it — a progress flag whose output starts once the wait is over answers
 "is it hung?" exactly when the question has stopped being asked. Under

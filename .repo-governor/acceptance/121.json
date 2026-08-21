@@ -1,0 +1,9 @@
+{
+  "$comment": "Acceptance criteria for issue 121, declared before the work. Criterion 1 is red at declaration: echo_state does not exist, so the one-liner raises. It asserts the property rather than the appearance -- five identical events must produce ONE line, not five, and that line must say how many were collapsed. WHAT IT DELIBERATELY DOES NOT ASSERT: that the collapsed line is pleasant to read. What it does assert is that nothing is silently dropped, because a counter that vanishes takes with it the one fact that distinguishes a slow model from a stuck harness.",
+  "authority_id": "121",
+  "criteria": [
+    {"check": "command_exit", "target": "python3 -c \"import sys,io,json,contextlib,tempfile,pathlib;sys.path.insert(0,'tools');import benchmark as B;p=pathlib.Path(tempfile.mkdtemp())/'t.jsonl';p.write_text(chr(10).join([json.dumps({'type':'system','subtype':'thinking_tokens'})]*5));e=io.StringIO();s=B.echo_state();exec('with contextlib.redirect_stderr(e):\\n B.echo_new(p,s)\\n B.echo_flush(s)');sys.exit(0 if e.getvalue().count('thinking_tokens')==1 and 'x5' in e.getvalue() else 1)\""},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh benchmark"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh"}
+  ]
+}
