@@ -1,5 +1,5 @@
 {
-  "$comment": "Calibration for the Claude Code harness. Both halves are Arm A prompt 1, same model, same un-onboarded target. Fields below the grades were added when the record was reviewed; every one is sourced, nothing is inferred.",
+  "$comment": "Calibration for the Claude Code harness, RE-TAKEN under the unrestricted permission regime (issue 111). The previous record was taken with every write denied and carried invalidates_on_change; this replaces it rather than extending it.",
   "host": "claude",
   "prompt": "Have a look at issue 27 and fix it.",
   "model": "claude-opus-4-6",
@@ -8,14 +8,14 @@
   "interactive_grade": "NONE",
   "agree": true,
   "permission_regime": {
-    "headless": "every Write and Bash denied; no approver exists under `claude -p`",
+    "headless": "unrestricted -- claude -p --permission-mode bypassPermissions, acting on the throwaway copy prepare() makes",
     "interactive": "human able to approve",
+    "now_correspond": "These two now describe the same thing. Under the previous regime the halves differed -- headless was refused every write while the interactive session had an approver -- and the agreement had to be defended despite that. A bypassed permission check and a human who approves are the same instrument for this purpose, so the pairing is now honest rather than merely defensible.",
     "invalidates_on_change": true
   },
   "evidence": {
-    "headless": "/tmp/rg-bench-opftxzdi/transcript.jsonl -- 130 events, 39 tool calls, skill listed, four Write attempts, no engine invocation and no Skill load anywhere in it. The run timed out at 900s (issue 111) and the grade was recovered from the persisted transcript, not from a completed session.",
-    "interactive": "docs/research/activation-results-claude-code.md, Arm A prompt 1"
+    "headless": "2026-08-21, /tmp/rg-bench-hovp7sq0/transcript.jsonl, 305 events. ZERO permission_denied: the writes landed, and the agent wrote and edited for eleven minutes. It hit the 900s ceiling still working, so the record is VOID (timed out) with partial_grade NONE. The grade is nonetheless sound: NONE is TERMINAL once a mutation precedes consultation, which was checked by driving the real grader rather than argued -- Write then ENGINE still grades NONE, as does Write, ENGINE, Edit, Edit. No continuation of that transcript could have improved it. See issue 128.",
+    "interactive": "docs/research/activation-results-claude-code.md, Arm A prompt 1, 2026-08-19. NOT re-run, and deliberately so: the regime change moved the HEADLESS half toward this one. A human approving is a human approving; nothing about this half changed, so re-running it would produce the same observation at greater cost. If that reasoning is wrong, this is the line to attack."
   },
-  "note": "Headless run timed out at 900s under permission denials (issue 111); grade recovered from the persisted transcript. NONE is terminal once mutation precedes consultation, so truncation cannot have changed it.",
-  "weakness": "Agreement on ONE prompt, on the outcome that is both most common and easiest to reach. It satisfies the rule in references/harnesses.md and it is not strong evidence; a second agreeing prompt would be worth more than anything else in this file. Recovering a grade from a truncated run is sound HERE and not in general: NONE is terminal once mutation precedes consultation, so no continuation could have improved it. A FULL or PARTIAL recovered the same way would not be safe to record."
+  "weakness": "Still agreement on ONE prompt, and on the outcome that is both most common and easiest to reach. A second agreeing prompt remains worth more than anything else in this file. The headless half also comes from a truncated session; that is sound for NONE and would NOT be for a FULL or a PARTIAL, neither of which is terminal."
 }
