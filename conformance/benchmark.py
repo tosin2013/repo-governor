@@ -735,6 +735,58 @@ def main():
                    "a denied Write is still a tool_use; that is why the two "
                    "calibration halves agreed under different regimes")
 
+    print("\nA counter must not bury the lines that explain a failure\n")
+    # Issue 121. One session logged 27 of its 32 lines as thinking_tokens, and
+    # a calibration run buried its four permission_denied lines -- the only
+    # ones explaining why it failed -- under several hundred lines of counter.
+    def echoed(events):
+        import contextlib as _c, io as _i
+        with _tf2.TemporaryDirectory() as td:
+            f = Path(td) / "t.jsonl"
+            f.write_text("\n".join(json.dumps(e) for e in events))
+            buf = _i.StringIO()
+            st = B.echo_state()
+            with _c.redirect_stderr(buf):
+                B.echo_new(f, st)
+                B.echo_flush(st)
+            return [ln for ln in buf.getvalue().splitlines() if ln.strip()]
+
+    THINK = {"type": "system", "subtype": "thinking_tokens"}
+    DENIED = {"type": "system", "subtype": "permission_denied"}
+    WRITE = {"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "name": "Write", "input": {}}]}}
+
+    out = echoed([THINK] * 5)
+    fails += check("five identical events are one line", len(out) == 1,
+                   f"got {len(out)} lines")
+    fails += check("...and it says how many", out and "x5" in out[0],
+                   f"got {out[0] if out else None}; the count is what "
+                   "distinguishes a slow model from a stuck harness, so "
+                   "collapsing must not delete it")
+
+    out = echoed([THINK] * 5 + [WRITE, DENIED] + [THINK] * 3)
+    fails += check("the lines that explain a failure survive intact",
+                   len(out) == 4 and "Write" in out[1] and "permission_denied" in out[2],
+                   f"got {out}")
+    fails += check("...and a run after them is collapsed too",
+                   out and "x3" in out[-1], f"got {out[-1] if out else None}")
+
+    fails += check("different events are never merged",
+                   len(echoed([THINK, DENIED, THINK])) == 3,
+                   "collapsing only ever joins lines that render identically")
+
+    fails += check("a run still pending at the end is not dropped",
+                   len(echoed([WRITE] + [THINK] * 4)) == 2,
+                   "the last run is held waiting for a different line; without "
+                   "a flush at exit it would never be printed at all")
+
+    import contextlib as _c5, io as _i5
+    _b5 = _i5.StringIO()
+    with _c5.redirect_stderr(_b5):
+        B.dbg(True, "marker", at=42.0)
+    fails += check("a held line is stamped when it happened, not when printed",
+                   "42.0" in _b5.getvalue(), f"got {_b5.getvalue()!r}")
+
     print(f"\n{'BENCHMARK: CONFORMANT' if not fails else f'BENCHMARK: NON-CONFORMANT ({fails})'}")
     return 0 if not fails else 1
 

@@ -71,22 +71,63 @@ EXIT_VOID = 3
 _T0 = time.monotonic()
 
 
-def dbg(on, msg):
+def dbg(on, msg, at=None):
     """Progress, to STDERR. Never stdout -- stdout is the JSON record, and a
-    caller that pipes it into jq must not have to filter our chatter out."""
+    caller that pipes it into jq must not have to filter our chatter out.
+
+    `at` overrides the timestamp, so a line held back to be collapsed is
+    stamped when it HAPPENED rather than when it was finally printed.
+    """
     if on:
-        print(f"[{time.monotonic() - _T0:7.1f}s] {msg}", file=sys.stderr, flush=True)
+        t = (time.monotonic() - _T0) if at is None else at
+        print(f"[{t:7.1f}s] {msg}", file=sys.stderr, flush=True)
 
 
-def _echo_new(path, shown):
-    """Echo transcript lines that appeared since last call. Returns the count."""
+def echo_state():
+    return {"shown": 0, "last": None, "count": 0, "since": 0.0, "until": 0.0}
+
+
+def echo_flush(state):
+    """Emit the run being held, if any. Must be called when the host exits."""
+    if state["last"] is None:
+        return
+    n = state["count"]
+    # The COUNT stays. A run of thinking_tokens is the one thing that
+    # distinguishes a slow model from a stuck harness, so collapsing it must
+    # not delete it -- and the span says how long the model spent there.
+    tag = f"  x{n}   (to {state['until']:.1f}s)" if n > 1 else ""
+    dbg(True, f"  | {state['last']}{tag}", at=state["since"])
+    state["last"] = None
+    state["count"] = 0
+
+
+def echo_new(path, state):
+    """Echo new transcript lines, collapsing consecutive identical ones.
+
+    One real session logged 27 of its 32 lines as `thinking_tokens`, and a
+    calibration run buried its four `permission_denied` lines -- the only ones
+    explaining why it failed -- under several hundred lines of a counter.
+
+    The rule is deliberately general rather than a denylist of noisy event
+    names: consecutive lines that RENDER identically are collapsed. That can
+    never hide differing information, and it needs no maintenance when the host
+    adds an event type nobody here has seen.
+    """
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
     except OSError:
-        return shown
-    for line in lines[shown:]:
-        dbg(True, "  | " + _event_line(line))
-    return len(lines)
+        return state
+    for line in lines[state["shown"]:]:
+        rendered = _event_line(line)
+        now = time.monotonic() - _T0
+        if rendered == state["last"]:
+            state["count"] += 1
+            state["until"] = now
+        else:
+            echo_flush(state)
+            state.update(last=rendered, count=1, since=now, until=now)
+    state["shown"] = len(lines)
+    return state
 
 
 def _event_line(line):
@@ -412,11 +453,11 @@ def run_once(host, target, prompt, model=None, timeout=900, debug=False,
                 open(epath, "w", encoding="utf-8") as efh:
             proc = subprocess.Popen(argv, stdout=fh, stderr=efh, text=True,
                                     cwd=str(dst), stdin=subprocess.DEVNULL)
-            shown = 0
+            estate = echo_state()
             while True:
                 rc = proc.poll()
                 if debug:
-                    shown = _echo_new(tpath, shown)
+                    echo_new(tpath, estate)
                 if rc is not None:
                     break
                 if time.monotonic() - t0 > timeout:
@@ -425,6 +466,9 @@ def run_once(host, target, prompt, model=None, timeout=900, debug=False,
                     timed_out = True
                     break
                 time.sleep(0.25)
+        if debug:
+            echo_new(tpath, estate)     # anything written between the last
+            echo_flush(estate)          # poll and the exit, then the tail
         out = tpath.read_text(encoding="utf-8")
         errtxt = epath.read_text(encoding="utf-8")
         # A timeout is no longer an error that throws the session away. The
