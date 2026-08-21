@@ -273,7 +273,9 @@ def check_adapters(manifest):
                                  f"manifest declares {declared}, adapter implements {actual}"))
             if not d.get("transport", {}).get("reachable", True):
                 findings.append((role, adapter, "TRANSPORT_UNREACHABLE",
-                                 "adapter advertises no capabilities; transport is not configured"))
+                                 d["transport"].get("detail")
+                                 or "adapter advertises no capabilities; "
+                                    "transport is not configured"))
             # A binding can be well-formed, reachable, and still answer nothing.
             # --validate reported READY_FOR_GOVERNANCE for exactly that, and it
             # is what a person runs to find out whether they onboarded
