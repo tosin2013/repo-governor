@@ -17,9 +17,12 @@ Linear's workflow-state model does not line up with GitHub Projects:
 been admitted", which GitHub Projects cannot. INV-002 depends on exactly that
 distinction, so this is where the abstraction either holds or leaks.
 
-Two modes:
+Three modes:
   live     POSTs to api.linear.app/graphql with LINEAR_API_KEY
   fixture  reads a captured response — set REPO_GOVERNOR_LINEAR_FIXTURE
+  mcp      agent-supplied transport — manifest declares transport.kind=mcp,
+           agent fetches via MCP and supplies data through --input - or
+           REPO_GOVERNOR_LINEAR_FIXTURE (ADR-020, #124)
 
 Accepts both raw shapes: the GraphQL API nests state as `state.type`, the
 Linear MCP server flattens it to `statusType`. Shape normalization happens
@@ -40,7 +43,7 @@ import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from _protocol import cite, fail, main, ok, unknown  # noqa: E402
+from _protocol import binding, cite, fail, main, ok, unknown  # noqa: E402
 
 ROLE = "roadmap_authority"
 FIXTURE = os.environ.get("REPO_GOVERNOR_LINEAR_FIXTURE")
@@ -174,6 +177,13 @@ def _fetch(fn):
         except json.JSONDecodeError as e:
             return None, fail(ROLE, fn, "MALFORMED_SOURCE", f"fixture is not valid JSON: {e}")
     if not API_KEY:
+        b = binding()
+        if (b.get("transport") or {}).get("kind") == "mcp":
+            return None, fail(ROLE, fn, "PROVIDER_UNAVAILABLE",
+                              "MCP transport is declared but no input was supplied. "
+                              "The agent must fetch Linear issues via MCP with fields "
+                              f"{list(MCP_REQUIRED)} and supply them via --input - "
+                              "or REPO_GOVERNOR_LINEAR_FIXTURE.")
         return None, fail(ROLE, fn, "PROVIDER_UNAVAILABLE",
                           "LINEAR_API_KEY is not set and no fixture was provided")
     req = urllib.request.Request(
@@ -325,7 +335,11 @@ def get_decision_history(kw):
 
 
 def _probe():
-    return bool(FIXTURE and Path(FIXTURE).exists()) or bool(API_KEY)
+    if FIXTURE and Path(FIXTURE).exists():
+        return True
+    if API_KEY:
+        return True
+    return (binding().get("transport") or {}).get("kind") == "mcp"
 
 
 FUNCTIONS = {
@@ -361,6 +375,9 @@ CAPABILITIES = {
 def _configured():
     if FIXTURE:
         return True, None
+    b = binding()
+    if (b.get("transport") or {}).get("kind") == "mcp":
+        return True, None
     if not API_KEY:
         return False, "LINEAR_API_KEY is unset; every query will refuse."
     return True, None
@@ -369,5 +386,7 @@ if __name__ == "__main__":
     sys.exit(main(ROLE, CAPABILITIES, FUNCTIONS,
                   {"name": "linear",
                    "permissions": {"read": True, "write": False},
-                   "mode": "fixture" if FIXTURE else ("live" if API_KEY else "unconfigured")},
+                   "mode": "fixture" if FIXTURE else ("live" if API_KEY else
+                          ("mcp" if (binding().get("transport") or {}).get("kind") == "mcp"
+                           else "unconfigured"))},
                   properties=PROPERTIES, probe=_probe, config_probe=_configured))

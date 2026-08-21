@@ -66,6 +66,26 @@ Returns JSON with a `decision`. Obey it:
 
 Every `unknown` carries `reason`, `dimension`, `blocking`, and a human-readable `resolution`. Report the resolution rather than working around it.
 
+## Linear with MCP transport
+
+When the manifest declares `roadmap_authority` as Linear with `"transport": {"kind": "mcp"}`, the engine cannot reach Linear on its own — the engine never calls MCP (ADR-016). The **agent** bridges the gap by fetching from Linear MCP and supplying the data to the engine through the environment.
+
+**Step 1 — fetch.** Call the Linear MCP server's `list_issues` tool with `fields: ["id", "title", "status", "statusType"]`. These four fields are required; a payload missing any of them is refused as `MALFORMED_SOURCE`.
+
+**Step 2 — cache.** Write the JSON response to a temporary file.
+
+**Step 3 — evaluate.** Run `completion.py` with `REPO_GOVERNOR_LINEAR_FIXTURE` pointing at that file:
+
+```bash
+REPO_GOVERNOR_LINEAR_FIXTURE=/tmp/linear-issues.json python3 "$RG/engine/completion.py" <work-id>
+```
+
+The adapter reads the fixture, normalizes the MCP payload (same code path `tools/live-equivalence.py` uses), and returns a typed verdict. No `LINEAR_API_KEY` is needed.
+
+**Hooks and headless contexts** cannot see the agent's MCP session. If hooks are installed, the hook subprocess will report `PROVIDER_UNAVAILABLE` with a message naming the missing input. That is correct — hooks deliver the governance requirement; they do not compute verdicts. The agent's `completion.py` run is where the verdict is produced.
+
+**Do not** default to MCP because a server happens to be connected (INV-014). The transport is declared in the manifest, not inferred.
+
 ## Four invariants that always apply
 
 These hold at every profile, including a nearly empty repository. The other ten load with the governance profile — see `references/invariants.md`.
