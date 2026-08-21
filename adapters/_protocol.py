@@ -163,7 +163,8 @@ def parse_args(argv):
 
 
 def main(role, capabilities, functions, describe_extra=None, properties=None, probe=None,
-         writers=None, writers_probe=None, transports=None, config_probe=None):
+         writers=None, writers_probe=None, transports=None, config_probe=None,
+         transport_detail=None):
     """Standard entry point. `functions` maps name -> callable(kw) -> response.
 
     `capabilities` are claims that MUST be exercisable by a conformance probe
@@ -233,8 +234,15 @@ def main(role, capabilities, functions, describe_extra=None, properties=None, pr
             # which variable it needs is adapter-specific knowledge ADR-003
             # keeps out of the engine. Default True: an adapter with nothing
             # to configure is configured.
+            # `detail` explains an unreachable transport in the adapter's own
+            # words. The engine's default message assumes unreachable implies
+            # unconfigured, which is false for a declared agent-supplied
+            # transport: configured by a human, and simply not usable from
+            # this process.
             "transport": {"reachable": reachable, "writable": writable,
                           "configured": configured, "configured_detail": config_detail,
+                          "detail": (transport_detail() if callable(transport_detail)
+                                     else transport_detail) if not reachable else None,
                           "supports": sorted(transports or {})},
         }
         if describe_extra:

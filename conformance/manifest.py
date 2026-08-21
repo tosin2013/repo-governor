@@ -152,6 +152,41 @@ def main():
     print(f"  [{'PASS' if ok3 else 'FAIL'}] control: the same binding WITH identity is ready"
           + ("" if ok3 else f"\n         {out_good.strip()[:180]}"))
 
+    # A DECLARED transport is not a reached one (issue 130). Declaring
+    # transport.kind=mcp made the adapter report reachable and writable, which
+    # silenced WRITE_GRANTED_BUT_TRANSPORT_READONLY for a transport that has no
+    # write path at all -- the #17 guard, disarmed by adding a line to a
+    # manifest. It also advertised a full capability set the adapter could not
+    # exercise, which ADR-008 C2 forbids.
+    print("\nA declared transport is not a reached one\n")
+    mcp = _copy.deepcopy(kept)
+    mcp["providers"]["roadmap_authority"] = {
+        "type": "linear", "adapter": "adapters/linear",
+        "transport": {"kind": "mcp", "server": "linear"}}
+    mcp["permissions"]["roadmap_authority"] = {"read": True, "write": True}
+    out_mcp = _validate(mcp)
+
+    okm1 = "WRITE_GRANTED_BUT_TRANSPORT_READONLY" in out_mcp
+    extra += not okm1
+    print(f"  [{'PASS' if okm1 else 'FAIL'}] granting write over a declared MCP transport is caught"
+          + ("" if okm1 else "\n         agent-supplied stdin is read-only by construction; "
+                             "a grant that cannot be served must not validate clean"))
+
+    # Issue 124's own requirement, kept as a control: the fix for THIS issue
+    # must not quietly undo it by making the adapter unconfigured again.
+    okm2 = "NOT_CONFIGURED" not in out_mcp
+    extra += not okm2
+    print(f"  [{'PASS' if okm2 else 'FAIL'}] and it is still not NOT_CONFIGURED (issue 124)"
+          + ("" if okm2 else "\n         a declared transport IS configured; that was the "
+                             "whole complaint, and this check exists so fixing 130 "
+                             "cannot silently reopen 124"))
+
+    okm3 = "--input" in out_mcp
+    extra += not okm3
+    print(f"  [{'PASS' if okm3 else 'FAIL'}] the unreachable finding says what would fix it"
+          + ("" if okm3 else "\n         the engine's default message claims the transport is "
+                             "not configured, which is false here"))
+
     # The engine must not have learned an adapter's variable names.
     src = (ROOT / "engine" / "manifest.py").read_text()
     ok4 = "REPO_GOVERNOR_GH_REPO" not in src and "LINEAR_API_KEY" not in src
@@ -160,7 +195,7 @@ def main():
           + ("" if ok4 else "\n         adapter-specific knowledge must stay in the adapter"))
 
     fails += extra
-    total = len(CASES) + len(PERM_CASES) + 4
+    total = len(CASES) + len(PERM_CASES) + 7
     print(f"\n{total - fails}/{total} checks passed")
     print("MANIFEST LOADER: " + ("CONFORMANT" if not fails else f"NON-CONFORMANT ({fails})"))
     return 0 if not fails else 1
