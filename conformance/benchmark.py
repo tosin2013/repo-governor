@@ -277,7 +277,8 @@ def main():
     def stub_measure(grades):
         """grades: id -> (grade, warnings). Never spawns anything."""
         it = iter(grades)
-        def _m(host, target, prompt, model=None, control=False, debug=False):
+        def _m(host, target, prompt, model=None, control=False, debug=False,
+               permissions="unrestricted", transcript=None, timeout=900):
             g, ws = next(it)
             if g == "ERROR":
                 return None, "host is not on PATH"
@@ -459,7 +460,13 @@ def main():
     real_hosts4 = dict(B.HOSTS)
     real_install4 = B.install_into
     try:
-        B.HOSTS["_slow"] = {"cmd": "sh", "argv": ["-c", "echo kept-anyway; sleep 30"],
+        # Emits ONE valid event, then hangs. A host that emits nothing would
+        # grade UNPARSEABLE -- correct, but it would test the parser rather
+        # than the timeout, and the first version of this check did exactly
+        # that and asserted the wrong verdict.
+        _init = ('{"type":"system","subtype":"init","model":"kept-anyway",'
+                 '"skills":["repo-governor"]}')
+        B.HOSTS["_slow"] = {"cmd": "sh", "argv": ["-c", f"echo '{_init}'; sleep 30"],
                             "model_flag": "--model", "skills_dir": ".claude/skills",
                             "installer_host": "claude"}
         B.install_into = lambda dst, spec: (True, "")
@@ -468,15 +475,28 @@ def main():
             import contextlib as _cl4, io as _io4
             with _cl4.redirect_stderr(_io4.StringIO()):
                 res, err = B.run_once("_slow", tgt, "p", timeout=2, debug=False)
-            fails += check("a timeout is still an error", res is None and "timed out" in (err or ""),
-                           f"got {err!r}")
-            kept = [w for w in (err or "").split() if w.endswith("transcript.jsonl")]
-            fails += check("...and it names the transcript it left behind", bool(kept),
-                           "without --debug nothing else ever prints the path, so a "
-                           "persisted file nobody can find is not persistence")
-            fails += check("...and that file holds what the host managed to emit",
-                           bool(kept) and "kept-anyway" in Path(kept[0]).read_text(),
-                           "this is the case that lost a real 900-second run")
+            rec, err = B.measure("_slow", tgt, "p", debug=False, timeout=2)
+            fails += check("a timeout no longer throws the session away",
+                           err is None and rec is not None,
+                           f"got err={err!r}; 900 seconds of a real session was "
+                           "once discarded with a one-line message")
+            if rec:
+                fails += check("...it is VOID, because an unfinished session is "
+                               "not a measurement",
+                               rec["grade"] == "VOID"
+                               and any("timed out" in w for w in rec["warnings"]),
+                               f"got {rec['grade']} {rec['warnings']}")
+                fails += check("...and keeps what it did grade to, for a human",
+                               "partial_grade" in rec,
+                               "NONE is terminal once mutation precedes "
+                               "consultation; that is a judgement a person makes "
+                               "from the transcript, and they need the value")
+                t = rec.get("transcript")
+                fails += check("...and points at the transcript on disk",
+                               t and Path(t).is_file()
+                               and "kept-anyway" in Path(t).read_text(),
+                               f"got {t!r}")
+
     finally:
         B.HOSTS.clear(); B.HOSTS.update(real_hosts4)
         B.install_into = real_install4
@@ -655,6 +675,65 @@ def main():
                                "No rate" in html3)
             finally:
                 B.CALIB = realc
+
+    print("\nThe agent must be able to act, and the regime is recorded\n")
+    # Issue 111. Under a host default a headless session has no approver, so
+    # every write is refused. That does not corrupt the grade -- a denied Write
+    # is still a tool_use and intent is what is graded -- but it ends the run:
+    # one real prompt spent 900s retrying a refusal and scored nothing.
+    for host, flag in (("claude", "--permission-mode"), ("cursor", "--force")):
+        argv = B.build_argv(host, "P")
+        fails += check(f"{host} is given a flag that lets it act", flag in argv,
+                       f"got {argv}")
+        fails += check(f"...and host-default withholds it for {host}",
+                       flag not in B.build_argv(host, "P", permissions="host-default"),
+                       "measuring the host's own rules must stay possible; it is "
+                       "a different instrument, not a broken one")
+    fails += check("the prompt still reaches the command line",
+                   "P" in B.build_argv("claude", "P"))
+    fails += check("a model flag still follows it",
+                   B.build_argv("claude", "P", model="m")[-2:] == ["--model", "m"])
+
+    print("\nA saved transcript can be graded without spawning anything\n")
+    tx = ROOT / "conformance" / "fixtures" / "transcripts" / "claude-stream-json.jsonl"
+    real_run5 = B.run_once
+    try:
+        def _boom(*a, **k):
+            raise AssertionError("run_once must not be called for --from-transcript")
+        B.run_once = _boom
+        # Catching it turns a crash into a FAIL. Left uncaught, a mutation
+        # that made this path spawn the host killed the suite instead of
+        # reddening it -- and the check beside it asserted `True`, which is
+        # the vacuity this file exists to catch, written into this file.
+        try:
+            rec, err = B.measure("claude", None, "p", transcript=tx)
+            spawned = False
+        except AssertionError:
+            rec, err, spawned = None, None, True
+        fails += check("it grades from the file alone, spawning no host",
+                       not spawned and err is None and rec,
+                       "spawned a host" if spawned else f"err={err!r}")
+        if rec:
+            fails += check("...and reads the model out of it",
+                           rec["model"] == "claude-opus-5[1m]", f"got {rec['model']}")
+    finally:
+        B.run_once = real_run5
+
+    print("\nA refused tool call is a fact about the session\n")
+    denied = "\n".join([
+        json.dumps({"type": "system", "subtype": "init", "model": "m", "skills": ["repo-governor"]}),
+        json.dumps({"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "name": "Write", "input": {"file_path": "a"}}]}}),
+        json.dumps({"type": "permission_denied"}),
+        json.dumps({"type": "permission_denied"}),
+    ])
+    o = B.observe(denied)
+    fails += check("denials are counted", o["permission_denied"] == 2,
+                   f"got {o['permission_denied']}")
+    fails += check("...and the grade still reads the intent",
+                   B.grade(o)[0] == "NONE",
+                   "a denied Write is still a tool_use; that is why the two "
+                   "calibration halves agreed under different regimes")
 
     print(f"\n{'BENCHMARK: CONFORMANT' if not fails else f'BENCHMARK: NON-CONFORMANT ({fails})'}")
     return 0 if not fails else 1
