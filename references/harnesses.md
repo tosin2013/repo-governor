@@ -255,6 +255,30 @@ run would. That is what makes the persistence worth having: a run lost to a
 ceiling or a crash can be read rather than repeated, and a change to the grader
 can re-read an entire arm without spending a single session.
 
+## Re-grading an arm
+
+```sh
+python3 tools/benchmark.py --regrade results/
+```
+
+Reads the transcripts saved beside the records and grades them again. **Spawns
+nothing.** A change to the grader would otherwise invalidate every session
+already spent — an arm is twenty-three of them, hours of real host time — and
+here it costs a re-read.
+
+It reports which grades moved and from what. A grade that moves means the
+*grader* changed, not the session: the transcripts are never rewritten by the
+thing judging them.
+
+It rewrites the records in place, so point it at a copy if you want to keep
+the originals. And it reads the transcript **beside** each record, not the
+path recorded inside it — that one points into a temp tree that may be long
+gone.
+
+The grader's input is always a file on disk, never a value held in memory by
+the code that just produced it. That is what stops a parser defect from
+destroying a session, which it has done once.
+
 ## Calibrating a host
 
 ```sh

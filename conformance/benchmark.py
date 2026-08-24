@@ -165,8 +165,19 @@ def main():
         import contextlib
         import io
         real_run = B.run_once
+        # The stub must return what run_once REALLY returns, transcript path
+        # included. It used to omit it, and the omission went unnoticed until
+        # the grader started reading the file: a stub shaped differently from
+        # the contract is how a suite stays green over a path that is broken.
+        import tempfile as _tfs
+        _tf_dir = _tfs.mkdtemp(prefix="rg-stub-")
+        _tp = Path(_tf_dir) / "transcript.jsonl"
+        _tp.write_text(raw, encoding="utf-8")
         B.run_once = lambda *a, **k: ({"raw": raw, "stderr": "",
-                                       "workdir": "/t", "argv": []}, None)
+                                       "workdir": _tf_dir, "transcript": str(_tp),
+                                       "timed_out": False,
+                                       "permission_regime": "unrestricted",
+                                       "argv": []}, None)
         buf, ebuf = io.StringIO(), io.StringIO()
         try:
             with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(ebuf):
@@ -786,6 +797,97 @@ def main():
         B.dbg(True, "marker", at=42.0)
     fails += check("a held line is stamped when it happened, not when printed",
                    "42.0" in _b5.getvalue(), f"got {_b5.getvalue()!r}")
+
+    print("\nThe grader reads the transcript on disk, not a value in memory\n")
+    # The structural half of cut 2. A mutation making measure() grade the
+    # in-memory `raw` survived every check here, because the stub wrote the
+    # SAME bytes to both -- so the two were indistinguishable. They have to
+    # differ for the check to mean anything.
+    with _tf2.TemporaryDirectory() as td:
+        truth = Path(td) / "truth.jsonl"
+        truth.write_text(transcript(ENGINE), encoding="utf-8")   # grades FULL
+        real_run6 = B.run_once
+        try:
+            B.run_once = lambda *a, **k: (
+                {"raw": transcript(EDIT),          # would grade NONE
+                 "stderr": "", "workdir": td, "transcript": str(truth),
+                 "timed_out": False, "permission_regime": "unrestricted",
+                 "argv": []}, None)
+            rec, err = B.measure("claude", "/t", "p")
+            fails += check("the file wins over whatever the runner held",
+                           err is None and rec and rec["grade"] == "FULL",
+                           f"got {rec['grade'] if rec else err}; grading the "
+                           "in-memory value is how a parser bug once destroyed "
+                           "a 900-second session")
+        finally:
+            B.run_once = real_run6
+
+    print("\nAn arm can be re-graded without re-running a session\n")
+    # Issue 131 (cut 2 of 117). A change to grade() otherwise invalidates every
+    # session already spent, and an arm is twenty-three of them. The grader's
+    # input is now always a file, so the suite and a re-grade share one path.
+    import shutil as _sh
+    FIX = ROOT / "conformance" / "fixtures" / "arm-regrade"
+    with _tf2.TemporaryDirectory() as td:
+        # A COPY. --regrade rewrites records in place, and a suite that
+        # mutated a tracked fixture would leave the tree dirty on a passing
+        # run -- a defect this repository has shipped before.
+        arm = Path(td) / "arm"
+        _sh.copytree(FIX, arm)
+        before = {p.stem: json.loads(p.read_text())["grade"]
+                  for p in arm.glob("*.json")}
+        # A decoy at the path INSIDE each record. In a real arm that path
+        # points into a temp tree that may be gone; here it exists and grades
+        # differently, so anything reading it instead of the file beside the
+        # record changes a grade and is caught. Without this, a mutation that
+        # followed the stale path merely crashed, which reads as a pass.
+        decoy = arm / "decoy.jsonl"
+        decoy.write_text(transcript(ENGINE), encoding="utf-8")     # FULL
+        for rp in arm.glob("*.json"):
+            r = json.loads(rp.read_text()); r["transcript"] = str(decoy)
+            rp.write_text(json.dumps(r, indent=2, sort_keys=True))
+        summ, err = B.regrade(arm)
+        fails += check("a saved arm re-grades", err is None and summ, str(err))
+        if summ:
+            fails += check("every record with a transcript is re-graded",
+                           summ["regraded"] == 3, f"got {summ['regraded']}")
+            fails += check("an unchanged grader moves no grade", summ["changed"] == [],
+                           f"got {summ['changed']}; re-grading the same transcripts "
+                           "with the same grader must be idempotent or the grader "
+                           "is not a function of the transcript")
+            after = {p.stem: json.loads(p.read_text())["grade"]
+                     for p in arm.glob("*.json")}
+            fails += check("...and the grades on disk are unchanged", before == after,
+                           f"{before} -> {after}")
+            fails += check("the transcripts themselves are never rewritten",
+                           all((arm / f"{k}.transcript.jsonl").read_text()
+                               == (FIX / f"{k}.transcript.jsonl").read_text()
+                               for k in before),
+                           "evidence is not editable by the thing judging it")
+
+        # The property the whole issue is for: a CHANGED grader is visible
+        # without re-running anything.
+        real_grade = B.grade
+        try:
+            B.grade = lambda obs, control=False: ("FULL", "a grader that changed")
+            summ2, err2 = B.regrade(arm)
+            fails += check("a changed grader re-grades the arm from disk",
+                           err2 is None and summ2 and len(summ2["changed"]) >= 2,
+                           f"got {summ2['changed'] if summ2 else err2}")
+            fails += check("...and says which grades moved, and from what",
+                           summ2 and all({"id", "was", "now"} <= set(c)
+                                         for c in summ2["changed"]),
+                           "a re-grade that does not say what moved is a silent "
+                           "rewrite of evidence")
+        finally:
+            B.grade = real_grade
+
+    with _tf2.TemporaryDirectory() as td:
+        _, err3 = B.regrade(Path(td))
+        fails += check("a directory with no transcripts refuses",
+                       err3 is not None and "keeps neither" in err3,
+                       f"got {err3!r}; an arm run without --out has nothing to "
+                       "re-grade, and saying so beats reporting zero")
 
     print(f"\n{'BENCHMARK: CONFORMANT' if not fails else f'BENCHMARK: NON-CONFORMANT ({fails})'}")
     return 0 if not fails else 1
