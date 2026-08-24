@@ -1,0 +1,59 @@
+{
+  "$comment": "Acceptance criteria for issue 155 - OpenSpec as an architecture provider. GROUNDED IN A CENSUS RUN 2026-08-24, not in documentation, and the census corrected the issue twice. (1) There is no `openspec/archive/`; archive lives INSIDE changes/, so this issue's original path-as-status claim named a directory present in 4.5% of repositories. (2) The first census reported project.md at 97.8% -- a selection artifact, because the sample was found BY searching for project.md. An independent selector puts it at 49/237 = 20.7%. Detection therefore keys on openspec/ plus changes/ or specs/, never on project.md. TWO TRAPS ARE ENCODED AS CRITERIA RATHER THAN COMMENTS. First: specs/ is absent in 41.7% of real OpenSpec repositories, so get_specs must answer a typed UNKNOWN and never an empty success -- ADR-003 rule 6, absence is not unknown. Second, and it is the one that would do damage: AN ARCHIVED CHANGE IS COMPLETED, NOT SUPERSEDED. Mapping changes/archive/ onto get_superseded_decisions would be wrong on its own terms AND would fabricate cross-provider contradictions through the union built in issue 154, because ADR-013 rule 3 escalates exactly the case 'active in one provider, superseded in another'. A false ARCHITECTURE_REVIEW is worse than no adapter.",
+  "authority_id": "155",
+  "covers": {
+    "declared": "an `adapters/openspec` that answers the section 12 contract from the layout measured in the census, detection that proposes it, and documentation saying what the ADR and OpenSpec providers each answer so a person can tell which to bind.",
+    "uncovered": "TWO THINGS. (1) Spec Kit -- issue 156, unstarted, and its own census is not run. (2) Whether openspec/ should count toward the architecture_history difficulty indicator. Issue 161 deliberately excluded it and asserts it stays L1; now that an adapter can read the evidence, the exclusion should be REVISITED rather than silently flipped, because raising a repository's required roles is a governance consequence and this bar does not measure whether it is the right one."
+  },
+  "criteria": [
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/layer1.py | grep -q \"\\[PASS\\] openspec: specs/ absent yields a typed UNKNOWN, not an empty success\"'",
+      "$comment": "C1 THE 41.7% CASE. Measured: only 58.3% of OpenSpec repositories carry specs/. An empty success would report 'no specs' as a fact about the architecture; the truth is that this repository uses OpenSpec delta-only. ADR-003 rule 6, INV-012."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/layer1.py | grep -q \"\\[PASS\\] openspec: an archived change is completed, never superseded\"'",
+      "$comment": "C2 THE TRAP. get_superseded_decisions must return empty with a stated note. Archiving is completion. Mapping it to supersession would fabricate ARCHITECTURE_REVIEW through the issue 154 union, which escalates 'active in one provider, superseded in another'."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/layer1.py | grep -q \"\\[PASS\\] openspec: a change and an ADR with the same id do not contradict\"'",
+      "$comment": "C2b THE TRAP, END TO END. The unit check above can pass while the union still escalates. This binds both providers and asserts no finding."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/layer1.py | grep -q \"\\[PASS\\] openspec: loose files in changes/ are reported as skipped, not dropped\"'",
+      "$comment": "C3 THE 11.2% CASE. Measured: 1 repository in 9 has loose files beside the change directories. Silently dropping them reports a smaller change set as though it were the whole one -- the defect issue 25 fixed in adapters/adr via _completeness."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/layer1.py | grep -q \"\\[PASS\\] openspec: detection keys on the directory, not on project.md\"'",
+      "$comment": "C4 THE CORRECTED CENSUS. project.md is present in 20.7% under an independent selector. Keying on it would miss four repositories in five."
+    },
+    {
+      "$comment": "C5 detection proposes and never binds (ADR-010), and lands on issue 161's single list rather than duplicating it.",
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh onboarding"
+    },
+    {
+      "$comment": "C6 the adapter honours the protocol and advertises honestly (ADR-008 C2/C4).",
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh layer1"
+    },
+    {
+      "$comment": "C7 the union still behaves: one provider byte-identical, disjoint evidence does not escalate.",
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh union"
+    },
+    {
+      "$comment": "C8 a person can tell which provider answers which question. references/providers.md states what ADRs answer and what OpenSpec answers, because the maintainer asked 'i do not even know' and that is the finding.",
+      "check": "command_exit",
+      "target": "bash -c 'grep -q \"what was decided\" references/providers.md && grep -q \"OpenSpec\" references/providers.md'"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh"
+    }
+  ]
+}
