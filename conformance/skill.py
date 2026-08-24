@@ -483,26 +483,65 @@ def main():
     WORDS = {"seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11,
              "twelve": 12, "thirteen": 13}
     COUNT = re.compile(r"(\d+|" + "|".join(WORDS) + r")\s+(?:conformance\s+)?suites?\b"
-                       r"|(\d+)\s*/\s*(\d+)\s+pass"
-                       r"|Expect\s+\**(\d+)\s*/\s*(\d+)"
                        r"|(\d+)\s+of\s+(\d+)\s+conformance\s+suites?", re.I)
+    # A count claim the pattern cannot see is indistinguishable from no claim
+    # at all, and that is how CONTRIBUTING.md came to say "must be green,
+    # 10/10" eighteen lines after saying 16/16, with this check green.
+    #
+    # TWO GENERAL FIXES WERE TRIED AND BOTH FAILED, recorded so the next person
+    # does not spend the afternoon rediscovering it:
+    #
+    #   Every bare N/N -> three false positives in README.md immediately. This
+    #   repository writes activation rates that way ("20/20 on one host and 0/2
+    #   on another"), and the exemption list it needed wants exactly the
+    #   maintenance the phrasing list wants. Same defect, opposite costume.
+    #
+    #   N/N near context words -> docs/adrs/README.md writes 29/29 and 112/112
+    #   about ASSERTIONS INSIDE a suite, and the word "conformance" is in the
+    #   file path beside them. Broadening to "green|pass" made it worse.
+    #
+    # N/N genuinely means three things here: suites, assertions within a suite,
+    # and activation rates. No rule over prose separates them, so the
+    # enumeration stays -- with the phrasing that actually went stale added,
+    # and with the blind spot stated rather than implied.
+    RATIO_PHRASINGS = (
+        r"(\d+)\s*/\s*(\d+)\s+pass",
+        r"Expect\s+\**(\d+)\s*/\s*(\d+)",
+        r"green\**\W{0,4}(\d+)\s*/\s*(\d+)",   # "must be green, 16/16," -- the stale one
+    )
+    RATIO = re.compile("|".join(RATIO_PHRASINGS), re.I)
+
     total_claims = 0
     for doc in ("README.md", "AGENTS.md", "CONTRIBUTING.md", "docs/installation.md",
                 "docs/adrs/README.md", ".github/PULL_REQUEST_TEMPLATE.md"):
         f = ROOT / doc
         if not f.is_file():
             continue
-        for m in COUNT.finditer(f.read_text(encoding="utf-8")):
+        text = f.read_text(encoding="utf-8")
+        claims = []
+        for m in COUNT.finditer(text):
             raw = [g for g in m.groups() if g]
             # "4 of 12 conformance suites fail" -- the TOTAL is the last number.
             val = raw[-1]
             n = WORDS.get(val.lower(), None) if not val.isdigit() else int(val)
-            if n is None:
-                continue
+            if n is not None:
+                claims.append((m.group(0).strip(), n))
+        for m in RATIO.finditer(text):
+            nums = [g for g in m.groups() if g]
+            claims.append((m.group(0).strip(), int(nums[-1])))
+        for label, n in claims:
             total_claims += 1
-            fails += check(f"{doc}: '{m.group(0).strip()}' matches the {len(truth)} on disk",
+            fails += check(f"{doc}: '{label}' matches the {len(truth)} on disk",
                            n == len(truth),
                            f"disk has {len(truth)}: {sorted(truth)}")
+        # Two claims in ONE file contradicting each other is what happened, and
+        # no cross-document check would have caught it however good the
+        # pattern: both were compared against disk, and only one was wrong.
+        distinct = {n for _, n in claims}
+        fails += check(f"{doc}: states one suite count, not several",
+                       len(distinct) <= 1,
+                       f"claims {sorted(distinct)} in the same file: "
+                       f"{[c for c, _ in claims]}")
     fails += check("at least one document still states a suite count",
                    total_claims > 0,
                    "found 0 -- either every count was removed, or the pattern went "

@@ -1,0 +1,9 @@
+{
+  "$comment": "Acceptance criteria for issue 126, declared before the work. THE ISSUE'S OWN DIAGNOSIS WAS WRONG and was corrected on the issue first: the pattern does not require the word 'suites' -- it has four alternatives and 16/16 is matched by one of them. The real defect is that the pattern enumerates PHRASINGS, so a bare N/N that is neither preceded by 'Expect' nor followed by 'pass' matches nothing, and a count claim no alternative matches is indistinguishable from no claim at all. Criterion 1 is therefore not 'add N/N to the list' -- that is one more phrasing and leaves the shape intact -- but that a document contradicting itself is caught. Criterion 2 is the mutation-shaped one: reverting CONTRIBUTING.md line 50 to a wrong count must redden the suite, which is the only thing that proves the check can see it at all.",
+  "authority_id": "126",
+  "criteria": [
+    {"check": "command_exit", "target": "./tools/run-conformance.sh skill"},
+    {"check": "command_exit", "target": "python3 -c \"import subprocess,sys,pathlib,shutil,tempfile;p=pathlib.Path('CONTRIBUTING.md');o=p.read_text();b=tempfile.mkdtemp();shutil.copy(p,b);p.write_text(o.replace('green**, 16/16,','green**, 10/10,'));r=subprocess.run([sys.executable,'conformance/skill.py'],capture_output=True,text=True);p.write_text(o);sys.exit(0 if r.returncode!=0 else 1)\""},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh"}
+  ]
+}

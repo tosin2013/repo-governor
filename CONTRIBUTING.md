@@ -47,7 +47,7 @@ If a finding cannot be described without private content, say so on the issue an
 ## Pull requests
 
 - **Branch and PR.** Do not push to `main`.
-- **Conformance must be green**, 10/10, before you open it. If a suite fails for a reason you believe is environmental rather than a defect, say which and why in the PR body — do not silence it.
+- **Conformance must be green**, 16/16, before you open it. If a suite fails for a reason you believe is environmental rather than a defect, say which and why in the PR body — do not silence it.
 - **Never make a test pass by making it vacuous.** This has been the single most common defect in this repository's own history: a scenario that compares `{}` to `{}`, a check that counts a single provider as agreement, a permission fixture relying on a mode git does not preserve. A green suite that tests nothing is worse than a red one. If a check is hard to satisfy honestly, that is usually the check working.
 - **Explain why, not what.** The diff already says what changed. Commit messages here carry the reasoning, including what was tried and rejected.
 
