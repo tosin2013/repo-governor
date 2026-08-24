@@ -1,0 +1,13 @@
+{
+  "$comment": "Acceptance criteria for issue 141, declared before the work and confirmed red at declaration: neither deliverable exists. THIS IS RESEARCH, so the bar checks that the QUESTION WAS ANSWERED IN WRITING, not that any mechanism was built -- a considered refusal closes this issue as completely as a mechanism would, and a bar demanding a mechanism would prejudge the research. Criterion 3 is the one that does real work: an ADR whose status line is missing or unparseable is the defect adapters/adr measures in other people's repositories at 92%, and shipping one here would be the funniest possible way to fail. Criterion 4 catches the consequence of adding an ADR at all -- conformance/skill.py recounts statuses from disk and cross-checks every N of M Accepted claim in three documents, so the ledger row and those counts must move with it. WHAT THIS BAR CANNOT CHECK: whether the research is any good. It can check that a finding cites a source, that the dogfood measurement was actually run rather than asserted, and that the ADR reaches a decision instead of restating the question. Judgement stays with the reader.",
+  "authority_id": "141",
+  "criteria": [
+    {"check": "file_exists",  "target": "docs/research/2026-08-24-architecture-decisions-and-release-readiness.md"},
+    {"check": "command_exit", "target": "bash -c 'ls docs/adrs/032-*.md >/dev/null'"},
+    {"check": "command_exit", "target": "bash -c 'grep -qE \"^\\\\*\\\\*Status\\\\*\\\\*: (Proposed|Accepted|Rejected)\" docs/adrs/032-*.md'"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh skill"},
+    {"check": "command_exit", "target": "bash -c 'grep -q \"^Sources:\\\\|^## Sources\" docs/research/2026-08-24-architecture-decisions-and-release-readiness.md'"},
+    {"check": "command_exit", "target": "bash -c 'grep -q \"What this does not settle\" docs/research/2026-08-24-architecture-decisions-and-release-readiness.md'"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh"}
+  ]
+}
