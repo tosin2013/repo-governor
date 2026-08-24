@@ -1,0 +1,64 @@
+{
+  "$comment": "Acceptance criteria for issue 156 - GitHub Spec Kit as an architecture provider. MEASURED 2026-08-24 before a line was written, and the census overturned part of the issue. THE POPULATION MARKER IS .specify/, NEVER specs/. Two selectors returned 399 and 230 unique repositories with an overlap of 6, and testing the second for contamination found 35 of 70 - 50% - carry no .specify/ at all. `specs/` is an ordinary directory name. Detection keyed on it would bind an architecture provider to any repository with a folder so named, which manufactures architectural authority from a directory name (section 37) and is worse than not detecting. TWO DOCUMENTED CLAIMS DO NOT HOLD. Features are said to be numbered NNN-slug; 23.6% of repositories use no numbering at all, so identity must come from the directory name as written. And the constitution's Articles IV-VI are documented as project-defined placeholders; 6 of 59 constitutions read - 10.2% - are UNFILLED TEMPLATES carrying named placeholders like PRINCIPLE_2_NAME. Reading those as binding constraints would move get_constraints from UNKNOWN to DEFINED on a file nobody wrote. The placeholders are mechanically detectable, so this is a check rather than a caveat. CONSTRAINTS COME FROM HEADINGS, WHICH ARE STRUCTURE. 50 of 50 constitutions carry `##` headings, median 4, and 98% carry `###` too. That is addressable without reading prose, which is what ADR-016 rule 2 asks.",
+  "authority_id": "156",
+  "covers": {
+    "declared": "an `adapters/speckit` answering the section 12 contract from the measured layout, detection that proposes it on .specify/ and never on specs/, and the three refusals this provider has to make: an unfilled template is UNKNOWN, tasks.md completion never reaches a disposition, and Spec Kit supplies no decision ledger.",
+    "uncovered": "TWO THINGS. (1) The branch-dependence problem. specs/ is populated per feature branch, so what this provider reports depends on which branch is checked out - unlike adapters/adr, whose directory does not move underneath it. The adapter reports the fact in provenance and does nothing about it; whether a governance provider may return different architecture per branch is not settled here. (2) Whether .specify/ should count toward the architecture_history difficulty indicator - the same question issue 165 asks for openspec/, and it should be answered once for both."
+  },
+  "criteria": [
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/layer1.py | grep -q \"\\[PASS\\] speckit: an unfilled template constitution is UNKNOWN, never DEFINED\"'",
+      "$comment": "C1 SECTION 37. Measured at 10.2% of real constitutions. Reading an unwritten template as binding constraints manufactures architectural authority from a file nobody has filled in."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/layer1.py | grep -q \"\\[PASS\\] speckit: an authored constitution yields constraints\"'",
+      "$comment": "C2 THE SIGNAL STILL FIRES. Without this, C1 passes by never returning constraints at all -- removing the capability instead of qualifying it."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/layer1.py | grep -q \"\\[PASS\\] speckit: constraints come from headings, not from prose\"'",
+      "$comment": "C3 ADR-016 rule 2. 50 of 50 constitutions carry `##` headings, median 4. Structure is addressable; prose is not."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/layer1.py | grep -q \"\\[PASS\\] speckit: a spec directory without NNN- numbering is still read\"'",
+      "$comment": "C4 THE 23.6% CASE. The documentation says features are numbered; nearly a quarter of real repositories do not number them. An adapter deriving identity from the number fails on one repository in four."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/layer1.py | grep -q \"\\[PASS\\] speckit: tasks.md completion never becomes a constraint or a decision\"'",
+      "$comment": "C5 INV-002. references/integrations.md names this failure in as many words -- 'This task is marked Ready, so I should work on it.' Checkbox state is execution state and is mechanically readable, which is exactly why the refusal has to be asserted."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/layer1.py | grep -q \"\\[PASS\\] speckit: Spec Kit supplies no decision ledger, and says so\"'",
+      "$comment": "C6 THE MIRROR OF adapters/adr::get_specs. Spec Kit has no ADRs. Returning empty WITH a note is the honest answer; returning empty silently reports 'no decisions' as a fact about the architecture."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/layer1.py | grep -q \"\\[PASS\\] speckit: detection keys on .specify, never on specs/\"'",
+      "$comment": "C7 THE CENSUS CORRECTION. 50% of repositories matching specs/**/plan.md carry no .specify/ at all. Binding an architecture provider on a generic directory name is section 37."
+    },
+    {
+      "$comment": "C8 the adapter honours the protocol and advertises honestly (ADR-008 C2/C4).",
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh layer1"
+    },
+    {
+      "$comment": "C9 detection proposes and never binds (ADR-010).",
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh onboarding"
+    },
+    {
+      "$comment": "C10 the union still behaves with a third architecture adapter in the world.",
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh union"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh"
+    }
+  ]
+}

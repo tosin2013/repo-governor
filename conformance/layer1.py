@@ -63,6 +63,18 @@ SUITE = {
         "break_env": {"REPO_GOVERNOR_ADR_DIR": "/nonexistent-path-xyz"},
         "unknown_fn": None,
     },
+    "adapters/speckit": {
+        "role": "architecture",
+        "env": {"REPO_GOVERNOR_SPECKIT_DIR": "conformance/fixtures/speckit/authored/.specify"},
+        "probe": {},
+        "capability_fn": {
+            "constraints": ("get_constraints", {}),
+            "specs": ("get_specs", {}),
+            "provenance": ("get_provenance", {}),
+        },
+        "break_env": {"REPO_GOVERNOR_SPECKIT_DIR": "/nonexistent-path-xyz"},
+        "unknown_fn": None,
+    },
     "adapters/openspec": {
         "role": "architecture",
         "env": {"REPO_GOVERNOR_OPENSPEC_DIR": "conformance/fixtures/openspec/full"},
@@ -526,6 +538,91 @@ def _openspec_design(rep):
             f"project.md-alone advertises={only} (must be False)")
 
 
+def _sq(fixture, fn):
+    env = dict(os.environ,
+               REPO_GOVERNOR_SPECKIT_DIR=f"conformance/fixtures/speckit/{fixture}/.specify")
+    env.pop("REPO_GOVERNOR_BINDING", None)
+    r = subprocess.run([sys.executable, str(ROOT / "adapters" / "speckit"),
+                        "query", "architecture", fn],
+                       capture_output=True, text=True, cwd=str(ROOT), env=env, timeout=60)
+    return json.loads(r.stdout)
+
+
+def _speckit_design(rep):
+    """The three refusals the census forced, asserted rather than commented."""
+    A = "adapters/speckit"
+
+    # §37. Spec Kit ships a constitution with named placeholders, and 10.2% of
+    # real constitutions are still in that state. Reading their articles as
+    # constraints asserts an architecture from a file nobody wrote.
+    d = _sq("template", "get_constraints")
+    u = d.get("unknown") or {}
+    rep.add(A, "speckit: an unfilled template constitution is UNKNOWN, never DEFINED",
+            d.get("value") is None and u.get("reason") == "STATUS_TEMPLATE_UNFILLED",
+            f"value={d.get('value')} unknown={u or None}")
+
+    # Without this the check above passes by never producing constraints at all.
+    d = _sq("authored", "get_constraints")
+    v = d.get("value") or {}
+    rep.add(A, "speckit: an authored constitution yields constraints",
+            v.get("state") == "DEFINED" and v.get("count") == 4,
+            f"state={v.get('state')} count={v.get('count')}")
+
+    # ADR-016 rule 2: a typed field addressable without parsing prose. 50 of 50
+    # real constitutions carry `##` headings, median 4.
+    ids = [c["id"] for c in v.get("constraints") or []]
+    rep.add(A, "speckit: constraints come from headings, not from prose",
+            any(i.startswith("Article I:") for i in ids) and "Governance" in ids,
+            f"ids={ids}")
+
+    # 23.6% of real repositories do not number their feature directories. A
+    # filter on `NNN-` would report those as having no specs at all.
+    d = _sq("authored", "get_specs")
+    specs = (d.get("value") or {}).get("specs") or []
+    unnumbered = [s["id"] for s in specs if not s["numbered"]]
+    rep.add(A, "speckit: a spec directory without NNN- numbering is still read",
+            len(specs) == 2 and unnumbered == ["checkout-flow"],
+            f"specs={[s['id'] for s in specs]} unnumbered={unnumbered}")
+
+    # INV-002. The fixture carries a COMPLETED checkbox in tasks.md on purpose:
+    # an assertion that checkbox state never surfaces is worth nothing unless
+    # there is a completed one to surface.
+    blob = json.dumps([_sq("authored", fn) for fn in
+                       ("get_constraints", "get_specs", "get_active_decisions",
+                        "get_superseded_decisions")])
+    rep.add(A, "speckit: tasks.md completion never becomes a constraint or a decision",
+            "T001" not in blob and "tasks.md" not in blob,
+            "checkbox state is EXECUTION state; references/integrations.md names the "
+            "failure -- 'This task is marked Ready, so I should work on it'")
+
+    # The mirror of adapters/adr::get_specs. Empty WITH a note; empty in silence
+    # would report "no architectural decisions" as a fact about the repository.
+    a = (_sq("authored", "get_active_decisions").get("value") or {})
+    sup = (_sq("authored", "get_superseded_decisions").get("value") or {})
+    rep.add(A, "speckit: Spec Kit supplies no decision ledger, and says so",
+            a.get("count") == 0 and sup.get("count") == 0
+            and "no decision ledger" in (a.get("note") or ""),
+            f"active={a.get('count')} superseded={sup.get('count')} note={a.get('note')!r}")
+
+    # THE CENSUS CORRECTION. 50% of repositories matching `specs/**/plan.md`
+    # carry no `.specify/`. Behavioural, not a source grep -- a grep for
+    # "specs/" would fail on the comment saying we do not key on it, which
+    # happened in this very file during issue 155.
+    with tempfile.TemporaryDirectory() as td:
+        bare = Path(td) / "specs-only" / "specs" / "001-thing"
+        bare.mkdir(parents=True)
+        (bare / "spec.md").write_text("# s\n")
+        env = dict(os.environ, REPO_GOVERNOR_SPECKIT_DIR=str(bare.parent.parent / ".specify"))
+        env.pop("REPO_GOVERNOR_BINDING", None)
+        r = subprocess.run([sys.executable, str(ROOT / "adapters" / "speckit"), "describe"],
+                           capture_output=True, text=True, cwd=str(ROOT), env=env, timeout=60)
+        claims = bool(json.loads(r.stdout).get("capabilities"))
+    rep.add(A, "speckit: detection keys on .specify, never on specs/",
+            not claims,
+            "a repository with specs/ and no .specify/ is not a Spec Kit repository; "
+            "50% of specs/**/plan.md matches are not")
+
+
 def main(argv):
     absent = _preflight.banner()
     targets = argv or list(SUITE)
@@ -538,6 +635,8 @@ def main(argv):
 
     if "adapters/openspec" in targets:
         _openspec_design(rep)
+    if "adapters/speckit" in targets:
+        _speckit_design(rep)
 
     cur = None
     for adapter, check, ok, detail in rep.rows:
