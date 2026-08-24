@@ -251,12 +251,17 @@ def main():
             rep.add("proposal-e2e", "onboard-interactive writes a proposal", made_proposal,
                     r.stderr[:120])
             if prop.exists():
-                # The tool prints TWO steps: create the store, then rename. The
-                # store is created explicitly rather than by the tool -- same
+                # The tool prints the store-creation steps, then the rename. The
+                # stores are created explicitly rather than by the tool -- same
                 # pattern as bootstrap-decisions.sh for Dolt, whose probe also
-                # requires the database to exist. Skipping it here would test a
+                # requires the database to exist. Skipping them here would test a
                 # path the tool does not tell anyone to take.
-                (tgt / ".repo-governor" / "decisions").mkdir(parents=True, exist_ok=True)
+                #
+                # Both directories, because the proposal now binds both roles
+                # (issue 144). Creating only the one the tool used to bind would
+                # leave this check passing for a manifest a user cannot reproduce.
+                for store in ("decisions", "acceptance"):
+                    (tgt / ".repo-governor" / store).mkdir(parents=True, exist_ok=True)
                 prop.rename(tgt / ".repo-governor.json")
                 r = _sp.run([sys.executable, str(ROOT_ / "engine" / "manifest.py"), "--validate"],
                             capture_output=True, text=True, cwd=str(tgt))
@@ -279,6 +284,76 @@ def main():
                 rep.add("proposal-e2e", "and as a list, since the role is multi-valued",
                         isinstance(_dh, list),
                         "ADR-013: a second backend may bind alongside")
+                # Issue 144: the same defect, twice more. An unbound
+                # acceptance_criteria is refused at the binding layer with
+                # PERMISSION_DENIED, which completion.py turns into a BLOCKING
+                # UNKNOWN -- so STOP_COMPLETE was not merely unreachable, it
+                # failed as "something is broken" rather than as the honest
+                # CONTINUE with NO_CRITERIA_DECLARED that the adapter exists to
+                # give. That is worse than the decision_history case above.
+                _ac = (m.get("providers") or {}).get("acceptance_criteria")
+                rep.add("proposal-e2e", "the proposal binds acceptance_criteria",
+                        bool(_ac),
+                        "unbound, STOP_COMPLETE is unreachable in every generated "
+                        "manifest and the failure reads as a broken provider")
+                rep.add("proposal-e2e", "bound to the backend that needs no binary",
+                        bool(_ac) and "acceptance-file" in json.dumps(_ac),
+                        "same argument as decision-history-file: a default that "
+                        "requires an install is not a default")
+
+                # The sweep, so this is not fixed a third time one role at a
+                # time. Every zero-install role whose detection gate is
+                # satisfied must reach the proposal; nothing outside the table
+                # and the two always-bound roles may appear.
+                # Loaded as a module rather than grepped: the table is data the
+                # tool acts on, and a source-text check would pass on a table
+                # that exists and is never read. imports.py refuses greps for
+                # exactly this reason.
+                import importlib.util as _ilu
+                _sp_oi = _ilu.spec_from_file_location(
+                    "_oi", ROOT_ / "tools" / "onboard-interactive.py")
+                _oi = _ilu.module_from_spec(_sp_oi)
+                _sp_oi.loader.exec_module(_oi)
+                _spec = getattr(_oi, "ZERO_INSTALL", {})
+                rep.add("proposal-e2e", "the zero-install table is declared, not implied",
+                        bool(_spec),
+                        "a sweep that reads no table is a sweep that checks nothing")
+                _ungated = {r for r, v in _spec.items() if not v.get("detect")}
+                rep.add("proposal-e2e",
+                        "every ungated zero-install role reaches the proposal",
+                        _ungated <= set(m.get("providers") or {}),
+                        f"missing {sorted(_ungated - set(m.get('providers') or {}))}")
+                # The gated case, driven directly. The end-to-end repository
+                # above has no ADRs, so it can never exercise it -- a mutation
+                # that skipped every gated role survived the whole suite until
+                # these two existed, because "architecture absent" was the
+                # correct answer for that fixture either way.
+                _det = _oi.build_providers(
+                    "github-projects", "adapters/github-projects", "o/r", None, None,
+                    {"architecture": [{"type": "adr", "adapter": "adapters/adr",
+                                       "disposition": "PROVIDER_DETECTED"}]})
+                rep.add("proposal-e2e", "a DETECTED architecture provider is proposed",
+                        "architecture" in _det,
+                        "engine/onboard.py already prints PROVIDER_DETECTED with its "
+                        "evidence; the proposal used to discard it, so a human never "
+                        "saw the thing they were meant to accept (INV-013)")
+                rep.add("proposal-e2e", "...as a list, since the role is multi-valued",
+                        isinstance(_det.get("architecture"), list),
+                        "ADR-013 puts architecture in ARRAY_ROLES")
+                _und = _oi.build_providers(
+                    "github-projects", "adapters/github-projects", "o/r", None, None, {})
+                rep.add("proposal-e2e", "an UNDETECTED one is not",
+                        "architecture" not in _und,
+                        "proposing a role nothing detected is detection inventing "
+                        "evidence, which is the opposite defect (ADR-010)")
+
+                _allowed = set(_spec) | {"repository", "roadmap_authority"}
+                rep.add("proposal-e2e", "and nothing outside the table is proposed",
+                        set(m.get("providers") or {}) <= _allowed,
+                        f"unexpected {sorted(set(m.get('providers') or {}) - _allowed)}; "
+                        "execution, change_signals and retirement staying unbound is "
+                        "INV-013 working, not a defect to fix")
+
                 _w = (m.get("permissions") or {}).get("decision_history", {})
                 rep.add("proposal-e2e", "decision_history is the only write granted",
                         _w.get("write") is True

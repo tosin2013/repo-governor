@@ -1,0 +1,10 @@
+{
+  "$comment": "Acceptance criteria for issue 144, declared before the work. Criterion 1 is behavioural and was CONFIRMED RED by running it: the proposal builder does not exist yet as a callable, and the roles it must add are absent from every generated manifest. THE SHAPE OF THE FIX MATTERS AS MUCH AS THE FIX: this is issue 94's defect a second and third time, so the bar also demands the sweep -- criterion 2 asserts that every role with a zero-install default adapter AND positive detection reaches the proposal, which is the check that stops a fourth. WHAT IS DELIBERATELY NOT DEMANDED: that execution, change_signals or retirement be proposed. Those have no detected evidence and no zero-install default; leaving them unbound is INV-013 working, and a bar that demanded them would turn a correct refusal into a defect.",
+  "authority_id": "144",
+  "criteria": [
+    {"check": "command_exit", "target": "python3 -c \"import importlib.util,sys;s=importlib.util.spec_from_file_location('oi','tools/onboard-interactive.py');m=importlib.util.module_from_spec(s);s.loader.exec_module(m);p=m.build_providers('github-projects','adapters/github-projects','o/r',None,None,{'architecture':[{'type':'adr','adapter':'adapters/adr','disposition':'PROVIDER_DETECTED'}]});sys.exit(0 if 'acceptance_criteria' in p and 'architecture' in p else 1)\""},
+    {"check": "command_exit", "target": "python3 -c \"import importlib.util,sys;s=importlib.util.spec_from_file_location('oi','tools/onboard-interactive.py');m=importlib.util.module_from_spec(s);s.loader.exec_module(m);p=m.build_providers('github-projects','adapters/github-projects','o/r',None,None,{});sys.exit(0 if 'architecture' not in p and 'acceptance_criteria' in p else 1)\""},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh onboarding"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh"}
+  ]
+}

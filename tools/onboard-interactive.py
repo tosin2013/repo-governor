@@ -219,15 +219,94 @@ def _confirm_condition(level, profile, floors, ind):
     return raw, dict(LEVELS)[raw]
 
 
+# Roles a proposal can bind without asking anyone to install anything. This
+# table exists so the sweep is checkable rather than remembered.
+#
+# ISSUE 94 HAPPENED THREE TIMES. decision_history went unbound in every
+# generated manifest because nothing proposed it, and CAPTURE_ONLY -- the
+# default disposition -- had nowhere to record. That was fixed for one role and
+# the class was never swept, so acceptance_criteria and architecture repeated
+# it. The acceptance_criteria case is the worst of the three: an unbound role
+# is refused at the binding layer with PERMISSION_DENIED, which completion.py
+# turns into a BLOCKING UNKNOWN -- so STOP_COMPLETE was not merely unreachable,
+# it failed as "something is broken" rather than as the honest CONTINUE with
+# NO_CRITERIA_DECLARED that adapters/acceptance-file was built to give.
+#
+# `detect` names the role whose detection gates the entry, or None for roles
+# that need no evidence because the adapter reads a directory this tool creates.
+ZERO_INSTALL = {
+    "acceptance_criteria": {"type": "acceptance-file",
+                            "adapter": "adapters/acceptance-file",
+                            "detect": None, "multi": False},
+    "decision_history": {"type": "decision-history-file",
+                         "adapter": "adapters/decision-history-file",
+                         "detect": None, "multi": True},
+    "architecture": {"type": "adr", "adapter": "adapters/adr",
+                     "detect": "architecture", "multi": True},
+}
+
+
+def build_providers(choice, adapter, rid, admission, label, candidates):
+    """The providers block, extracted so a test can read it without a terminal.
+
+    A role appears here when a zero-install adapter can serve it AND, where the
+    table says so, detection actually found it. Roles with neither -- execution,
+    change_signals, retirement -- stay absent, which is INV-013 working rather
+    than the same defect: a role nobody bound has no governance function.
+
+    Detection proposes; only an accepted manifest binds (ADR-010 rule 1). But
+    the proposal has to contain the thing for a human to accept it, and that is
+    what was missing.
+    """
+    prov = {
+        "repository": {"type": "git", "adapter": "adapters/git", "contract_version": 1},
+        "roadmap_authority": {"type": choice, "adapter": adapter, "contract_version": 1},
+    }
+
+    for role, spec in ZERO_INSTALL.items():
+        if spec["detect"] and not (candidates or {}).get(spec["detect"]):
+            continue
+        entry = {"type": spec["type"], "adapter": spec["adapter"], "contract_version": 1}
+        prov[role] = [entry] if spec["multi"] else entry
+
+    if admission:
+        prov["roadmap_authority"]["admission"] = {"signal": admission}
+    if choice == "github-projects":
+        prov["roadmap_authority"]["transport"] = {"kind": "cli", "command": "gh"}
+        # The adapter reads its configuration from this env block, not from the
+        # fields above. Omitting it produced a manifest that validated as
+        # READY_FOR_GOVERNANCE and then answered PROVIDER_UNAVAILABLE for every
+        # id: "no repository declared ... an adapter that cannot tell which
+        # repository it is reading must not answer" (ADR-028).
+        env = {"REPO_GOVERNOR_GH_REPO": rid}
+        if admission:
+            env["REPO_GOVERNOR_GH_ADMISSION"] = admission
+        if admission == "label":
+            if not label:
+                raise ValueError("A label signal needs the label named; it is never "
+                                 "assumed (ADR-018).")
+            env["REPO_GOVERNOR_GH_ADMISSION_LABEL"] = label
+        prov["roadmap_authority"]["env"] = env
+    return prov
+
+
 def _assessed(repo: Path):
-    """(level, profile, floors, indicators) from engine/onboard.py. Never defaulted."""
+    """(level, profile, floors, indicators, candidates) from engine/onboard.py.
+
+    Candidates come back from the SAME call rather than a second one. Detection
+    already reports which roles it found and with what evidence; the proposal
+    used to discard all of it except the condition, which is why a detected
+    architecture provider was printed as PROVIDER_DETECTED and then left out of
+    the manifest (issue 144).
+    """
     r = subprocess.run(
         [sys.executable, str(SKILL / "engine" / "onboard.py"), str(repo), "--json"],
         capture_output=True, text=True)
     try:
-        c = json.loads(r.stdout)["condition"]
+        d = json.loads(r.stdout)
+        c = d["condition"]
         return (c["suggested"], c["profile"], c.get("floor") or [],
-                c.get("indicators") or {})
+                c.get("indicators") or {}, d.get("candidates") or {})
     except Exception:
         # No silent fallback to a level. A condition nobody assessed is not a
         # condition, and guessing one is the defect this function replaced.
@@ -307,50 +386,13 @@ def main(argv):
     # a warning about two screens earlier. The profile decides governance depth
     # (ADR-006); writing L1 over an L4 under-governs a repository that has
     # compatibility obligations.
-    level, profile, floors, ind = _assessed(repo)
+    level, profile, floors, ind, candidates = _assessed(repo)
     level, profile = _confirm_condition(level, profile, floors, ind)
-    prov = {
-        "repository": {"type": "git", "adapter": "adapters/git", "contract_version": 1},
-        "roadmap_authority": {"type": choice, "adapter": adapter, "contract_version": 1},
-    }
-    # decision_history, bound to the backend that needs nothing installed.
-    # It is the right default BECAUSE it is the weakest: no binary, always
-    # available, and honest that it hand-rolls its chain rather than having one
-    # supplied by the store. A default that requires `dolt` on PATH is not a
-    # default.
-    #
-    # Without this the role went unbound in every generated manifest, so
-    # CAPTURE_ONLY -- the product's default disposition -- had nowhere to
-    # record, which is the state adapters/decision-history-file was built to
-    # end and never reached because nothing proposed it (issue 94).
-    #
-    # Multi-valued per ADR-013, so a list: a second backend may bind alongside.
-    prov["decision_history"] = [{
-        "type": "decision-history-file",
-        "adapter": "adapters/decision-history-file",
-        "contract_version": 1,
-    }]
-
-    if admission:
-        prov["roadmap_authority"]["admission"] = {"signal": admission}
-    if choice == "github-projects":
-        prov["roadmap_authority"]["transport"] = {"kind": "cli", "command": "gh"}
-        # The adapter reads its configuration from this env block, not from the
-        # fields above. Omitting it produced a manifest that validated as
-        # READY_FOR_GOVERNANCE and then answered PROVIDER_UNAVAILABLE for every
-        # id: "no repository declared ... an adapter that cannot tell which
-        # repository it is reading must not answer" (ADR-028). That refusal is
-        # correct; generating a manifest without the field was the defect.
-        env = {"REPO_GOVERNOR_GH_REPO": rid}
-        if admission:
-            env["REPO_GOVERNOR_GH_ADMISSION"] = admission
-        if admission == "label":
-            if not label:
-                print("A label signal needs the label named; it is never assumed "
-                      "(ADR-018).", file=sys.stderr)
-                return 1
-            env["REPO_GOVERNOR_GH_ADMISSION_LABEL"] = label
-        prov["roadmap_authority"]["env"] = env
+    try:
+        prov = build_providers(choice, adapter, rid, admission, label, candidates)
+    except ValueError as e:
+        print(str(e), file=sys.stderr)
+        return 1
 
     # Deny by default (ADR-005). Every bound role gets read; exactly one gets
     # write, and the reason is stated at the top of the block rather than
@@ -371,9 +413,10 @@ def main(argv):
     out = {
         "$comment": ("PROPOSAL in manifest shape. Review every line, then rename to "
                      ".repo-governor.json and commit. The engine never reads this file "
-                     "(ADR-010 rule 1). Roles beyond these two are optional -- add them "
-                     "as you bind them; a role absent here has no governance function "
-                     "however reachable the system is (INV-013)."),
+                     "(ADR-010 rule 1). Roles here are the ones a zero-install adapter can "
+                     "serve, plus any detection actually found. Roles absent -- execution, "
+                     "change_signals, retirement -- have no governance function here however "
+                     "reachable the system is (INV-013); add them as you bind them."),
         "repo_governor": {"version": 1, "engine_min_version": "0.1.0"},
         "repository": {"id": rid},
         "condition": {
@@ -413,7 +456,12 @@ def main(argv):
     # Without it --validate reports TRANSPORT_UNREACHABLE and
     # WRITE_GRANTED_BUT_TRANSPORT_READONLY, both correct and both confusing on
     # a freshly generated proposal.
+    # One line per store, both for the same reason: the adapter's probe checks
+    # the directory exists, so a proposal that binds the role without it
+    # validates as TRANSPORT_UNREACHABLE -- correct, and confusing on a freshly
+    # generated manifest.
     print(f"  mkdir -p {repo / '.repo-governor' / 'decisions'}   # the decision store")
+    print(f"  mkdir -p {repo / '.repo-governor' / 'acceptance'}  # where completion bars live")
     print(f"  cd {repo} && mv {PROPOSAL} .repo-governor.json")
     print(f"  python3 {SKILL / 'engine' / 'manifest.py'} --validate")
     print("\nIf validation fails, rename it back. Nothing governs until it passes.")
