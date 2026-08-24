@@ -250,7 +250,53 @@ def main():
         subprocess.run(["git", "-C", str(r), "init", "-q"], check=True)
         rep.add("issue-161", "openspec/ alone does not raise the assessed level",
                 O.assess(r)["suggested"] == "L1",
-                "openspec/ is out of scope until issue 155 gives it an adapter")
+                "a spec workspace is intent declared, not decisions taken (issue 165)")
+
+        # --- issue 165: the same refusal, for the OTHER spec provider ---------
+        #
+        # The exclusion held for openspec/ by test and for .specify/ by
+        # accident. Both adapters exist now (PR 163, PR 168), so the original
+        # justification -- that no adapter could read the evidence -- has
+        # expired for both, and the decision was re-argued rather than flipped:
+        # counting a spec workspace would move 18% of OpenSpec and 32% of Spec
+        # Kit repositories, and the GREENFIELD -> STANDARD population is empty
+        # repositories that ran a scaffold once (median 0 source files).
+        sk = tmp / "speckit-only"
+        (sk / ".specify" / "memory").mkdir(parents=True)
+        (sk / ".specify" / "memory" / "constitution.md").write_text(
+            "# C\n\n## Article I: Real\ntext\n")
+        (sk / "specs" / "001-x").mkdir(parents=True)
+        (sk / "specs" / "001-x" / "spec.md").write_text("# s\n")
+        (sk / "src").mkdir()
+        for i in range(3):
+            (sk / "src" / f"m{i}.py").write_text("x=1\n")
+        subprocess.run(["git", "-C", str(sk), "init", "-q"], check=True)
+        rep.add("issue-165", "a Spec Kit workspace alone does not raise the assessed level",
+                O.assess(sk)["suggested"] == "L1",
+                "specs are intent declared; requiring a roadmap_authority for them aims "
+                "§54 at the emptiest repositories in the sample")
+
+        # THE REFUSAL MUST NOT OVER-REACH. Excluding spec workspaces must not
+        # suppress a real ADR directory sitting beside one -- 6% of OpenSpec and
+        # 5% of Spec Kit repositories carry both.
+        both = tmp / "specs-and-adrs"
+        (both / ".specify" / "memory").mkdir(parents=True)
+        (both / ".specify" / "memory" / "constitution.md").write_text("# C\n\n## A\nx\n")
+        (both / "openspec" / "changes" / "add-x").mkdir(parents=True)
+        (both / "openspec" / "changes" / "add-x" / "proposal.md").write_text("# p\n")
+        (both / "docs" / "adrs").mkdir(parents=True)
+        for n in (1, 2):
+            (both / "docs" / "adrs" / f"000{n}-d.md").write_text(
+                f"# {n}. D\n\n**Status**: Accepted\n")
+        (both / "src").mkdir()
+        for i in range(3):
+            (both / "src" / f"m{i}.py").write_text("x=1\n")
+        subprocess.run(["git", "-C", str(both), "init", "-q"], check=True)
+        a_both = O.assess(both)
+        rep.add("issue-165", "a spec workspace beside real ADRs still raises the level",
+                a_both["suggested"] == "L2" and a_both["indicators"]["architecture_history"],
+                f"assessed {a_both['suggested']} — excluding spec workspaces must not "
+                "suppress a genuine decision ledger that sits next to one")
 
         # --- issue 164: the API-surface floor reads structure, not substrings ---
         #

@@ -56,10 +56,38 @@ def _git(repo, *args):
 # `doc/adr` is adr-tools' default and `adrs/` is common at the repository root;
 # missing them reported real collections as no provider at all (#27).
 #
-# `openspec/` is deliberately absent. An OpenSpec repository holds
-# decisions-in-progress rather than a decision ledger, and raising a
-# repository's obligations for evidence no adapter can read is the wrong order.
-# It follows issue 155, not this list.
+# SPEC WORKSPACES ARE DELIBERATELY ABSENT, and this is a decision with a reason
+# rather than an omission. `openspec/` and `.specify/` are both readable now --
+# adapters/openspec and adapters/speckit answer for them -- so the original
+# justification, that no adapter could read the evidence, has expired. The
+# exclusion was re-argued on the evidence instead of being quietly flipped
+# (issue 165).
+#
+# ADRs are decisions TAKEN: durable, immutable, superseded rather than edited,
+# existing only once something has been decided. Specs are intent DECLARED,
+# and a scaffold emits them before anything exists at all. Those are not the
+# same fact about a repository's history.
+#
+# Measured with the corrected floor from issue 164, counting a spec workspace
+# would move 19 of 105 OpenSpec repositories (18%) and 13 of 40 Spec Kit
+# repositories (32%). The transition that settles it is GREENFIELD -> STANDARD,
+# 12 repositories across both tools:
+#
+#     source files, median            0
+#     spec/change directories, median 1   (max 3)
+#     planned but unbuilt             2 of 12
+#
+# That population is empty repositories that ran a scaffold once. Promoting them
+# out of GREENFIELD would require each to bind a roadmap_authority, which is
+# §54's "blocks routine reversible implementation excessively" aimed at the
+# emptiest repositories in the sample.
+#
+# Two things would change this answer, and both are measurable rather than
+# arguable: a spec COUNT threshold behaving differently from mere presence --
+# 2 of 12 is too thin to design on -- and issue 150's demand evidence.
+#
+# `conformance/onboarding.py` asserts the exclusion for BOTH directories, so it
+# cannot lapse for one of them by accident.
 ADR_DIRS = ("docs/adr", "docs/adrs", "docs/decisions", "doc/adr", "adrs")
 
 # A published identity per ecosystem. Structure, never prose about structure.

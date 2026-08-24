@@ -1,0 +1,40 @@
+{
+  "$comment": "Acceptance criteria for issue 165. THE OUTCOME IS A REFUSAL, and the point of the work is to make the refusal TESTED rather than accidental. Issue 161 excluded openspec/ from the architecture_history indicator because no adapter could read the evidence; that justification expired when PR 163 and PR 168 landed adapters/openspec and adapters/speckit. Re-measured with the corrected floor from PR 166: counting a spec workspace would move 19 of 105 OpenSpec repositories (18%) and 13 of 40 Spec Kit repositories (32%). FIXING ISSUE 164 MADE THIS BIGGER, not smaller -- the OpenSpec effect grew from 11% to 18% because fewer repositories are pinned at L4, so more sit in the range where this indicator decides. THE TRANSITION THAT SETTLES IT is GREENFIELD -> STANDARD, 12 repositories across both tools. Inspected: median 0 source files, median 1 spec directory, and only 2 of 12 are planned-but-unbuilt. The population promoted out of GREENFIELD is empty repositories that ran a scaffold once. ADRs are decisions TAKEN -- durable, immutable, and only existing once something was decided. Specs are intent DECLARED, emitted before anything exists. Requiring an empty repository to bind a roadmap_authority is section 54's 'blocks routine reversible implementation excessively' aimed at the emptiest repositories in the sample. NO BEHAVIOUR CHANGES. That is criterion 4 and it is checkable, which is the shape ADR-032 Decision 5 used: a refusal that is asserted rather than remembered.",
+  "authority_id": "165",
+  "criteria": [
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -q \"\\[PASS\\] openspec/ alone does not raise the assessed level\"'",
+      "$comment": "C1 issue 161's criterion, still holding. Green before this work and must stay green -- the refusal it encodes is now a decision with a reason rather than a placeholder."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -q \"\\[PASS\\] a Spec Kit workspace alone does not raise the assessed level\"'",
+      "$comment": "C2 THE GAP THIS CLOSES. The refusal held for one spec provider by test and the other by accident. Red at declaration: nothing asserted it for .specify/."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -q \"\\[PASS\\] a spec workspace beside real ADRs still raises the level\"'",
+      "$comment": "C3 THE REFUSAL MUST NOT OVER-REACH. Excluding spec workspaces must not suppress a genuine ADR directory that happens to sit beside one. 6% of OpenSpec and 5% of Spec Kit repositories carry both."
+    },
+    {
+      "$comment": "C4 NO BEHAVIOUR CHANGE. git diff touches no logic in engine/ -- only a comment recording the decision, plus conformance assertions. The outcome of this issue is that nothing happens, and that is checkable rather than remembered (ADR-032 Decision 5's shape).",
+      "check": "command_exit",
+      "target": "bash -c 'git diff origin/main -- engine/ | grep \"^[+-]\" | grep -v \"^[+-][+-]\" | grep -qv \"^[+-][[:space:]]*#\" && exit 1 || exit 0'"
+    },
+    {
+      "$comment": "C5 the reason is recorded where the exclusion lives, so it cannot silently lose its justification again -- which is exactly how this issue came to exist.",
+      "check": "command_exit",
+      "target": "bash -c 'grep -q \"decisions TAKEN\" engine/onboard.py && grep -q \"intent DECLARED\" engine/onboard.py'"
+    },
+    {
+      "$comment": "C6 the onboarding suite entire.",
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh onboarding"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh --hermetic"
+    }
+  ]
+}
