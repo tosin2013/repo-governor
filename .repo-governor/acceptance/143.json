@@ -1,0 +1,15 @@
+{
+  "$comment": "Acceptance criteria for issue 143. THIS BAR DELIBERATELY COVERS PART OF THE ISSUE and says so in 'covers' rather than in this comment, which is the whole point of the mechanism ADR-032 and issue 133 built -- two earlier bars recorded their scope in prose and both read STOP_COMPLETE for work that was half undone. Criteria 1-3 were confirmed red by running them. WHAT THEY CANNOT CHECK: whether the reported line is useful to a reader. A check can see that counts and a caveat are printed; whether an operator understands what the role does after reading it is a judgement, and the honest test is the maintainer who asked for this line running status.py.",
+  "authority_id": "143",
+  "covers": {
+    "declared": "the reporting half -- making the architecture role's state visible where an operator looks, and correcting a surface that promises constraint while delivering a count",
+    "uncovered": "whether the architecture role should reach a DISPOSITION. That is the substance of this issue and is not attempted. It is blocked on demand evidence (issue 150) and, if the answer is yes, on the scope problem measured in issue 146: get_constraints returns ADR titles, and 0 of 8 realistic discovery targets matched any of this repository's 23 Accepted titles."
+  },
+  "criteria": [
+    {"check": "command_exit", "target": "python3 -c \"import subprocess,sys;o=subprocess.run([sys.executable,'engine/status.py','.'],capture_output=True,text=True).stdout;sys.exit(0 if 'no disposition consults this' in o else 1)\""},
+    {"check": "command_exit", "target": "python3 -c \"import subprocess,sys,re;o=subprocess.run([sys.executable,'engine/status.py','.'],capture_output=True,text=True).stdout;sys.exit(0 if re.search(r'DEFINED.*Accepted.*Proposed', o) else 1)\""},
+    {"check": "command_exit", "target": "bash -c 'grep -q \"reported\" references/providers.md'"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh status"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh"}
+  ]
+}
