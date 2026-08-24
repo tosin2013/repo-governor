@@ -1,0 +1,9 @@
+{
+  "$comment": "Acceptance criteria for issue 113, declared before the work and confirmed red by running them: observe() has no rate_limit key today, and the only rmtree in the file removes a stale skill install rather than a prepared tree. THE BAR COVERS BOTH PARTS of the issue -- the rate window and the tree cleanup -- because a bar covering one would read STOP_COMPLETE for both, which is the defect issue 133 was just fixed for. WHAT IS DELIBERATELY NOT BUILT: a fixed sleep between prompts. The window is five hours; guessing an interval against it mitigates nothing, and the host already reports its own rate state in every session. Reading what it reports beats encoding a constant nobody measured.",
+  "authority_id": "113",
+  "criteria": [
+    {"check": "command_exit", "target": "python3 -c \"import sys,json;sys.path.insert(0,'tools');import benchmark as B;o=B.observe(json.dumps({'type':'rate_limit_event','rate_limit_info':{'status':'rejected','rateLimitType':'five_hour'}}));sys.exit(0 if o.get('rate_limit',{}).get('status')=='rejected' and B.void_reasons(o) else 1)\""},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh benchmark"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh"}
+  ]
+}
