@@ -1,0 +1,22 @@
+{
+  "$comment": "Acceptance criteria for issue 130, declared before the work and confirmed red by running them: writable is true today under a declared MCP transport, and the write guard in engine/manifest.py stays silent because of it. THE BAR COVERS THE WHOLE ISSUE, not a convenient part of it -- issue 117's bar was scoped to one of two cuts and consequently read STOP_COMPLETE while half the work was undone (see issue 131). Criterion 2 is the one that matters: it asserts the GUARD fires, not merely that a field changed, because the field is only interesting through what reads it. AMENDED DURING THE WORK, and recorded rather than done quietly: a criterion for ./tools/run-conformance.sh manifest was ADDED, because the original comment promised a guard-level check and no criterion delivered one -- layer1 tests the adapter contract, not the finding. Adding a criterion strengthens a bar and is safe; removing or loosening one during the work is the amendment failure this project cares about, and none was.",
+  "authority_id": "130",
+  "criteria": [
+    {
+      "check": "command_exit",
+      "target": "python3 -c \"import subprocess,json,os,sys;e=dict(os.environ);e['LINEAR_API_KEY']='';e['REPO_GOVERNOR_BINDING']=json.dumps({'adapter':'adapters/linear','type':'linear','transport':{'kind':'mcp','server':'linear'}});d=json.loads(subprocess.run([sys.executable,'adapters/linear','describe'],capture_output=True,text=True,env=e).stdout);sys.exit(0 if d['transport']['writable'] is False and d['transport']['reachable'] is False else 1)\""
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh layer1"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh manifest"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh"
+    }
+  ]
+}

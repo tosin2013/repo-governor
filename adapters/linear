@@ -334,12 +334,45 @@ def get_decision_history(kw):
     return ok(ROLE, "get_decision_history", {"history": hist}, [_ref(node, "state.type")])
 
 
+def _transport_detail():
+    """Why this process cannot reach the transport, when it cannot.
+
+    The engine's default message says "transport is not configured", which is
+    false for a declared MCP binding -- it IS configured, by a human, and is
+    simply not usable from here. A hook or CI subprocess has no MCP session and
+    never will (ADR-016 rule 6), so this has to name which process is speaking.
+    """
+    if (binding().get("transport") or {}).get("kind") == "mcp":
+        return ("MCP transport is declared but nothing has been supplied to this "
+                "process. An agent session holding the MCP connection can fetch "
+                "the issues and pipe them in with --input -; a hook, CI or "
+                "headless run cannot, and needs LINEAR_API_KEY.")
+    return None
+
+
 def _probe():
+    """Is the transport usable BY THIS PROCESS, right now?
+
+    A declared MCP transport is deliberately NOT enough. Nothing here probes
+    anything: there is no MCP client in this adapter, correctly (ADR-016), so
+    returning true for a declared transport would report "reachable" on the
+    strength of a word in a file.
+
+    It also decided `writable`, which _protocol derives from this -- and that
+    silenced WRITE_GRANTED_BUT_TRANSPORT_READONLY for a transport with no write
+    path at all. Agent-supplied stdin is read-only by construction.
+
+    And ADR-008 C2: capabilities must be exercisable by a probe. With MCP
+    declared and nothing supplied, none of them are, so advertising them was a
+    claim this adapter could not honour.
+
+    `configured` stays true for a declared transport -- that is issue 124's
+    fix and a separate axis. Declared, configured, and not yet reachable is a
+    coherent state, and it is the true one.
+    """
     if FIXTURE and Path(FIXTURE).exists():
         return True
-    if API_KEY:
-        return True
-    return (binding().get("transport") or {}).get("kind") == "mcp"
+    return bool(API_KEY)
 
 
 FUNCTIONS = {
@@ -389,4 +422,5 @@ if __name__ == "__main__":
                    "mode": "fixture" if FIXTURE else ("live" if API_KEY else
                           ("mcp" if (binding().get("transport") or {}).get("kind") == "mcp"
                            else "unconfigured"))},
-                  properties=PROPERTIES, probe=_probe, config_probe=_configured))
+                  properties=PROPERTIES, probe=_probe, config_probe=_configured,
+                  transport_detail=_transport_detail))
