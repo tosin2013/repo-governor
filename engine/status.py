@@ -217,9 +217,30 @@ def main(argv):
                      "no acceptance criteria declared anywhere — the completion firewall "
                      "(§40) cannot fire, and every verdict stays CONTINUE"))
 
-    multi = [r for r, b in prov.items() if isinstance(b, list) and len(b) > 1]
-    verdicts.append(("CONFLICT", bool(multi),
-                     "needs two peer providers on one role; none is multi-bound"))
+    # CONFLICT was reported reachable whenever any role was multi-bound. It is
+    # not reachable at all, from any manifest: no path in engine/ emits it as a
+    # disposition, and a validated manifest cannot even hold the case it was
+    # meant for -- ADR-013 rule 1 makes authority roles single-valued and
+    # manifest.py rejects a list where a scalar is required, so two peer roadmap
+    # authorities are a load-time CARDINALITY error, not a runtime verdict.
+    # Disagreement between peers of a MULTI-valued role is ARCHITECTURE_REVIEW
+    # (rule 3), which is a different word on purpose.
+    #
+    # This is the same defect the architecture caveat fixed in issue 143: a
+    # surface claiming a capability the engine does not have. It was wrong in
+    # both directions -- claiming the one nothing emits, omitting the one that is.
+    verdicts.append(("CONFLICT", False,
+                     "no engine path emits it. Two peers on a single-valued role "
+                     "is a manifest CARDINALITY error at load time (ADR-013 rule 1), "
+                     "and peers of a multi-valued role produce ARCHITECTURE_REVIEW"))
+
+    arch = prov.get("architecture")
+    arch_n = len(arch) if isinstance(arch, list) else (1 if arch else 0)
+    verdicts.append(("ARCHITECTURE_REVIEW", True,
+                     "always reachable: it is the §32 review lane for an "
+                     "ARCHITECTURE_IMPLICATION discovery"))
+    verdicts.append(("ARCHITECTURE_REVIEW \u00d72", arch_n > 1,
+                     f"needs two architecture providers to disagree; {arch_n} bound"))
 
     dh = prov.get("decision_history")
     dh_write = bool(dh) and MF.permitted(m, "decision_history", "write")[0]

@@ -1,0 +1,74 @@
+{
+  "$comment": "Acceptance criteria for issue 154 - evidence union for multi-valued roles, ADR-013 Implementation Plan step 4. EVERY BEHAVIOURAL CRITERION WAS WATCHED FAILING BEFORE IT WAS WRITTEN, against two-provider fixtures built for the purpose. Recorded verbatim: 'decision ids seen: [] -> RED, second store unread'; 'constraint ids: [ADR-0001] -> RED, saw 1 of 2'; 'ADR-0001 active in provider[0], superseded in provider[1], contradiction reported: False'; and for C6, grep for CONFLICT in engine/ returned only the status.py line that CLAIMS it while classify(ARCHITECTURE_IMPLICATION) returns ARCHITECTURE_REVIEW which status.py did not list - wrong in both directions. EACH CRITERION NAMES ONE ASSERTION rather than re-running the whole suite, so a regression in any single one reddens its own line instead of hiding behind a green suite. C3 is the ADR-008 C7 regression guard and was confirmed a different way, by diffing all five architecture functions and the compiled envelope against a snapshot taken at dc2c26a BEFORE any code changed: 'IDENTICAL - no observable difference on the single-provider path'. A guard that has never been red proves nothing, so it is also confirmed by mutation - see the PR.",
+  "authority_id": "154",
+  "covers": {
+    "declared": "the union itself - every binding on a multi-valued role is reached, evidence accumulates with per-provider attribution, the single-provider path is byte-identical, a decision held only in the second decision_history store now reaches a verdict, active-vs-superseded disagreement across two architecture providers escalates to ARCHITECTURE_REVIEW citing both without blocking, and status.py stops claiming a disposition nothing emits while omitting one that is.",
+    "uncovered": "THREE THINGS. (1) No real second provider is bound anywhere - the fixtures are two instances of adapters/adr over different directories, which proves the fan-out and proves nothing about portability. docs/adrs/README.md:121's warning applies until issue 155 or 156 lands. (2) Contradiction detection is bounded to what the section 12 contract can express. 'Accepted in one provider, Rejected in another' is NOT detectable: get_constraints drops a Rejected decision entirely and get_active_decisions filters it out, so no declared function reports an id whose status is neither active nor superseded. Widening that is a contract change and is not attempted here. (3) architecture stays reported-only. Unioning it changes a display; nothing consults it (issue 143, whose own uncovered half this does not close either)."
+  },
+  "criteria": [
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/union.py | grep -q \"\\[PASS\\] a decision held ONLY in the second store is found\"'",
+      "$comment": "C1 CONSEQUENCE CHECK. prior_decision drives section 39 rediscovery, so a store never read is evidence that cannot stop work. Red at declaration."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/union.py | grep -q \"\\[PASS\\] ...and it would be ARCHITECTURE_REVIEW without the record\"'",
+      "$comment": "C2 THE CONTROL FOR C1's VERDICT. The first draft asserted CAPTURE_ONLY on a BUG discovery -- which defaults to CAPTURE_ONLY with or without a prior decision, so it was green either way. This pins that the disposition actually MOVES."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/union.py | grep -q \"\\[PASS\\] the envelope grows no key when one provider is bound\"'",
+      "$comment": "C3 ADR-008 C7 REGRESSION GUARD. The file-based adapter stays the default and almost every repository has exactly one, so a fan-out that reshapes the single-provider envelope breaks every existing install to serve a case nobody has yet. Confirmed by baseline diff before the code changed, and must be confirmed by mutation."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/union.py | grep -q \"\\[PASS\\] unioned constraints equal what one direct call returns, in order\"'",
+      "$comment": "C3b The union is compared against a DIRECT single call, not against itself. Comparing the union to the union is the vacuous shape this repository has shipped six times."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/union.py | grep -q \"\\[PASS\\] DIFFERENT constraints are a union, not a finding\"'",
+      "$comment": "C4 THE CHECK THAT STOPS THE FIX BECOMING THE BUG. ADR-013's own Consequences warn multi-valued architecture brushes against section 54's over-escalation failure condition. Differing sets are the normal case."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/union.py | grep -q \"\\[PASS\\] both providers contribute their constraints, in binding order\"'",
+      "$comment": "C4b The union actually unions. Red at declaration -- saw 1 of 2."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/union.py | grep -q \"\\[PASS\\] BOTH providers are cited \u2014 the engine does not pick (rule 3)\"'",
+      "$comment": "C5 ADR-013 rule 3 and rule 4 in one case: an id active in one provider and superseded in another is ARCHITECTURE_REVIEW, not an inferred lineage. Red at declaration -- contradiction reported: False."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/union.py | grep -q \"\\[PASS\\] it does not block: rule 2 scopes halting to single-valued roles\"'",
+      "$comment": "C5b Rule 2 scopes halting to single-valued roles. A multi-valued disagreement is recorded, never a stop."
+    },
+    {
+      "$comment": "C6 status.py CLAIMS ONLY WHAT CAN BE EMITTED. It printed 'CONFLICT reachable' while no engine path emits that disposition, and omitted ARCHITECTURE_REVIEW which classify() does emit. Same defect family as the architecture caveat issue 143 fixed.",
+      "check": "command_exit",
+      "target": "python3 -c \"import subprocess,sys,re;o=subprocess.run([sys.executable,'engine/status.py','.'],capture_output=True,text=True).stdout;b=o.split('CAN CONCLUDE')[-1];sys.exit(0 if 'ARCHITECTURE_REVIEW' in b and not re.search(r'^\\\\s*CONFLICT\\\\s+reachable', b, re.M) else 1)\""
+    },
+    {
+      "$comment": "C7 ADR-021 holds. The chokepoint is being widened, which is exactly when a second spawn site gets added somewhere else.",
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh bindings"
+    },
+    {
+      "$comment": "C8 ADR-013 rule 1 is untouched. No single-valued role acquired a tie-break; the manifest still rejects a list where a scalar is required.",
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh manifest"
+    },
+    {
+      "$comment": "C9 the whole suite, so a new assertion cannot be added and left unrun.",
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh union"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh"
+    }
+  ]
+}
