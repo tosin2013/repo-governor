@@ -133,7 +133,23 @@ def _scan():
             return None, ("PROVIDER_UNAVAILABLE", f"cannot read {p}: {e}")
         status, why = _status_of(text)
         ti = TITLE_RE.search(text)
-        sup = SUPERSEDED_RE.search(text)
+        # Bounded to the header, for the reason _header() already exists: a
+        # document that TALKS ABOUT a thing is not an instance of the thing.
+        # Searching the whole text read ADR-013 -- Accepted, and explaining
+        # supersession as a concept -- as superseded by ADR-0031, which does
+        # not exist. The four-digit form was the tell that those were
+        # illustrative ids in a sentence.
+        #
+        # The consequence was not cosmetic: a foundational Accepted decision
+        # was dropped from get_active_decisions and therefore absent from every
+        # envelope the engine compiles (issue 151).
+        #
+        # A cross-check that the named ADR exists on disk was considered and
+        # REJECTED. It fails in the dangerous direction: an ADR genuinely
+        # superseded by one that lives elsewhere, or is not yet written, would
+        # be resurrected as a live constraint. Honouring a declared supersession
+        # when in doubt is the conservative reading.
+        sup = SUPERSEDED_RE.search(_header(text)[0])
         records.append({
             "id": f"ADR-{NUM_RE.match(p.name).group(1)}",
             "path": str(p),
