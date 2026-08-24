@@ -175,6 +175,16 @@ ENGINE_CALL = ("engine/manifest.py", "engine/completion.py",
 # Tools that change the repository. Bash is judged on its command text, and
 # conservatively -- an unrecognised shell line is not assumed to be a write.
 EDIT_TOOLS = ("Edit", "Write", "MultiEdit", "NotebookEdit", "str_replace_editor")
+# Tools that hand work to another agent. THE RULE, decided rather than
+# inherited: a subagent's acts are the parent's acts. The parent chose to
+# delegate, and delegated work is still work it caused -- so a subagent's
+# mutation fixes the parent's grade exactly as its own would.
+#
+# The case this does NOT yet capture: parent consults governance, subagent
+# mutates without consulting. That reads PARTIAL, as though one agent did
+# both, and flattens the shape most worth seeing -- governance reached, then
+# not carried across a delegation boundary. See issue 123.
+DELEGATION_TOOLS = ("Agent", "Task")
 WRITE_SHELL = (">", ">>", "tee ", "sed -i", "git commit", "git apply",
                "npm install", "pip install", "mv ", "rm ")
 
@@ -230,7 +240,8 @@ def observe(raw):
     out = {"model": None, "skills": [], "tools": [], "hooks_fired": [],
            "calls": [], "parsed_events": 0, "text": [],
            "skills_reported": False, "unparsed_lines": 0, "skipped_events": 0,
-           "permission_denied": 0, "rate_limit": None}
+           "permission_denied": 0, "rate_limit": None,
+           "delegation": {"agent_calls": 0, "task_events": 0}}
     for e in events(raw, out):
         out["parsed_events"] += 1
         if e.get("subtype") == "init":
@@ -252,6 +263,19 @@ def observe(raw):
         # FIVE HOURS: an arm of twenty-three real sessions is exactly the shape
         # that exhausts one. The last report wins; it is a running position,
         # not an event.
+        # Delegation. Observed in a real Arm A prompt 1 run: the agent used
+        # the Agent tool and the subagent's work streamed into the SAME
+        # transcript as task_started / task_progress / task_updated, its tool
+        # calls indistinguishable from the parent's.
+        #
+        # Counted, not attributed. Which tool calls belong to the subagent is
+        # not derivable from one observed session, and guessing an event schema
+        # is the mistake that cost issue 109 a reconstructed fixture. The
+        # counts make the phenomenon visible in every record; attribution waits
+        # for a transcript where a subagent WRITES.
+        st = e.get("subtype") or ""
+        if isinstance(st, str) and st.startswith("task_"):
+            out["delegation"]["task_events"] += 1
         rl = e.get("rate_limit_info")
         if isinstance(rl, dict):
             out["rate_limit"] = rl
@@ -263,6 +287,8 @@ def observe(raw):
             if block.get("type") == "text":
                 out["text"].append(block.get("text", ""))
             if block.get("type") == "tool_use":
+                if block.get("name") in DELEGATION_TOOLS:
+                    out["delegation"]["agent_calls"] += 1
                 out["calls"].append({"name": block.get("name"),
                                      "input": json.dumps(block.get("input") or {})})
     return out
@@ -543,6 +569,7 @@ def measure(host, target, prompt, model=None, control=False, debug=False,
             "permission_regime": res.get("permission_regime"),
             "permission_denied": obs["permission_denied"],
             "rate_limit": obs["rate_limit"],
+            "delegation": obs["delegation"],
             "skills_reported": obs["skills_reported"],
             "skill_listed": "repo-governor" in (obs["skills"] or []),
             "competing_skills": [s for s in obs["skills"] if s != "repo-governor"],

@@ -1,0 +1,9 @@
+{
+  "$comment": "Acceptance criteria for issue 123, declared before the work. It covers the WHOLE issue, which is smaller than it looks: the issue's own last bullet says not to change grading until a transcript exists where a subagent WRITES, and none does. So the work is to observe delegation, record it, and write down the rule that is currently an accident. WHAT IS NOT DONE AND WHY: per-actor tracking, so that parent-consults-then-subagent-mutates becomes its own grade rather than PARTIAL. That is the interesting case and it needs a captured transcript to build against -- issue 109 already taught what building against a reconstructed fixture costs. WHAT CANNOT BE ASSERTED: that a subagent's tool calls are correctly ATTRIBUTED. They are not distinguished at all, deliberately, because the event schema for that is not known from one observed session and guessing it is the mistake this bar exists to avoid.",
+  "authority_id": "123",
+  "criteria": [
+    {"check": "command_exit", "target": "python3 -c \"import sys,json;sys.path.insert(0,'tools');import benchmark as B;ev=[{'type':'assistant','message':{'content':[{'type':'tool_use','name':'Agent','input':{}}]}},{'type':'system','subtype':'task_started'}];o=B.observe(chr(10).join(json.dumps(e) for e in ev));sys.exit(0 if o.get('delegation',{}).get('agent_calls')==1 and o['delegation']['task_events']==1 else 1)\""},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh benchmark"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh"}
+  ]
+}
