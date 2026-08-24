@@ -35,6 +35,23 @@ the whole item, because nothing mechanical reads prose. Declare the scope as
 data (`covers`, with `declared` and `uncovered`) and completion becomes
 unavailable until the uncovered part is split out or the bar is extended.
 
+**Name where the split went, and the block discharges itself.** Adding
+`split_to: ["156", "165"]` makes the engine evaluate those authorities instead
+of reading the sentence beside them. Every one `STOP_COMPLETE` → the item may
+complete, recorded as **`BAR_COVERS_PART_DISCHARGED`**. Any one outstanding →
+`CONTINUE`, *naming which*, so a reader knows where to go.
+
+The refusal survives: a bar still cannot complete by deleting `covers`, and an
+empty `split_to` is that with extra steps — `all([])` is `True`, so it is
+rejected explicitly. A cycle and an over-deep chain are both refusals rather
+than silent truncation, because a resolver that stops searching and answers
+*"discharged"* has declared a completion it never established (ADR-007).
+
+Without this the signal had no off switch: the engine told you to split the
+uncovered half and then could not tell that you had, so the parent read
+`CONTINUE` forever and a human had to arbitrate — which is the situation
+`covers` was built to replace, one level up.
+
 - **`blocking: true`** → stop and report the `resolution`.
 - **`blocking: false`** → real uncertainty that does not gate this decision. Note it; continue.
 
