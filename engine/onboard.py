@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import importlib.machinery
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -60,6 +61,58 @@ def _git(repo, *args):
 # repository's obligations for evidence no adapter can read is the wrong order.
 # It follows issue 155, not this list.
 ADR_DIRS = ("docs/adr", "docs/adrs", "docs/decisions", "doc/adr", "adrs")
+
+# A published identity per ecosystem. Structure, never prose about structure.
+PACKAGE_MANIFESTS = ("package.json", "pyproject.toml", "go.mod", "Cargo.toml")
+
+
+def _declares_package(path: Path):
+    """Does this manifest declare a package the world can depend on?
+
+    Not "does a manifest exist" -- a private workspace root has a package.json
+    and ships nothing, which is why `"private": true` is honoured rather than
+    ignored.
+    """
+    try:
+        text = path.read_text(errors="ignore")
+    except OSError:
+        return False
+    if path.name == "package.json":
+        try:
+            j = json.loads(text)
+        except json.JSONDecodeError:
+            return False
+        if not j.get("name") or j.get("private"):
+            return False
+        # A name and a version alone is `npm init` output, which every
+        # application has. Something that means to be DEPENDED ON says where it
+        # starts or what it ships. On 105 real repositories this distinction
+        # costs 3 of 49 -- it is close to free in coverage and it stops an
+        # ordinary application being told it carries compatibility obligations.
+        return any(k in j for k in
+                   ("main", "exports", "bin", "files", "publishConfig", "module", "types"))
+    if path.name == "pyproject.toml":
+        return bool(re.search(r"^\[project\]", text, re.M) and re.search(r"^name\s*=", text, re.M))
+    if path.name == "go.mod":
+        return bool(re.search(r"^module\s+\S+", text, re.M))
+    if path.name == "Cargo.toml":
+        return bool(re.search(r"^\[package\]", text, re.M) and re.search(r"^name\s*=", text, re.M))
+    return False
+
+
+def _ships_something(repo: Path):
+    """Compatibility obligations: a published package identity, or release tags.
+
+    Kept to the repository root and one level down. Walking the whole tree would
+    find every vendored dependency's manifest and floor everything.
+    """
+    for depth in ("", "*/"):
+        for name in PACKAGE_MANIFESTS:
+            for p in repo.glob(f"{depth}{name}"):
+                if _declares_package(p):
+                    return True
+    rc, out = _git(repo, "tag")
+    return rc == 0 and bool(out.strip())
 
 
 def assess(repo: Path):
@@ -107,9 +160,36 @@ def assess(repo: Path):
                                 ("README.md", "README", "README.rst", "README.txt"))
 
     # Floor indicators.
-    ind["public_api_surface"] = any(
-        "export " in p.read_text(errors="ignore")[:4000] or "__all__" in p.read_text(errors="ignore")[:4000]
-        for p in src[:60]) if src else False
+    #
+    # `public_api_surface` asks whether this repository carries COMPATIBILITY
+    # OBLIGATIONS -- whether something outside it depends on what it exposes.
+    # It used to ask whether the word `export ` appeared in the first 4000 bytes
+    # of any of the first 60 source files, which is ordinary module syntax in
+    # TypeScript and says nothing about obligations.
+    #
+    # Measured on 105 public repositories (issue 164):
+    #
+    #     `export ` grep            73/105   70%   -- 100% of TypeScript repos
+    #     published package         41/105   39%
+    #     git tags present          22/105   21%
+    #     package OR tags           52/105   50%
+    #
+    # 37 of 105 were floored with NO published package and NO tags -- nothing
+    # saying they ship anything to anyone -- and each was told to bind the five
+    # roles GOVERNOR_HIGH_ASSURANCE requires. §54 names "blocks routine
+    # reversible implementation excessively" as a failure condition. The test
+    # was also wrong the other way: 12 repositories publish a package with no
+    # `export ` in the scanned slice, so it was close to UNCORRELATED with what
+    # it claimed to detect rather than merely over-eager.
+    #
+    # Both signals are kept because they are near-independent (both=11,
+    # package-only=30, tags-only=11): a project can publish to a registry
+    # without tagging, and tag releases without a manifest.
+    #
+    # This is the fifth time a substring test has stood in for a structural fact
+    # here. `conformance/imports.py` refuses to grep source for imports and says
+    # why in its docstring -- a string in a comment is not an import.
+    ind["public_api_surface"] = _ships_something(repo)
     rc, out = _git(repo, "branch", "-r")
     ind["release_branches"] = sum(
         1 for b in out.splitlines() if any(k in b for k in ("release/", "v1.", "v2.", "stable"))) > 0

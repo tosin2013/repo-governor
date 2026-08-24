@@ -252,6 +252,112 @@ def main():
                 O.assess(r)["suggested"] == "L1",
                 "openspec/ is out of scope until issue 155 gives it an adapter")
 
+        # --- issue 164: the API-surface floor reads structure, not substrings ---
+        #
+        # `public_api_surface` is a FLOOR indicator: ADR-006 rule 3 says it may
+        # not be overridden downward, and it selects GOVERNOR_HIGH_ASSURANCE,
+        # which engine/vocabulary.py requires five bound roles for. It used to
+        # fire on the word `export ` appearing in a source file -- ordinary
+        # module syntax in TypeScript, and silent about compatibility
+        # obligations.
+        #
+        # Measured on 105 public repositories: it floored 100% of TypeScript
+        # repositories, and 37 of 105 had no published package and no tags at
+        # all. Replacing it changed the verdict for 52 of 105 -- half the
+        # sample -- which is what "near-uncorrelated" means in practice.
+        #
+        # Every assertion below BUILDS A REPOSITORY and asks the engine. None
+        # greps engine/onboard.py: a check that reads source text for the string
+        # it disapproves of fails on the comment explaining the disapproval,
+        # which happened in conformance/layer1.py during issue 155.
+        def _mkrepo(name, files, tag=None):
+            r = tmp / f"floor-{name}"
+            for rel, content in files.items():
+                q = r / rel
+                q.parent.mkdir(parents=True, exist_ok=True)
+                q.write_text(content)
+            subprocess.run(["git", "-C", str(r), "init", "-q"], check=True)
+            if tag:
+                subprocess.run(["git", "-C", str(r), "add", "-A"], check=True,
+                               capture_output=True)
+                subprocess.run(["git", "-C", str(r), "-c", "user.email=t@e",
+                                "-c", "user.name=t", "commit", "-qm", "x"],
+                               check=True, capture_output=True)
+                subprocess.run(["git", "-C", str(r), "tag", tag], check=True,
+                               capture_output=True)
+            return r
+
+        TS = "export function widget() { return 1 }\n"
+
+        # Exports and nothing else. No manifest, no tags: this repository does
+        # not ship, and must not be told to bind five providers.
+        only_exports = _mkrepo("only-exports", {"src/a.ts": TS, "src/b.ts": TS, "src/c.ts": TS})
+        a = O.assess(only_exports)
+        rep.add("issue-164",
+                "the API-surface floor reads a declared package identity, not a source substring",
+                not a["indicators"]["public_api_surface"],
+                "a file containing the word 'export' is module syntax, not a compatibility "
+                "obligation; this floored 100% of TypeScript repositories")
+        rep.add("issue-164",
+                "a repository that ships nothing is not floored to HIGH_ASSURANCE",
+                a["profile"] != "GOVERNOR_HIGH_ASSURANCE",
+                f"assessed {a['suggested']} / {a['profile']} — that profile requires five "
+                "bound roles and manifest.py errors on each missing one (§54)")
+
+        # A published identity. Without this the check above passes by never
+        # firing at all, which removes the capability instead of correcting it.
+        pkg = _mkrepo("published", {
+            "package.json": '{"name": "widget", "version": "1.0.0", "main": "src/a.ts"}\n',
+            "src/a.ts": TS})
+        rep.add("issue-164", "a published package identity raises the floor",
+                O.assess(pkg)["indicators"]["public_api_surface"],
+                "a named, non-private manifest that declares an entry point is a claim "
+                "that something outside this repository depends on it")
+
+        # A name and a version and nothing else is `npm init` output, which every
+        # application has. The B-growing fixture carries exactly that and expects
+        # L2; floring it would tell ordinary applications they carry
+        # compatibility obligations. Costs 3 of 49 on 105 real repositories.
+        bare = _mkrepo("bare-manifest", {
+            "package.json": '{"name": "app", "version": "1.0.0"}\n', "src/a.ts": TS})
+        rep.add("issue-164", "a bare name-and-version manifest does not raise the floor",
+                not O.assess(bare)["indicators"]["public_api_surface"],
+                "npm init output is not a declaration that anything depends on this")
+
+        # `"private": true` is honoured. A workspace root has a manifest and
+        # ships nothing; treating every package.json as a publication would
+        # reintroduce the false positives by a different route.
+        # Carries an entry point TOO, so only the `private` guard can decline it.
+        # The first version omitted `main`, which meant the strict entry-point
+        # test already declined it and the private check was never exercised --
+        # the assertion passed whether or not `private` was honoured, and a
+        # mutation removing the guard survived.
+        priv = _mkrepo("private-pkg", {
+            "package.json": '{"name": "wsroot", "private": true, "main": "src/a.ts"}\n',
+            "src/a.ts": TS})
+        rep.add("issue-164", "a package marked private does not raise the floor",
+                not O.assess(priv)["indicators"]["public_api_surface"],
+                "'private': true says explicitly that this is not published")
+
+        # Tags with no manifest. Measured near-independent from the package
+        # signal (both=11, package-only=30, tags-only=11), so either alone
+        # misses a real population.
+        tagged = _mkrepo("tagged", {"main.go": "package main\n"}, tag="v1.0.0")
+        rep.add("issue-164", "tags raise the floor even with no package manifest",
+                O.assess(tagged)["indicators"]["public_api_surface"],
+                "a project can tag releases without publishing a manifest")
+
+        # A Go repository with one stray TypeScript file. The old scan took the
+        # first sixty source files across ALL extensions, so this was floored on
+        # a language the repository does not use -- Go has no `export` keyword,
+        # and 11 of 14 Go repositories were floored anyway.
+        mixed = _mkrepo("go-with-stray-ts", {
+            "main.go": "package main\n", "internal/x.go": "package internal\n",
+            "scripts/helper.ts": TS})
+        rep.add("issue-164", "the floor scan is bounded by the languages the repository uses",
+                not O.assess(mixed)["indicators"]["public_api_surface"],
+                "a stray .ts file floored Go-dominant repositories, verified on a real one")
+
         # gate 4: proposal is written but the ENGINE never reads it.
         a = repos["A-greenfield"]
         subprocess.run([sys.executable, str(ROOT / "engine" / "onboard.py"), str(a), "--write"],
@@ -551,6 +657,10 @@ def main():
             _sp.run(["git", "-C", str(fl), "remote", "add", "origin",
                      "https://github.com/acme/w.git"], capture_output=True)
             (fl / "src" / "a.ts").write_text("export const a = 1;\n")
+            # Floored by a PUBLISHED IDENTITY, not by the word `export`. This
+            # fixture exists to prove a floor cannot be overridden downward, so
+            # it has to be floored by something that still floors (issue 164).
+            (fl / "package.json").write_text('{"name": "floored", "version": "1.0.0", "main": "src/a.ts"}\n')
             _sp.run(["git", "-C", str(fl), "add", "-A"], capture_output=True)
             _sp.run(["git", "-C", str(fl), "-c", "user.email=t@t", "-c", "user.name=t",
                      "commit", "-q", "-m", "i"], capture_output=True)

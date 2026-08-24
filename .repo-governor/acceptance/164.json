@@ -1,0 +1,55 @@
+{
+  "$comment": "Acceptance criteria for issue 164. MEASURED ON 105 PUBLIC REPOSITORIES, not fixtures, before a line was written. Baseline at bfb52a7: the `export ` substring test floors 73 of 105 (70%) to GOVERNOR_HIGH_ASSURANCE, which requires five bound roles; 100% of TypeScript repositories, and 11 of 14 Go repositories despite Go having no `export` keyword -- src[:60] is not bounded by language and a stray .ts file floored them. THE FALSE-POSITIVE POPULATION IS 37 OF 105 (35%): floored today with no published package identity and no tags at all. The test is also wrong the other way -- 12 repositories publish a package and have no `export ` in the first sixty files -- so it is close to uncorrelated with what it claims to detect rather than merely over-eager. A NUMBER WAS DISCARDED RATHER THAN PUBLISHED. The first pass measured git tags at 12%; these are --depth 1 clones, which do not fetch tags. Checked: 0 before an explicit fetch, 77 after. Re-measured at 21%. The replacement signal is `published package identity OR tags`, which fires on 52 of 105 (50%). WHAT THIS BAR CANNOT CHECK: whether 50% is the RIGHT floor rate. That is calibration of the L0-L4 thresholds, explicitly out of scope here and blocked behind this issue in 165. CORRECTED AFTER IMPLEMENTATION. The estimate said the replacement would fire on 52 of 105 (50%); it fires on 69 (66%). Two errors: the tag count was read while a background `git fetch --tags` was still running (22 then, stable at 51 now, re-read twice), and the estimate script did not check Cargo.toml while the implementation does. That is the THIRD measurement error in one day -- with the project.md selection artifact and the 12% shallow-clone tag reading -- all sharing one shape: the method could not have produced the answer it gave. WHAT THE FIX ACTUALLY DOES is change the VERDICT for 52 of 105 repositories (28 false positives removed, 24 true positives gained) while barely moving the rate. The two signals agree on 53 of 105, which is what near-uncorrelated means in practice. WHAT IT DOES NOT DO, stated because the issue body implied otherwise: 66% are still floored to GOVERNOR_HIGH_ASSURANCE and still required to bind five roles. If 70% was \u00a754 over-escalation then 66% still is. That is threshold calibration, filed separately rather than absorbed here. NOTE ON CRITERION LABELS: an apostrophe in an assertion label breaks the single-quoted `bash -c` string these criteria are written as, and the criterion then fails for a reason unrelated to the code. This is the second time (issue 154 had \"both providers' constraints\"). Labels named by a bar avoid apostrophes.",
+  "authority_id": "164",
+  "criteria": [
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -q \"\\[PASS\\] the API-surface floor reads a declared package identity, not a source substring\"'",
+      "$comment": "C1 THE DEFECT. A repository whose only claim to a public API is the word `export ` in a source file must NOT be floored. Red at declaration."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -q \"\\[PASS\\] a published package identity raises the floor\"'",
+      "$comment": "C2 THE SIGNAL STILL FIRES. Without this, C1 passes by never floring anything -- the failure mode is a check that removes a capability instead of correcting it."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -q \"\\[PASS\\] tags raise the floor even with no package manifest\"'",
+      "$comment": "C3 THE UNION. Measured: the two signals are near-independent (both=11, package-only=30, tags-only=11), so either alone misses a real population. A repository can tag releases without a manifest."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -q \"\\[PASS\\] the floor scan is bounded by the languages the repository uses\"'",
+      "$comment": "C4 THE SECOND DEFECT IN THE SAME LINE. src[:60] takes the first sixty source files across ALL extensions, so a Go-dominant repository was floored by a stray .ts file. Verified on a real repository."
+    },
+    {
+      "$comment": "C4b PRIVATE IS HONOURED. A workspace root has a package.json and ships nothing. Treating every manifest as a publication would reintroduce the false positives by another route.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -q \"\\[PASS\\] a package marked private does not raise the floor\"'"
+    },
+    {
+      "$comment": "C4c NPM INIT OUTPUT IS NOT A PUBLICATION. A name and version with no entry point is what every application has. The B-growing onboarding fixture carries exactly that and expects L2 -- it caught a signal that was too loose, and the correction costs 3 of 49 on the 105-repository sample.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -q \"\\[PASS\\] a bare name-and-version manifest does not raise the floor\"'"
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -q \"\\[PASS\\] a repository that ships nothing is not floored to HIGH_ASSURANCE\"'",
+      "$comment": "C5 THE CONSEQUENCE, stated as the user experiences it. GOVERNOR_HIGH_ASSURANCE requires five bound roles and manifest.py errors on each missing one. \u00a754 names 'blocks routine reversible implementation excessively' as a failure condition; 35% floored on no evidence of shipping is that."
+    },
+    {
+      "$comment": "C6 the onboarding suite entire, so a new assertion cannot be added and left unrun.",
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh onboarding"
+    },
+    {
+      "$comment": "C7 issue 161's shared-list guarantee still holds; this touches the same file.",
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh manifest"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh"
+    }
+  ]
+}
