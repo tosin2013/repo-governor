@@ -1,0 +1,22 @@
+{
+  "$comment": "Acceptance criteria for issue 131 (cut 2 of 117). SCOPE, DECLARED RATHER THAN DISCOVERED: three of the four benefits cut 2 claimed had already arrived incrementally and were verified present before this bar was written -- the transcript is written before it is parsed, records and transcripts stream per prompt, and a single saved transcript can be graded with no host. The one that had NOT arrived is re-grading a whole saved arm, and that is what this bar demands. WHAT IS DELIBERATELY NOT DONE: rewriting the CLI into run/grade/suite verbs. That would break every documented invocation, the calibration flow and the report flow, for no benefit this bar could express. The structural half that DOES matter is done: the grader's input is now always a file on disk, so the suite and a re-grade share one path. If the verb split is wanted it is a separate issue with its own bar, which is the lesson of 133. The re-grade criterion runs against a COPY: --regrade rewrites records in place, and a criterion that mutated a tracked fixture would leave the tree dirty on a passing run -- a defect this repository has shipped before.",
+  "authority_id": "131",
+  "criteria": [
+    {
+      "check": "file_exists",
+      "target": "conformance/fixtures/arm-regrade/1.transcript.jsonl"
+    },
+    {
+      "check": "command_exit",
+      "target": "rm -rf /tmp/rg-regrade-check && cp -r conformance/fixtures/arm-regrade /tmp/rg-regrade-check && python3 tools/benchmark.py --regrade /tmp/rg-regrade-check"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh benchmark"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh"
+    }
+  ]
+}

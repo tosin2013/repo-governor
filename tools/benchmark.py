@@ -495,8 +495,7 @@ def measure(host, target, prompt, model=None, control=False, debug=False,
     """
     if transcript is not None:
         # Grade a transcript that already exists. No host, no temp tree, no
-        # session spent. A grader change can then re-read an entire arm, and a
-        # run lost to a crash or a ceiling can be read rather than repeated.
+        # session spent.
         res = {"raw": Path(transcript).read_text(encoding="utf-8"), "stderr": "",
                "workdir": None, "transcript": str(transcript), "argv": [],
                "timed_out": False, "permission_regime": None}
@@ -505,6 +504,12 @@ def measure(host, target, prompt, model=None, control=False, debug=False,
                             debug=debug, permissions=permissions)
         if err:
             return None, err
+        # Cut 2 of issue 117, the half that matters: the grader's input is
+        # ALWAYS a file on disk, never a value held in memory by the code that
+        # just produced it. Running and judging no longer share a fate -- which
+        # is how a parser bug once destroyed a 900-second session -- and the
+        # suite and a re-grade now walk the same path.
+        res["raw"] = Path(res["transcript"]).read_text(encoding="utf-8")
     obs = observe(res["raw"])
     g, why = grade(obs, control=control)
     out = {
@@ -609,6 +614,58 @@ def suite_plan(doc, host, target, path):
                      "protocol's one-prompt-per-session rule rather than breaking it."),
         "ids": [p["id"] for p in prompts],
     }
+
+
+def regrade(out_dir, host=None):
+    """Re-grade an arm from the transcripts beside its records. Spawns nothing.
+
+    This is what cut 2 was for. A change to grade() otherwise invalidates every
+    session already spent -- and an arm is twenty-three of them, hours of real
+    host time. Here it costs a re-read.
+
+    Metadata comes from the record (prompt, control), evidence from the
+    transcript next to it. The `transcript` field inside the old record is
+    ignored on purpose: it points into a temp tree that may be long gone, and
+    the file beside the record is the copy that was kept.
+    """
+    d = Path(out_dir)
+    if not d.is_dir():
+        return None, f"{out_dir} is not a directory"
+    pairs = []
+    for rec_path in sorted(d.glob("*.json")):
+        tx = d / f"{rec_path.stem}.transcript.jsonl"
+        if tx.is_file():
+            pairs.append((rec_path, tx))
+    if not pairs:
+        return None, (f"no record/transcript pairs in {out_dir} -- an arm run "
+                      "without --out keeps neither")
+
+    changed, out = [], []
+    for rec_path, tx in pairs:
+        try:
+            old = json.loads(rec_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as e:
+            return None, f"{rec_path.name} is not valid JSON: {e}"
+        rec, err = measure(host or old.get("host") or "claude", None,
+                           old.get("prompt", ""), old.get("model"),
+                           bool(old.get("control")), transcript=tx)
+        if err:
+            return None, f"{rec_path.name}: {err}"
+        rec["id"] = old.get("id", rec_path.stem)
+        rec["lane"] = old.get("lane")
+        rec["regraded_from"] = str(tx)
+        if old.get("grade") != rec["grade"]:
+            changed.append({"id": rec["id"], "was": old.get("grade"),
+                            "now": rec["grade"]})
+        rec_path.write_text(json.dumps(rec, indent=2, sort_keys=True) + "\n",
+                            encoding="utf-8")
+        out.append(rec)
+    return {"regraded": len(out), "changed": changed,
+            "records_at": str(d),
+            "note": ("A grade that moved means the GRADER changed, not the "
+                     "session. The transcripts are untouched." if changed else
+                     "No grade moved: this grader agrees with the one that "
+                     "produced these records.")}, None
 
 
 def run_suite(host, target, doc, path, out_dir=None, model=None, debug=False,
@@ -979,11 +1036,21 @@ def main(argv):
                          "rules, under which a headless session has no approver")
     ap.add_argument("--from-transcript",
                     help="grade a saved transcript.jsonl; spawns nothing")
+    ap.add_argument("--regrade",
+                    help="re-grade an --out directory from its saved transcripts")
     ap.add_argument("--report", help="a directory of records written by --out")
     ap.add_argument("--report-out", help="with --report: write the HTML here")
     ap.add_argument("--debug", action="store_true",
                     help="progress and the live transcript, to stderr; stdout stays JSON")
     a = ap.parse_args(argv)
+
+    if a.regrade:
+        summary, err = regrade(a.regrade, a.host)
+        if err:
+            print(json.dumps({"error": err}, indent=2))
+            return EXIT_USAGE
+        print(json.dumps(summary, indent=2, sort_keys=True))
+        return EXIT_OK
 
     if a.report:
         records, err = load_records(a.report)
