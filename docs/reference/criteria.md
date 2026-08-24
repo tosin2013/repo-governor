@@ -122,6 +122,10 @@ Differentiation candidate:
 
 **Confirmed 2026-08-17.** The broad sweep in [`../research/2026-08-17-external-landscape.md`](../research/2026-08-17-external-landscape.md) found no tool in the spec-driven-development or tracker categories that answers "is this work currently authorized?" across providers. OpenSpec and Spec Kit answer *how to build*; none reconciles a spec against a withdrawn roadmap item.
 
+**Bounded 2026-08-24.** A second sweep, [`../research/2026-08-24-architecture-decisions-and-release-readiness.md`](../research/2026-08-24-architecture-decisions-and-release-readiness.md), asked whether an Accepted architecture decision with undischarged obligations is a fact a release should measure. It found the concept already named in ADR practice — MADR's optional `Confirmation` section — mechanical confirmation bounded to *structural* obligations, and decision immutability forbidding discharge state from living in the decision itself. Measured on this project's own ledger: **267 post-acceptance obligations, one discharge marker.**
+
+The differentiation candidate is **not** extended to cover it. [ADR-032](../adrs/032-a-decision-declares-how-it-will-be-confirmed.md) requires a decision to declare how it would be confirmed and refuses to build anything that polices the answer — §65 lists release governance among Future Candidate Capabilities followed by "none are authorized merely by inclusion here", and a mechanism firing on 267 items would meet §54's *blocks routine reversible implementation excessively*.
+
 ---
 
 ## §62 — Initial Implementation Boundary
