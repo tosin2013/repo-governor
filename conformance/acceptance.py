@@ -192,6 +192,45 @@ def main():
         fails += check("it refuses to overwrite an existing record", p2.returncode != 0,
                        "replacing a bar somebody set is editing the bar to fit the work")
 
+    print("\nA bar may declare that it covers only part of its authority\n")
+    # Issue 133. Two bars shipped saying "cut 1 only" and "DECISION HALF ONLY"
+    # in a $comment, and both read STOP_COMPLETE for the whole item -- nothing
+    # mechanical reads prose, and one nearly lost its remaining half. Scope is
+    # declared as DATA or it is not checkable. Matching words in a comment was
+    # rejected: conformance/imports.py parses an AST rather than grepping for
+    # exactly this reason.
+    import tempfile as _tfc
+    OKC = [{"check": "file_exists", "target": "README.md"}]
+
+    def with_file(doc, wid="T-9"):
+        td = _tfc.mkdtemp()
+        d = Path(td) / ".repo-governor" / "acceptance"
+        d.mkdir(parents=True)
+        (Path(td) / "README.md").write_text("x")
+        (d / f"{wid}.json").write_text(json.dumps(doc))
+        return adapter(wid, td)
+
+    r = with_file({"authority_id": "T-9", "criteria": OKC,
+                   "covers": {"declared": "the parser", "uncovered": "the writer"}})
+    fails += check("a declared scope is served to the engine",
+                   (r.get("value") or {}).get("covers", {}).get("uncovered") == "the writer",
+                   f"got {r.get('value', {}).get('covers')!r}")
+
+    for label, cov in (("without 'uncovered'", {"declared": "the parser"}),
+                       ("without 'declared'", {"uncovered": "the writer"}),
+                       ("as a bare string", "half of it")):
+        r = with_file({"authority_id": "T-9", "criteria": OKC, "covers": cov})
+        bad = (r.get("error") or {}).get("type") == "MALFORMED_SOURCE"
+        fails += check(f"a 'covers' {label} is refused", bad,
+                       "a partial bar that will not name the uncovered part has "
+                       "recorded a boast, not a limit -- and the limit is the "
+                       "thing a reader needs")
+
+    r = with_file({"authority_id": "T-9", "criteria": OKC})
+    fails += check("control: a bar with no 'covers' is served unchanged",
+                   r.get("ok") and (r.get("value") or {}).get("covers") is None,
+                   "otherwise the refusals above would pass for any bar at all")
+
     print(f"\n{'ACCEPTANCE: CONFORMANT' if not fails else f'ACCEPTANCE: NON-CONFORMANT ({fails})'}")
     return 0 if not fails else 1
 

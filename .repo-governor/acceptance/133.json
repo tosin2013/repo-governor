@@ -1,0 +1,9 @@
+{
+  "$comment": "Acceptance criteria for issue 133, declared before the work and confirmed red by running them: completion.py 93 reads STOP_COMPLETE today while the wording half of issue 93 is deliberately unattempted. Criterion 1 is the defect itself, end to end, on a real authority -- not a fixture standing in for it. WHAT WAS REJECTED AS A DESIGN: warning when a $comment contains 'only' or 'half'. Matching prose is the vacuity this repository refuses elsewhere (conformance/imports.py parses an AST rather than grepping for a string precisely so a word in a comment cannot decide a verdict), and it would both miss honest bars phrased differently and fire on innocent ones. Scope is DECLARED as data or it is not checkable. THIS DOES NOT ADD A DISPOSITION: STOP_PARTIAL would need section 32 and an ADR. A bar that admits it is partial simply cannot reach STOP_COMPLETE, which is the safe direction and needs no new vocabulary.",
+  "authority_id": "133",
+  "criteria": [
+    {"check": "command_exit", "target": "python3 -c \"import sys,json,subprocess;d=json.loads(subprocess.run([sys.executable,'engine/completion.py','93'],capture_output=True,text=True).stdout);sys.exit(1 if d['decision']=='STOP_COMPLETE' else 0)\""},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh acceptance"},
+    {"check": "command_exit", "target": "./tools/run-conformance.sh"}
+  ]
+}

@@ -65,6 +65,21 @@ def template(wid):
             {"check": "command_exit", "target": "python3 tests/run.py"},
             {"check": "tests_pass", "target": "npm test"},
         ],
+        # An author who knows their bar is partial needs somewhere to say so
+        # that is not a comment. Two bars in this repository recorded exactly
+        # that in prose and both read STOP_COMPLETE for the whole item, because
+        # nothing mechanical reads prose (issue 133). Offered here, unset,
+        # because most bars are not partial and a template must not suggest
+        # that scoping one down is the normal move.
+        "$covers_if_partial": {
+            "$comment": ("Rename to 'covers' ONLY if this bar deliberately covers part "
+                         "of the item. Completion then becomes unavailable until the "
+                         "uncovered part is split out or this bar is extended. Both "
+                         "fields are required: a partial bar that will not name what it "
+                         "leaves out has recorded a boast, not a limit."),
+            "declared": "the part this bar does cover",
+            "uncovered": "the part it does NOT, and why it is not attempted here",
+        },
         "authority_id": str(wid),
         "criteria": [],
     }

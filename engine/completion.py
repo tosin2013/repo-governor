@@ -212,12 +212,33 @@ def evaluate(authority_id, manifest=None):
 
     unresolved = [r for r in results if r["satisfied"] is None]
     unmet = [r for r in results if r["satisfied"] is False]
+    covers = (crit["value"] or {}).get("covers")
 
     if unresolved:
         # ADR-007: must not declare completion it cannot verify.
         decision, satisfied = "UNKNOWN", "UNKNOWN"
     elif unmet:
         decision, satisfied = "CONTINUE", False
+    elif covers:
+        # Every declared criterion is met, and the bar itself says it covers
+        # only part of this authority. Completion is therefore not something
+        # this bar can establish, whatever its criteria say.
+        #
+        # CONTINUE rather than a new disposition: STOP_PARTIAL would need
+        # section 32 and an ADR, and the safe direction needs no new
+        # vocabulary. The work continues, which is true.
+        decision, satisfied = "CONTINUE", False
+        unknowns.append({
+            "dimension": "evidence", "reason": "BAR_COVERS_PART", "blocking": False,
+            "meaning": "The declared bar is satisfied but covers only part of this item.",
+            "detail": (f"The bar covers {covers.get('declared')!r}. NOT covered: "
+                       f"{covers.get('uncovered')!r}. Every criterion passed, so the "
+                       "covered part is done; the item is not."),
+            "resolution": ("Split the uncovered part into its own authority with its "
+                           "own bar, or extend this bar to cover it. Removing 'covers' "
+                           "without doing either would declare completion the criteria "
+                           "do not establish."),
+        })
     else:
         decision, satisfied = "STOP_COMPLETE", True
 

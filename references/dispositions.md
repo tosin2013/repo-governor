@@ -26,6 +26,15 @@ Read `unknowns[]`. Each entry carries:
   "blocking": false, "resolution": "Declare criteria in ..., or accept no completion bar." }
 ```
 
+One reason is worth knowing by name. **`BAR_COVERS_PART`** appears when every
+declared criterion passed and the bar itself says it covers only part of the
+item — `CONTINUE` with nothing failing, which is otherwise the most confusing
+output the engine can produce. Two issues shipped with *"cut 1 only"* and
+*"DECISION HALF ONLY"* written in a comment, and both read `STOP_COMPLETE` for
+the whole item, because nothing mechanical reads prose. Declare the scope as
+data (`covers`, with `declared` and `uncovered`) and completion becomes
+unavailable until the uncovered part is split out or the bar is extended.
+
 - **`blocking: true`** → stop and report the `resolution`.
 - **`blocking: false`** → real uncertainty that does not gate this decision. Note it; continue.
 

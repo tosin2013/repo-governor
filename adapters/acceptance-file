@@ -90,6 +90,23 @@ def _load(fn, kw):
                           f"{p}: free-prose amendment record ({str(d_legacy)[:40]}...). "
                           "Use the structured 'amendments' array so the justification is checkable.")
 
+    # A bar may DECLARE that it covers only part of its authority. Two issues
+    # shipped with exactly that written in a $comment -- "cut 1 only",
+    # "DECISION HALF ONLY" -- and both read STOP_COMPLETE for the whole item,
+    # because nothing mechanical reads prose. One of them nearly lost its
+    # remaining half.
+    #
+    # `uncovered` is the required half. A bar that says which part it covers
+    # but not which part it does not has recorded a boast, not a limit, and the
+    # limit is the thing a reader needs.
+    if "covers" in data:
+        c = data["covers"]
+        if not isinstance(c, dict) or not c.get("declared") or not c.get("uncovered"):
+            return None, fail(ROLE, fn, "MALFORMED_SOURCE",
+                              f"{p}: 'covers' must declare both what it covers and what "
+                              "it does NOT ('declared' and 'uncovered'). A partial bar "
+                              "that will not name the uncovered part cannot be acted on.")
+
     if data.get("authority_id") != wid:
         return None, fail(ROLE, fn, "MALFORMED_SOURCE",
                           f"{p} declares authority_id={data.get('authority_id')!r}, expected {wid!r}")
@@ -124,6 +141,7 @@ def get_criteria(kw):
     return ok(ROLE, "get_criteria",
               {"authority_id": kw["id"],
                "criteria": data["criteria"],
+               "covers": data.get("covers"),
                "amendments": len(data.get("amendments") or []),
                "count": len(data["criteria"]),
                "machine_checkable": True},
