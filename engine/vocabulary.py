@@ -60,6 +60,13 @@ REASONS = {
     # acceptance — non-blocking: absence means no completion bar, not danger
     "NO_CRITERIA_DECLARED":          ("acceptance", False,
                                       "No acceptance criteria declared; STOP_COMPLETE unavailable."),
+    # A bar that declares it covers only part of its authority. Non-blocking:
+    # the covered part genuinely passed, and the decision is already CONTINUE
+    # -- this explains WHY completion is unavailable when every criterion is
+    # green, which is otherwise the most confusing output the engine can emit.
+    "BAR_COVERS_PART":               ("evidence", False,
+                                      "The declared bar is satisfied but covers only part of "
+                                      "this item; STOP_COMPLETE unavailable."),
     "ACCEPTANCE_UNSTATED":           ("acceptance", False,
                                       "Provider cannot supply machine-checkable acceptance conditions."),
     "NON_GOALS_UNSTATED":            ("scope", False,

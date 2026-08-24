@@ -2,7 +2,17 @@
   "$comment": "Acceptance criteria for issue 93, DECISION HALF ONLY. The issue's third acceptance condition -- that Arm A completes or restarts before any wording change lands -- is deliberately NOT satisfiable here and is not attempted: prompts 1-4 are graded against the current SKILL.md, and editing it mid-arm makes them incomparable with 5-20. This work is done when the question is recorded well, not when SKILL.md changes. Acceptance of the ADR is a human act (section 68) and is likewise not a criterion.",
   "authority_id": "93",
   "criteria": [
-    {"check": "command_exit", "target": "./tools/run-conformance.sh skill"},
-    {"check": "command_exit", "target": "./tools/run-conformance.sh vocabulary"}
-  ]
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh skill"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh vocabulary"
+    }
+  ],
+  "covers": {
+    "declared": "the decision half -- recording the question and the reasoning",
+    "uncovered": "the wording half: any change to SKILL.md's AUTHORITY_SOURCE_MISSING text. Deliberately not attempted -- prompts 1-4 of Arm A were graded against the current wording, and editing it mid-arm makes them incomparable with 5-20. Blocked on issue 36 completing or restarting."
+  }
 }

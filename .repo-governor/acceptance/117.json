@@ -2,8 +2,21 @@
   "$comment": "Acceptance criteria for issue 117, CUT 1 ONLY. Cut 2 -- splitting run from grade -- is a refactor and must not ride along with a bug fix; it stays open on the issue. Criterion 1 was run and confirmed red at declaration: threading is imported today for the watchdog that only the streaming branch needs. The behavioural criterion lives in the suite because it needs a slow fake host, and it was demonstrated failing first: a run that times out WITHOUT --debug currently loses its transcript entirely, because subprocess.run raises before the write. The 900s run that produced this repository's first calibration survived only because it happened to be invoked with a flag whose purpose is unrelated to durability.",
   "authority_id": "117",
   "criteria": [
-    {"check": "command_exit", "target": "python3 -c \"import sys;sys.path.insert(0,'tools');import benchmark as B;sys.exit(1 if hasattr(B,'threading') else 0)\""},
-    {"check": "command_exit", "target": "./tools/run-conformance.sh benchmark"},
-    {"check": "command_exit", "target": "./tools/run-conformance.sh"}
-  ]
+    {
+      "check": "command_exit",
+      "target": "python3 -c \"import sys;sys.path.insert(0,'tools');import benchmark as B;sys.exit(1 if hasattr(B,'threading') else 0)\""
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh benchmark"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh"
+    }
+  ],
+  "covers": {
+    "declared": "cut 1 -- one path to the transcript, whatever --debug says",
+    "uncovered": "cut 2 -- splitting run from grade. Split out to issue 131 by hand AFTER this bar had already read STOP_COMPLETE, which is the defect issue 133 exists for. Recorded retroactively so the record shows what the bar actually covered rather than what it was read as covering."
+  }
 }
