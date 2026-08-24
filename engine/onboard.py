@@ -43,6 +43,25 @@ def _git(repo, *args):
         return 127, ""
 
 
+# Where ADR collections live, in one place because TWO places disagreed.
+#
+# Detection scanned five conventions and the difficulty indicator scanned three,
+# so a repository using `adrs/` or `doc/adr` was told it had "little architecture
+# history" by the same run that detected its architecture provider -- and the
+# indicator is not cosmetic: it raises the assessed level from L1 to L2, which
+# selects the profile, which decides which roles manifest.py REQUIRES. Renaming a
+# directory changed which roles a repository had to bind (issue 161).
+#
+# `doc/adr` is adr-tools' default and `adrs/` is common at the repository root;
+# missing them reported real collections as no provider at all (#27).
+#
+# `openspec/` is deliberately absent. An OpenSpec repository holds
+# decisions-in-progress rather than a decision ledger, and raising a
+# repository's obligations for evidence no adapter can read is the wrong order.
+# It follows issue 155, not this list.
+ADR_DIRS = ("docs/adr", "docs/adrs", "docs/decisions", "doc/adr", "adrs")
+
+
 def assess(repo: Path):
     """Report observed indicators and a SUGGESTED level. A human decides."""
     ind = {}
@@ -58,8 +77,9 @@ def assess(repo: Path):
     ind["migrations"] = any(p.is_dir() and p.name in ("migrations", "migrate")
                             for p in repo.rglob("*"))
     ind["feature_flags"] = any("flag" in p.name.lower() for p in files)
-    ind["architecture_history"] = any(
-        (repo / d).is_dir() for d in ("docs/adr", "docs/adrs", "docs/decisions"))
+    # Reads ADR_DIRS, the same list detection reads. Restating the conventions
+    # here is what made the two disagree (issue 161).
+    ind["architecture_history"] = any((repo / d).is_dir() for d in ADR_DIRS)
     ind["ci_workflows"] = len(list((repo / ".github" / "workflows").glob("*"))) if (
         repo / ".github" / "workflows").is_dir() else 0
 
@@ -168,10 +188,10 @@ def detect(repo: Path):
         add("repository", "git", "adapters/git", "PROVIDER_DETECTED",
             [_cite(repo, ".git", "valid git repository")])
 
-    # architecture — ADR directory. `doc/adr` is adr-tools' default and `adrs/`
-    # is common at the repository root; missing them reported real collections
-    # as no provider at all (#27).
-    for d in ("docs/adr", "docs/adrs", "docs/decisions", "doc/adr", "adrs"):
+    # architecture — ADR directory. Conventions come from ADR_DIRS, which
+    # `assess()` also reads, so detecting a provider and assessing the level
+    # cannot disagree about what an ADR collection looks like (issue 161).
+    for d in ADR_DIRS:
         p = repo / d
         if p.is_dir():
             md = sorted(p.glob("*.md"))

@@ -155,6 +155,28 @@ def _parse_form(path):
     return True, ""
 
 
+def _src():
+    return (ROOT / "engine" / "onboard.py").read_text()
+
+
+def _detected_convs():
+    """The conventions the DETECTION loop iterates, read from source.
+
+    Asserting `for d in ADR_DIRS` textually is the only way to show the loop
+    reads the shared list rather than a literal that happens to match it today.
+    """
+    import re
+    m = re.search(r"# architecture — ADR directory[\s\S]{0,400}?\n    for d in ([^:]+):", _src())
+    return list(O.ADR_DIRS) if m and m.group(1).strip() == "ADR_DIRS" else []
+
+
+def _indicator_convs():
+    """Same, for the architecture_history indicator."""
+    import re
+    m = re.search(r'ind\["architecture_history"\] = any\(\(repo / d\)\.is_dir\(\) for d in ([^)]+)\)', _src())
+    return list(O.ADR_DIRS) if m and m.group(1).strip() == "ADR_DIRS" else []
+
+
 def main():
     rep = R()
     with tempfile.TemporaryDirectory() as td:
@@ -162,6 +184,73 @@ def main():
         repos = {}
         for name, fx in SPEC["fixtures"].items():
             repos[name], _ = run_fixture(name, fx, tmp, rep)
+
+        # --- issue 161: detection and the difficulty indicator must agree ------
+        #
+        # engine/onboard.py decided two things about ADR evidence from two
+        # different lists -- detection scanned five conventions, the
+        # `architecture_history` indicator scanned three. So a repository using
+        # `adrs/` or `doc/adr` was told it had "little architecture history" by
+        # the same run that detected its architecture provider, and the
+        # indicator raises the level from L1 to L2, which selects the profile,
+        # which decides which roles manifest.py REQUIRES.
+        #
+        # DERIVED FROM O.ADR_DIRS, never restated. A check that hard-codes the
+        # conventions is the third place to forget the next time one is added,
+        # which is the defect it exists to catch, one layer up.
+        levels, contradictions = {}, []
+        for conv in O.ADR_DIRS:
+            r = tmp / ("adrconv-" + conv.replace("/", "_"))
+            (r / conv).mkdir(parents=True)
+            # TWO decisions, so the provider reads PROVIDER_DETECTED rather than
+            # PROVIDER_UNCONFIRMED. The contradiction is sharpest when detection
+            # is confident and the indicator still says there is no history.
+            for n, t in ((1, "First"), (2, "Second")):
+                (r / conv / f"000{n}-x.md").write_text(
+                    f"# {n}. {t} decision\n\n**Status**: Accepted\n")
+            (r / "src").mkdir()
+            for i in range(3):
+                (r / "src" / f"m{i}.py").write_text("x=1\n")
+            subprocess.run(["git", "-C", str(r), "init", "-q"], check=True)
+            a = O.assess(r)
+            levels[conv] = a["suggested"]
+            found = "architecture" in O.detect(r)
+            if found and not a["indicators"]["architecture_history"]:
+                contradictions.append(conv)
+
+        rep.add("issue-161", "every detected ADR convention raises the assessed level identically",
+                len(set(levels.values())) == 1,
+                f"{levels} — identical repositories differing only in directory name; "
+                "the level selects the profile, and the profile decides which roles "
+                "manifest.py requires")
+        rep.add("issue-161", "no repository is told it has little architecture history "
+                "while its architecture provider is detected",
+                not contradictions,
+                f"self-contradicting for {contradictions}")
+        rep.add("issue-161", "detection and the difficulty indicator read the same list",
+                # Both must be NON-EMPTY. `all()` over an empty list is True, so
+                # the first draft of this check went green precisely when a site
+                # stopped reading ADR_DIRS -- vacuous exactly where it mattered.
+                bool(_detected_convs()) and bool(_indicator_convs())
+                and set(_detected_convs()) == set(O.ADR_DIRS)
+                and set(_indicator_convs()) == set(O.ADR_DIRS),
+                "one of the two sites restates the conventions instead of reading ADR_DIRS; "
+                "that is how they diverged in the first place")
+
+        # The fix must not WIDEN. openspec/ is a separate judgement -- an OpenSpec
+        # repository holds decisions-in-progress, not a decision ledger -- and
+        # raising a repository's required roles for evidence no adapter can read
+        # is the wrong order. It follows issue 155.
+        r = tmp / "openspec-only"
+        (r / "openspec" / "changes" / "add-thing").mkdir(parents=True)
+        (r / "openspec" / "changes" / "add-thing" / "proposal.md").write_text("# p\n")
+        (r / "src").mkdir()
+        for i in range(3):
+            (r / "src" / f"m{i}.py").write_text("x=1\n")
+        subprocess.run(["git", "-C", str(r), "init", "-q"], check=True)
+        rep.add("issue-161", "openspec/ alone does not raise the assessed level",
+                O.assess(r)["suggested"] == "L1",
+                "openspec/ is out of scope until issue 155 gives it an adapter")
 
         # gate 4: proposal is written but the ENGINE never reads it.
         a = repos["A-greenfield"]

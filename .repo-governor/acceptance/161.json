@@ -1,0 +1,40 @@
+{
+  "$comment": "Acceptance criteria for issue 161. WATCHED FAILING FIRST. Baseline captured at d8d71d9 across six scratch repositories, each identical except for the directory name -- one Accepted ADR and three source files: docs/adrs, docs/adr and docs/decisions each assess L2 / GOVERNOR_STANDARD; adrs and doc/adr each assess L1 / GOVERNOR_LITE with the reason 'little architecture history', while the SAME RUN detects their architecture provider. That is the defect, and it is exactly the split between onboard.py:174's five conventions and onboard.py:61's three. THE FIX IS NOT TWO MORE STRINGS. Two places that must agree about what a thing is, with only one updated, is the shape this repository has shipped four times -- imports.py refusing to grep for imports, the suite-count check missing N/N, and SUPERSEDED_RE matching prose about supersession. One list read by both sites, and an assertion DERIVED from that list rather than restating it, or the assertion becomes the third place to forget. SCOPE, DELIBERATELY WITHOUT A `covers` BLOCK. Issue 161 lists three things and the bar reaches all three: one shared list, an assertion derived from it, and a DECISION about openspec/ -- which is excluded, and criterion 4 asserts it stays L1 so the fix cannot quietly widen. An excluded thing that was decided and asserted is not uncovered work. The adjacent questions -- whether openspec/ should eventually count (issue 155) and whether any profile should require `architecture` (issue 143) -- belong to those issues, and recording them here would make BAR_COVERS_PART mean 'other issues exist' rather than 'this work is half done'. That signal was made load-bearing three days ago and is worth not diluting.",
+  "authority_id": "161",
+  "criteria": [
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -q \"\\[PASS\\] every detected ADR convention raises the assessed level identically\"'",
+      "$comment": "C1 THE DEFECT. Red at declaration: adrs/ and doc/adr assess L1 while docs/adrs assesses L2, on repositories identical but for the directory name."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -q \"\\[PASS\\] no repository is told it has little architecture history while its architecture provider is detected\"'",
+      "$comment": "C2 THE SELF-CONTRADICTION, asserted directly rather than inferred from levels. This is the sentence a user actually reads, and it was false for two of five conventions."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -q \"\\[PASS\\] detection and the difficulty indicator read the same list\"'",
+      "$comment": "C3 ONE SOURCE, derived from the shared constant, not restated. A conformance check that hard-codes the conventions is the third place to forget -- issue 154 showed that a check living only in a bar goes unguarded the moment the issue closes, and a check that restates its subject goes stale the moment the subject moves."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -q \"\\[PASS\\] openspec/ alone does not raise the assessed level\"'",
+      "$comment": "C4 THE FIX MUST NOT WIDEN. openspec/ is deliberately out of scope and stays L1 until issue 155 gives it an adapter. Without this the fix could quietly raise required roles for a population -- measured at median 1 active change directory -- whose evidence nothing can read."
+    },
+    {
+      "$comment": "C5 the onboarding suite as a whole, so a new assertion cannot be added and left unrun.",
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh onboarding"
+    },
+    {
+      "$comment": "C6 ADR-010 holds: detection proposes, never binds. This change touches the file where that rule lives.",
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh manifest"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh"
+    }
+  ]
+}
