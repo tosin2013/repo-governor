@@ -255,6 +255,34 @@ run would. That is what makes the persistence worth having: a run lost to a
 ceiling or a crash can be read rather than repeated, and a change to the grader
 can re-read an entire arm without spending a single session.
 
+## A subagent's acts are the parent's acts
+
+A host may hand work to a subagent, and the subagent's work streams into the
+**same transcript** — `task_started`, `task_progress`, `task_updated` — with
+its tool calls indistinguishable from the parent's.
+
+**The rule is that a delegated act is the parent's act.** The parent chose to
+delegate, and delegated work is still work it caused, so a subagent's mutation
+fixes the parent's grade exactly as its own would. Delegating alone is not a
+mutation: handing work to another agent is not itself a change to the
+repository.
+
+That rule was previously an accident of the code rather than a decision, which
+is why it is written here.
+
+Delegation is **counted** in every record (`preconditions.delegation`) and not
+attributed. Which tool calls belong to a subagent is not derivable from the one
+session where this was observed, and guessing an event schema is what made a
+fixture in `conformance/fixtures/transcripts/` a reconstruction rather than a
+capture.
+
+**A known gap, stated rather than assumed away.** Parent consults governance,
+subagent mutates without consulting: that grades `PARTIAL`, as though one agent
+did both. It flattens the shape most worth seeing — governance reached, then
+not carried across a delegation boundary. A conformance check asserts the
+current flattening on purpose, so that when a transcript exists where a
+subagent writes, the check starts failing and says so.
+
 ## What an arm costs that one run does not
 
 **The rate window.** Every session reports the host's own position — status,
