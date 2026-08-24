@@ -233,6 +233,38 @@ def main():
                    "no roadmap adapter advertises enumeration; claiming the set, or "
                    "printing nothing, would both misrepresent that")
 
+    print("\nA role that answers a question nothing acts on says so\n")
+    # Issue 143. A repository can bind thirty ADRs and see only
+    # "bound adapters/adr answers", which says nothing about whether they were
+    # read or what they mean -- and the binding implies a constraint the engine
+    # never consults. That matters more now that onboarding proposes this role
+    # when it detects ADRs (issue 144).
+    rc3, out3 = run(ROOT)
+    fails += check("architecture reports the state it resolved",
+                   "DEFINED" in out3,
+                   "get_constraints answers DEFINED / INFERRED / UNKNOWN and the "
+                   "operator was shown none of it")
+    fails += check("...and the decisions it read, by status",
+                   "Accepted" in out3 and "Proposed" in out3,
+                   "counts and named states, never a ratio")
+    fails += check("...and that no disposition consults them",
+                   "no disposition consults this" in out3,
+                   "the role answers 'what constrains how it must be built?' and "
+                   "nothing reads the answer; leaving that unsaid lets the binding "
+                   "imply governance it does not perform")
+
+    # NOT A SCORE. The refusal is in status.py's own docstring -- "a number
+    # invites optimising the number" -- and it bites hardest here: a Proposed
+    # ADR is not worse than an Accepted one. ADR-024 is correctly Proposed
+    # pending a measurement on repositories this project does not own, and a
+    # percentage would read that as debt.
+    import re as _re
+    fails += check("no ratio or percentage is printed for the ledger",
+                   not _re.search(r"architecture[\s\S]{0,220}?(\d+\s*%|\d+\s*/\s*\d+\s+(?:Accepted|ADRs))", out3),
+                   "a score would create pressure to accept decisions to raise it, "
+                   "which is admission without authority applied to an architecture "
+                   "ledger")
+
     print(f"\n{'STATUS: CONFORMANT' if not fails else f'STATUS: NON-CONFORMANT ({fails})'}")
     return 0 if not fails else 1
 

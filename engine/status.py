@@ -51,6 +51,54 @@ import vocabulary as V  # noqa: E402
 SCHEMA = ROOT / "schemas" / "manifest-v1.json"
 
 
+def _architecture_detail(role, described):
+    """What the architecture role actually holds, and what it does with it.
+
+    A repository can bind thirty ADRs and see only `bound adapters/adr answers`,
+    which says nothing about whether they were read or what they mean. That
+    matters more now that onboarding proposes this role when it detects ADRs
+    (issue 144): people will bind something whose value was invisible.
+
+    NOT A SCORE. `engine/status.py` refuses those, and the reason applies with
+    unusual force here: a Proposed ADR is not worse than an Accepted one.
+    ADR-024 is correctly Proposed pending a measurement on repositories this
+    project does not own. A number would read that as debt and create pressure
+    to accept decisions to raise it -- admission without authority, applied to
+    an architecture ledger. Counts and named states carry the same information
+    and cannot be optimised.
+
+    The last line is the honest part. The role answers "what constrains how it
+    must be built?" and no disposition consults the answer; it moves one
+    thinness dimension in the compiled envelope and nothing else (issue 143).
+    Saying so where an operator reads it beats leaving the binding to imply
+    otherwise.
+    """
+    if role != "architecture" or not described:
+        return []
+    out = []
+    con = B.call("architecture", "get_constraints", {"id": "-"})
+    if not con.get("ok"):
+        return [f"constraints unreadable: {(con.get('error') or {}).get('type')}"]
+    state = (con.get("value") or {}).get("state")
+    counts = {}
+    act = B.call("architecture", "get_active_decisions", {})
+    if act.get("ok"):
+        for dec in (act.get("value") or {}).get("decisions") or []:
+            word = (dec.get("status") or "?").split()[0]
+            counts[word] = counts.get(word, 0) + 1
+    sup = B.call("architecture", "get_superseded_decisions", {})
+    if sup.get("ok"):
+        n = (sup.get("value") or {}).get("count") or 0
+        if n:
+            counts["Superseded"] = n
+    tally = ", ".join(f"{v} {k}" for k, v in sorted(counts.items())) or "no decisions read"
+    out.append(f"{state} — {tally}")
+    if con.get("unknown"):
+        out.append(f"{con['unknown'].get('reason')}: {con['unknown'].get('detail', '')[:70]}")
+    out.append("reported only; no disposition consults this")
+    return out
+
+
 def roles():
     """The eight roles, from the schema. Never a list restated here."""
     d = json.loads(SCHEMA.read_text(encoding="utf-8"))
@@ -146,6 +194,8 @@ def main(argv):
             declared = {k for k, v in (d.get("capabilities") or {}).items() if v is False}
             if declared:
                 print(f"  {'':<20}           cannot supply: {', '.join(sorted(declared))}")
+            for line in _architecture_detail(role, d):
+                print(f"  {'':<20}           {line}")
 
     # What follows is the useful half: not what is configured, but what can be
     # CONCLUDED. A disposition nothing can reach is a governance behaviour this

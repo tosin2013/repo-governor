@@ -20,6 +20,19 @@ conformance minimums: [`docs/reference/provider-roles.md`](../docs/reference/pro
 
 Keeping these apart is the point: it stops *"the task says READY"* implying *"the work is authorized"*.
 
+**One role answers its question and nothing acts on the answer.** `architecture` is
+**reported, not consulted**: its decisions land in the compiled envelope and move one of
+five thinness dimensions, and no disposition reads them. A repository can bind thirty
+Accepted ADRs and no verdict changes.
+
+That is worth stating because the binding implies otherwise — the adapter reads four
+status dialects, onboarding reports `PROVIDER_DETECTED` with its evidence, and the
+question above promises a constraint. `engine/status.py` now prints the same caveat
+beside the role. Whether it *should* reach a disposition is
+[#143](https://github.com/tosin2013/repo-governor/issues/143), open, and the obstacle is
+measured rather than assumed: `get_constraints` returns ADR titles, and 0 of 8 realistic
+discovery targets matched any of this repository's Accepted titles.
+
 ## Wire protocol
 
 ```bash
