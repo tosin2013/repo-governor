@@ -319,6 +319,32 @@ def detect(repo: Path):
                    if arch else []),
                 path="openspec")
 
+    # architecture — GitHub Spec Kit. Keys on `.specify/` and NEVER on `specs/`.
+    #
+    # A census on 2026-08-24 ran two selectors: `.specify/memory/constitution.md`
+    # returned 399 repositories, `specs/**/plan.md` returned 230, and they
+    # overlapped by 6. Testing the second for contamination found 35 of 70 --
+    # 50% -- carry no `.specify/` at all, because `specs/` is an ordinary
+    # directory name. Proposing an architecture provider on that would
+    # manufacture architectural authority from a folder name (§37), which is
+    # worse than not detecting at all (issue 156).
+    spk = repo / ".specify"
+    if spk.is_dir():
+        con = spk / "memory" / "constitution.md"
+        specs = repo / "specs"
+        feats = len([q for q in specs.iterdir() if q.is_dir()]) if specs.is_dir() else 0
+        ev = [_cite(repo, ".specify", "Spec Kit workspace")]
+        if con.is_file():
+            ev.append(_cite(repo, ".specify/memory/constitution.md", "constitution present"))
+        if feats:
+            ev.append(_cite(repo, "specs", f"{feats} feature specification(s)"))
+        add("architecture", "speckit", "adapters/speckit",
+            "PROVIDER_DETECTED" if con.is_file() else "PROVIDER_UNCONFIRMED",
+            ev,
+            [] if con.is_file() else
+            [_cite(repo, ".specify/memory", "no constitution.md; constraints unreadable")],
+            path=".specify")
+
     # change_signals — Renovate / Dependabot
     for f, t in (("renovate.json", "renovate"), (".renovaterc.json", "renovate"),
                  (".github/dependabot.yml", "dependabot")):

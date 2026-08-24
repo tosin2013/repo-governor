@@ -72,11 +72,20 @@ bind both — neither is a substitute for the other.
 |---|---|---|
 | **ADRs** | **what was decided.** Immutable: a decision is superseded by a new one, never edited. True regardless of what is being built now. | `adapters/adr` |
 | **OpenSpec** | **what is being built.** `changes/<id>/` is in flight; it moves to `changes/archive/<id>/` when it lands, and `specs/` holds what the system must currently satisfy. | `adapters/openspec` |
+| **Spec Kit** | **what the system must satisfy, and what each feature specifies.** `.specify/memory/constitution.md` holds the binding principles; `specs/<feature>/` holds the specifications. | `adapters/speckit` |
 
 `adapters/adr` returns empty for `get_specs` by declaration and names OpenSpec as
 the resolution; `adapters/openspec` returns empty for `get_superseded_decisions`
-by declaration, because **archiving a change is completion, not supersession.**
-Each states what it cannot supply rather than guessing.
+by declaration, because **archiving a change is completion, not supersession**;
+`adapters/speckit` returns empty for both decision functions, because Spec Kit
+records specifications and keeps no decision ledger. Each states what it cannot
+supply rather than guessing.
+
+Two things a spec provider will not do. **Task completion is never authority** —
+`tasks.md` checkboxes are execution state, and INV-002 keeps that separate from
+whether work is authorized. And **an unfilled template is not a constraint**:
+10.2% of measured Spec Kit constitutions still carry the shipped placeholders,
+and reading their articles would assert an architecture nobody wrote (§37).
 
 You should not have to work this out. `engine/onboard.py` detects both and
 proposes what it finds — it never binds (ADR-010), so the choice stays yours,
