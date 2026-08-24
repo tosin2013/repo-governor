@@ -889,6 +889,77 @@ def main():
                        f"got {err3!r}; an arm run without --out has nothing to "
                        "re-grade, and saying so beats reporting zero")
 
+    print("\nAn arm costs what a single run does not\n")
+    # Issue 113. Two costs that only appear at arm scale: a FIVE-HOUR rate
+    # window the host reports and nothing read, and twenty-three whole copies
+    # of the target left in $TMPDIR -- memory, if /tmp is a tmpfs.
+    for st in ("allowed", "rejected"):
+        o = B.observe(json.dumps({"type": "rate_limit_event", "rate_limit_info":
+                                  {"status": st, "rateLimitType": "five_hour"}}))
+        fails += check(f"a rate report of {st!r} is read from the transcript",
+                       (o.get("rate_limit") or {}).get("status") == st)
+        voided = any("rate limit" in r for r in B.void_reasons(o))
+        fails += check(f"...and {'voids' if st != 'allowed' else 'does not void'} the run",
+                       voided == (st != "allowed"),
+                       "a throttled session was shaped by a quota, not by the "
+                       "prompt; grading it records the quota as the agent's choice")
+
+    with _tf2.TemporaryDirectory() as td:
+        # The guard. `workdir` arrives from a record a person may have edited,
+        # and nothing here may ever delete a path this tool did not create.
+        outside = Path(td) / "not-ours" / "repo"
+        outside.mkdir(parents=True)
+        (outside / "f").write_text("x" * 100)
+        fails += check("it refuses to delete a tree it did not create",
+                       B.drop_tree(outside) == 0 and outside.exists(),
+                       "the prefix guard is the only thing between a record "
+                       "field and rm -rf")
+
+        ours = Path(td) / "rg-bench-abc" / "repo"
+        ours.mkdir(parents=True)
+        (ours / "f").write_text("y" * 500)
+        n = B.drop_tree(ours)
+        fails += check("it removes one it did, and says how much it reclaimed",
+                       n >= 500 and not ours.parent.exists(), f"got {n}")
+
+    print("\nAn arm stops when the host says it is out of quota\n")
+    real_measure2, real_calib2 = B.measure, B.CALIB
+    with _tf2.TemporaryDirectory() as td:
+        try:
+            B.CALIB = Path(td)
+            (Path(td) / "claude.json").write_text(json.dumps({"agree": True}))
+            seq = iter([("FULL", "allowed"), ("NONE", "allowed"),
+                        ("NONE", "rejected"), ("NONE", "allowed"), ("QUIET", "allowed")])
+
+            def _m(host, target, prompt, model=None, control=False, debug=False,
+                   permissions="unrestricted", transcript=None, timeout=900):
+                g, st = next(seq)
+                return {"host": host, "prompt": prompt, "control": control,
+                        "grade": g, "warnings": [], "why": "", "model": "m",
+                        "preconditions": {"rate_limit": {"status": st,
+                                                         "rateLimitType": "five_hour",
+                                                         "resetsAt": 1787248800}}}, None
+            B.measure = _m
+            ps = [{"id": str(i + 1), "text": f"p{i}", "control": False} for i in range(4)]
+            ps += [{"id": "c1", "text": "c", "control": True}]
+            summ, code = B.run_suite("claude", "/t", {"arm": "A", "prompts": ps}, "s.json")
+            st = summ.get("stopped_early")
+            fails += check("the arm stops at the throttled prompt",
+                           st and st["at"] == "3", f"got {st}")
+            fails += check("...and names the prompts it never ran",
+                           st and st["unspent"] == ["4", "c1"], f"got {st}")
+            fails += check("...and withholds the rate for the whole arm",
+                           summ["rate"] is None and any("unspent" in w or "rate limit" in w
+                                                        for w in summ["rate_withheld_because"]),
+                           f"got {summ['rate_withheld_because']}; an arm that did "
+                           "not finish is not an arm")
+            fails += check("...rather than grinding through the rest",
+                           summ["measured"] + summ["controls"] + summ["void"] == 3,
+                           "twenty more prompts failing the same way produce twenty "
+                           "void records and one withheld rate, hours later")
+        finally:
+            B.measure, B.CALIB = real_measure2, real_calib2
+
     print(f"\n{'BENCHMARK: CONFORMANT' if not fails else f'BENCHMARK: NON-CONFORMANT ({fails})'}")
     return 0 if not fails else 1
 

@@ -255,6 +255,33 @@ run would. That is what makes the persistence worth having: a run lost to a
 ceiling or a crash can be read rather than repeated, and a change to the grader
 can re-read an entire arm without spending a single session.
 
+## What an arm costs that one run does not
+
+**The rate window.** Every session reports the host's own position — status,
+window type, and when it resets. The window is **five hours**, and an arm is
+twenty-three real sessions, which is exactly the shape that exhausts one. A run
+whose status is not `allowed` is **void**: it was shaped by a quota, not by the
+prompt, and grading it would record the quota as the agent's choice. The arm
+then **stops**, naming the prompts it never ran — twenty more failing the same
+way produce twenty void records and one withheld rate, hours later.
+
+There is deliberately **no sleep between prompts**. Guessing an interval
+against a five-hour window mitigates nothing, and the host already says where
+it stands.
+
+**The prepared copies.** Each run copies the target wholesale. One run leaves
+one tree and that is wanted — the record points at it. An arm leaves
+twenty-three, which on a target carrying `node_modules` is tens of gigabytes,
+and on a `tmpfs` `/tmp` is memory.
+
+So with `--out`, a tree is **kept when the run went wrong** — void or errored,
+which is when someone will want to look at it — and dropped when the run graded
+cleanly and its evidence has already been copied out. `--keep-trees` keeps them
+all. Without `--out` nothing is dropped, because the transcript would go with
+it. The summary reports bytes reclaimed and kept: a harness that quietly
+deletes evidence and one that quietly fills a disk are the same defect from
+opposite sides.
+
 ## Re-grading an arm
 
 ```sh

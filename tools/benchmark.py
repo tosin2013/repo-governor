@@ -230,7 +230,7 @@ def observe(raw):
     out = {"model": None, "skills": [], "tools": [], "hooks_fired": [],
            "calls": [], "parsed_events": 0, "text": [],
            "skills_reported": False, "unparsed_lines": 0, "skipped_events": 0,
-           "permission_denied": 0}
+           "permission_denied": 0, "rate_limit": None}
     for e in events(raw, out):
         out["parsed_events"] += 1
         if e.get("subtype") == "init":
@@ -247,6 +247,14 @@ def observe(raw):
             out["skills"] = sk if isinstance(sk, list) else []
             tl = e.get("tools")
             out["tools"] = tl if isinstance(tl, list) else []
+        # The host states its own rate position in every session -- status,
+        # window type, and when it resets. Nothing read it, and the window is
+        # FIVE HOURS: an arm of twenty-three real sessions is exactly the shape
+        # that exhausts one. The last report wins; it is a running position,
+        # not an event.
+        rl = e.get("rate_limit_info")
+        if isinstance(rl, dict):
+            out["rate_limit"] = rl
         if e.get("subtype") == "permission_denied" or e.get("type") == "permission_denied":
             out["permission_denied"] += 1
         if e.get("subtype") == "hook_started":
@@ -307,6 +315,15 @@ def void_reasons(obs):
     if obs["parsed_events"] == 0:
         reasons.append("no events parsed -- the output format changed and this "
                        "grade is meaningless rather than zero")
+    rl = obs.get("rate_limit") or {}
+    status = rl.get("status")
+    if status is not None and status != "allowed":
+        # Not an activation result. The session was shaped by a quota, and
+        # grading it would record the quota as though it were the agent's
+        # choice.
+        reasons.append(f"the host reported rate limit status {status!r} "
+                       f"({rl.get('rateLimitType') or 'window unstated'}): this "
+                       "session was shaped by a quota, not by the prompt")
     if not obs.get("skills_reported"):
         reasons.append("the transcript carried no skill listing, so it cannot be "
                        "shown that repo-governor was available to activate: the "
@@ -525,6 +542,7 @@ def measure(host, target, prompt, model=None, control=False, debug=False,
         "preconditions": {
             "permission_regime": res.get("permission_regime"),
             "permission_denied": obs["permission_denied"],
+            "rate_limit": obs["rate_limit"],
             "skills_reported": obs["skills_reported"],
             "skill_listed": "repo-governor" in (obs["skills"] or []),
             "competing_skills": [s for s in obs["skills"] if s != "repo-governor"],
@@ -668,8 +686,32 @@ def regrade(out_dir, host=None):
                      "produced these records.")}, None
 
 
+def _tree_bytes(d):
+    try:
+        return sum(f.stat().st_size for f in Path(d).rglob("*") if f.is_file())
+    except OSError:
+        return 0
+
+
+def drop_tree(workdir):
+    """Remove one prepared copy. Returns bytes reclaimed, or 0.
+
+    Guarded on the mkdtemp prefix. Nothing here should ever be able to delete a
+    path this tool did not create, and `workdir` arrives from a record that a
+    person may have edited.
+    """
+    if not workdir:
+        return 0
+    tmp = Path(workdir).parent
+    if not tmp.name.startswith("rg-bench-") or not tmp.is_dir():
+        return 0
+    n = _tree_bytes(tmp)
+    shutil.rmtree(tmp, ignore_errors=True)
+    return n
+
+
 def run_suite(host, target, doc, path, out_dir=None, model=None, debug=False,
-              permissions="unrestricted", timeout=900):
+              permissions="unrestricted", timeout=900, keep_trees=False):
     """Every prompt, each in its own session. Returns (summary, exit_code).
 
     Records stream to disk as they complete when --out is given. Twenty-three
@@ -679,6 +721,8 @@ def run_suite(host, target, doc, path, out_dir=None, model=None, debug=False,
     if out_dir:
         Path(out_dir).mkdir(parents=True, exist_ok=True)
     records, errors = [], []
+    reclaimed = kept = 0
+    stopped = None
     for n, pr in enumerate(doc["prompts"], 1):
         dbg(debug, f"--- prompt {pr['id']} ({n}/{len(doc['prompts'])}): "
                    f"{pr['text'][:60]}")
@@ -701,6 +745,34 @@ def run_suite(host, target, doc, path, out_dir=None, model=None, debug=False,
             src = rec.get("transcript")
             if src and Path(src).is_file():
                 shutil.copyfile(src, Path(out_dir) / f"{pr['id']}.transcript.jsonl")
+        # A prepared tree is a whole copy of the target. One run leaves one and
+        # that is wanted -- the record points at it for inspection. An arm
+        # leaves twenty-three, which on a target carrying node_modules is tens
+        # of gigabytes, and on a tmpfs /tmp is memory.
+        #
+        # So: keep the tree when the run went WRONG, which is when someone will
+        # want to look at it, and drop it when the run graded cleanly and its
+        # evidence has already been copied out. Never drop without --out: the
+        # transcript would go with it.
+        if out_dir and not keep_trees and not rec["warnings"]:
+            reclaimed += drop_tree(rec.get("workdir"))
+        else:
+            kept += _tree_bytes(Path(rec["workdir"]).parent) if rec.get("workdir") else 0
+
+        # The host says where it stands in its own rate window. Grinding
+        # through twenty more prompts that will all fail the same way produces
+        # twenty void records and one withheld rate, hours later.
+        rl = (rec.get("preconditions") or {}).get("rate_limit") or {}
+        if rl.get("status") not in (None, "allowed"):
+            stopped = {"reason": "rate_limited", "at": pr["id"],
+                       "status": rl.get("status"),
+                       "window": rl.get("rateLimitType"),
+                       "resets_at": rl.get("resetsAt"),
+                       "unspent": [q["id"] for q in doc["prompts"]
+                                   [doc["prompts"].index(pr) + 1:]]}
+            print(f"  STOPPED: rate limit {rl.get('status')!r}; "
+                  f"{len(stopped['unspent'])} prompt(s) unspent", file=sys.stderr)
+            break
         print(f"  {pr['id']:<4} {rec['grade']:<13} {pr['text'][:56]}", file=sys.stderr)
 
     s = summarise(records, host, len(errors))
@@ -724,7 +796,19 @@ def run_suite(host, target, doc, path, out_dir=None, model=None, debug=False,
         "rate_withheld_because": withheld,
         "records_at": str(out_dir) if out_dir else
                       "not written -- pass --out to keep them",
+        # Reported, not silent. A harness that quietly deletes evidence and a
+        # harness that quietly fills a disk are the same defect seen from
+        # different sides.
+        "trees": {"reclaimed_bytes": reclaimed, "kept_bytes": kept,
+                  "policy": ("kept for void or errored runs, dropped for clean ones"
+                             if out_dir and not keep_trees else
+                             "all kept -- pass --out (and omit --keep-trees) to reclaim")},
+        "stopped_early": stopped,
     }
+    if stopped:
+        withheld.append(f"the arm stopped at {stopped['at']} on a rate limit; "
+                        f"{len(stopped['unspent'])} prompt(s) were never run")
+        summary["rate"] = None
     code = EXIT_VOID if void else (EXIT_ERROR if errors else EXIT_OK)
     return summary, code
 
@@ -1027,6 +1111,9 @@ def main(argv):
     ap.add_argument("--dry-run", action="store_true",
                     help="with --suite: validate and print the plan, spawn nothing")
     ap.add_argument("--out", help="with --suite: directory to write one record per prompt")
+    ap.add_argument("--keep-trees", action="store_true",
+                    help="with --suite --out: keep every prepared copy, not only "
+                         "the ones whose run went wrong")
     ap.add_argument("--timeout", type=int, default=900,
                     help="seconds per session (default 900). A real prompt has "
                          "been seen thinking for 159s before its first tool call")
@@ -1084,7 +1171,8 @@ def main(argv):
             print(json.dumps({"error": "--suite needs --target"}, indent=2))
             return EXIT_USAGE
         summary, code = run_suite(a.host, a.target, doc, a.suite, a.out,
-                                  a.model, a.debug, a.permissions, a.timeout)
+                                  a.model, a.debug, a.permissions, a.timeout,
+                                  a.keep_trees)
         print(json.dumps(summary, indent=2, sort_keys=True))
         return code
 
