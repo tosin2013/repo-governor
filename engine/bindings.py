@@ -177,6 +177,56 @@ def call(role, fn, kw=None, verb="query", manifest=None, binding=None):
     return _spawn(binding, role, fn, kw or {}, verb)
 
 
+def call_all(role, fn, kw=None, verb="query", manifest=None):
+    """Invoke EVERY binding on a role. Returns (results, error_envelope).
+
+    ADR-013 Implementation Plan step 4, which was never built. `call()` ends
+    with `bindings[0]`, and that is correct for a single-valued role and
+    silently discards evidence on a multi-valued one. The cost was not
+    theoretical: `.repo-governor.json` binds two `decision_history` providers,
+    the second one deliberately -- its own manifest comment says "GitHub
+    already records decisions in stateReason and nothing was reading them" --
+    and it had still never been read. §39 rediscovery was being decided against
+    one of two stores.
+
+    `call()` is deliberately NOT reimplemented in terms of this. A role with one
+    binding must produce the byte-identical envelope it produced before (ADR-008
+    C7), and the cheapest way to guarantee that is for the single path to be
+    the same code it always was. Callers that want the union ask for it.
+
+    Each result is `{"binding": <the binding>, "envelope": <adapter reply>}`.
+    A provider that fails contributes its typed failure rather than vanishing:
+    ADR-003 rule 6 forbids conflating absence with unknown, and a union that
+    quietly drops an unreachable provider reports a smaller architecture as
+    though it were the whole one.
+    """
+    need = VERB_PERMISSION.get(verb)
+    if need is None:
+        return None, _fail(role, fn, "BAD_REQUEST", f"unknown adapter verb {verb!r}")
+
+    m = manifest
+    if m is None:
+        m, errs = MF.load()
+        if errs:
+            return None, _fail(role, fn, "MANIFEST_INVALID", f"refusing to evaluate: {errs[0]}")
+
+    # The permission check happens ONCE, before any subprocess, for the same
+    # reason it does in call(): a denied call must not reach a provider at all.
+    # Checking per binding would be the same rule applied N times, which reads
+    # as thoroughness and is really an invitation to check it zero times on the
+    # path someone adds later.
+    allowed, why = MF.permitted(m, role, need)
+    if not allowed:
+        return None, _fail(role, fn, "PERMISSION_DENIED",
+                           f"{role}.{need} is not granted: {why}")
+
+    bindings, err = resolve(role, m)
+    if err:
+        return None, err
+    return [{"binding": b, "envelope": _spawn(b, role, fn, kw or {}, verb)}
+            for b in bindings], None
+
+
 def describe(binding, use_cache=True):
     """Read an adapter's advertised contract. Cached per process."""
     key = binding["adapter"]

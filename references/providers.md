@@ -62,3 +62,20 @@ Single-valued: `roadmap_authority`, `execution`, `repository`, `acceptance_crite
 Multi-valued: `architecture`, `change_signals`, `retirement`, `decision_history`.
 
 Two candidates for a single-valued role halt onboarding. No ranking is applied.
+
+**Every binding on a multi-valued role is queried, and the evidence is unioned**
+(ADR-013 rule 3). Two `architecture` providers contribute their constraints
+together, attributed per provider; two `decision_history` stores are both read,
+so a decision recorded in either one is found. Nothing is ranked and nothing is
+picked.
+
+Disagreement is narrow on purpose. Providers holding **different** constraints
+are the normal case — that is what "evidence accumulates" means, and escalating
+on it would be §54's over-escalation failure condition. What escalates is one
+id held as an *active* decision by one provider and as *superseded* by another:
+that is `ARCHITECTURE_REVIEW` with both cited, and it does not block, because
+ADR-013 rule 2 scopes halting to single-valued roles.
+
+What this cannot see: *Accepted here, Rejected there*. `get_constraints` drops a
+Rejected decision and `get_active_decisions` filters it out, so no function in
+the role's contract reports an id whose status is neither active nor superseded.

@@ -26,7 +26,7 @@ Every suite, from a clean checkout:
 ./tools/run-conformance.sh
 ```
 
-- [ ] 16/16 pass
+- [ ] 17/17 pass
 - [ ] If any suite needs `dolt`, I installed it rather than unbinding the provider
 
 ## If you added or changed a test: did you break the code and watch it fail?

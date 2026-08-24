@@ -61,6 +61,92 @@ def _ask(role, fn, kw, manifest):
     return r.get("value"), None
 
 
+def _provider_name(binding, i):
+    """A stable, identifiable name for one binding that leaks no path.
+
+    ADR-013 rule 3 requires a contradiction to cite BOTH providers, so they have
+    to be distinguishable -- and two bindings of the same adapter over different
+    directories share a `type`. The index disambiguates them. The path is not
+    used: §51 keeps governed-repository content out of anything reportable, and
+    a directory name is content.
+    """
+    return f"{binding.get('type') or binding.get('adapter') or '?'}#{i}"
+
+
+def _ask_each(role, fn, kw, manifest):
+    """Every binding on a role, reduced to [(name, value, unknown_reason)].
+
+    The multi-valued counterpart of `_ask`. A provider that fails contributes
+    its typed failure rather than vanishing -- ADR-003 rule 6 forbids conflating
+    absence with unknown, and a union that quietly drops an unreachable provider
+    reports a smaller architecture as though it were the whole one.
+    """
+    results, err = B.call_all(role, fn, kw, manifest=manifest)
+    if err:
+        return [], err.get("error", {}).get("type")
+    out = []
+    for i, r in enumerate(results):
+        name, e = _provider_name(r["binding"], i), r["envelope"]
+        if not e.get("ok"):
+            out.append((name, None, e.get("error", {}).get("type")))
+        elif e.get("unknown"):
+            out.append((name, None, e["unknown"]["reason"]))
+        else:
+            out.append((name, e.get("value"), None))
+    return out, None
+
+
+def _contradictions(manifest):
+    """Cross-provider architecture disagreement. ADR-013 rules 3 and 4.
+
+    WHAT COUNTS IS DELIBERATELY NARROW, and the narrowness is the design.
+    ADR-013's own Consequences warn that multi-valued architecture providers
+    make ARCHITECTURE_REVIEW likelier and thereby "brush against §54's
+    over-escalation failure condition". Two providers holding DIFFERENT
+    constraints are a union and not a finding -- that is the normal case, and
+    the whole reason the role is multi-valued.
+
+    One thing escalates: **an id reported as an active decision by one provider
+    and as superseded by another.** Both §12 functions carry the id, so this is
+    read from the declared contract rather than inferred, and it is ADR-013
+    rule 4 verbatim -- "cross-provider supersession is not modelled at v1 ... if
+    an ADR and an OpenSpec change conflict, that is ARCHITECTURE_REVIEW, not an
+    inferred lineage."
+
+    WHAT THIS CANNOT SEE, stated because a check that looks total and is not is
+    worse than a narrow one that says so: "Accepted in one provider, Rejected in
+    another" is invisible. `get_constraints` drops a Rejected decision entirely
+    and `get_active_decisions` filters it out, so no function in the §12 contract
+    reports an id whose status is neither active nor superseded. Widening that
+    is a contract change, not a detection improvement.
+    """
+    act, act_err = _ask_each("architecture", "get_active_decisions", {}, manifest)
+    sup, sup_err = _ask_each("architecture", "get_superseded_decisions", {}, manifest)
+    if act_err or sup_err:
+        return []
+    where = {}
+    for bucket, rows in (("active_in", act), ("superseded_in", sup)):
+        for name, value, _why in rows:
+            for dec in (value or {}).get("decisions") or []:
+                did = dec.get("id")
+                if did:
+                    where.setdefault(did, {"active_in": [], "superseded_in": []})
+                    where[did][bucket].append(name)
+    out = []
+    for did in sorted(where):
+        w = where[did]
+        # A single provider partitions its own decisions, so it never appears in
+        # both lists. Both lists non-empty therefore means two providers differ.
+        if w["active_in"] and w["superseded_in"]:
+            out.append({"id": did,
+                        "active_in": sorted(w["active_in"]),
+                        "superseded_in": sorted(w["superseded_in"]),
+                        "finding": "one provider holds this decision as active and "
+                                   "another holds it as superseded; the engine does "
+                                   "not pick (ADR-013 rule 3)"})
+    return out
+
+
 def compile_envelope(authority_id, manifest=None):
     """Build the §31 envelope from provider state. Never invents a field."""
     m = manifest
@@ -73,7 +159,35 @@ def compile_envelope(authority_id, manifest=None):
     scope, scope_why = _ask("roadmap_authority", "get_scope", {"id": authority_id}, m)
     goals, goals_why = _ask("roadmap_authority", "get_non_goals", {"id": authority_id}, m)
     acc, acc_why = _ask("acceptance_criteria", "get_criteria", {"id": authority_id}, m)
-    arch, arch_why = _ask("architecture", "get_constraints", {"id": authority_id}, m)
+    # ADR-013 rule 3: multi-valued roles UNION their evidence. This was step 4
+    # of ADR-013's own implementation plan and was never built -- `B.call` ends
+    # at `bindings[0]`, so a second architecture provider validated, appeared in
+    # status.py, and was never asked anything (issue 154).
+    arch_each, arch_err = _ask_each("architecture", "get_constraints",
+                                    {"id": authority_id}, m)
+    arch_ids, seen = [], set()
+    for _name, value, _why in arch_each:
+        for c in (value or {}).get("constraints") or []:
+            cid = c.get("id")
+            if cid and cid not in seen:
+                seen.add(cid)
+                arch_ids.append(cid)
+    arch_whys = [(n, w) for n, _v, w in arch_each if w]
+    if arch_err:
+        arch_why = arch_err
+    elif arch_whys and len(arch_whys) == len(arch_each):
+        # Every provider unresolved. With ONE provider this is the reason string
+        # `_ask` returned before, unchanged -- which is what keeps the
+        # single-provider envelope byte-identical (ADR-008 C7).
+        arch_why = arch_whys[0][1]
+    elif arch_whys:
+        # Partial: some providers answered and some did not. Only reachable with
+        # two or more bound, so it cannot perturb the single-provider shape.
+        arch_why = (f"{len(arch_whys)} of {len(arch_each)} architecture providers "
+                    f"unresolved ({', '.join(n for n, _ in arch_whys)}): "
+                    f"{arch_whys[0][1]}")
+    else:
+        arch_why = None
 
     env = {
         "authority_id": authority_id,
@@ -85,7 +199,7 @@ def compile_envelope(authority_id, manifest=None):
         # deciding in advance what has not been described yet.
         "necessary_incidental_work": "decided per action; see classify()",
         "non_goals": (goals or {}).get("non_goals") or [],
-        "architecture_constraints": [c["id"] for c in (arch or {}).get("constraints") or []],
+        "architecture_constraints": arch_ids,
         "discovery_policy": "CAPTURE_ONLY unless proven necessary to the authorized outcome (INV-001)",
         "acceptance_conditions": (acc or {}).get("criteria") or [],
         "stop_condition": "acceptance conditions satisfied => STOP_COMPLETE (§40)",
@@ -93,6 +207,34 @@ def compile_envelope(authority_id, manifest=None):
             ("authority", auth_why), ("scope", scope_why), ("non_goals", goals_why),
             ("acceptance_conditions", acc_why), ("architecture", arch_why)) if v},
     }
+    # These keys appear ONLY when more than one architecture provider is bound.
+    # A repository with the default single `adapters/adr` binding -- which is
+    # almost every repository -- gets the same keys, in the same order, with the
+    # same values it got before. That is ADR-008 C7 and it is the first
+    # acceptance criterion, because a fan-out that quietly reshapes the
+    # one-provider envelope would break every existing install to serve a case
+    # nobody has yet.
+    if len(arch_each) > 1:
+        env["architecture_evidence"] = [
+            {"provider": n,
+             "state": (v or {}).get("state"),
+             "constraints": [c.get("id") for c in (v or {}).get("constraints") or []],
+             "unresolved": w}
+            for n, v, w in arch_each]
+        contra = _contradictions(m)
+        if contra:
+            # ADR-013 rule 3: "the engine does not pick." Both sides are cited
+            # and the disposition is a review lane, not a halt -- rule 2 scopes
+            # halting to single-valued roles, and disagreement between peers of a
+            # multi-valued role is recorded rather than blocking.
+            env["architecture_review"] = {
+                "disposition": "ARCHITECTURE_REVIEW",
+                "contradictions": contra,
+                "blocking": False,
+                "why": "two architecture providers disagree about the same decision; "
+                       "ADR-013 rule 3 records this and does not resolve it",
+            }
+
     env["thinness"] = _thinness(env)
     return env
 
@@ -166,16 +308,56 @@ def prior_decision(authority_id, dtype, target, manifest=None):
     if "decision_history" not in (m.get("providers") or {}):
         return None, None
     want = discovery_id(authority_id, dtype, target)
-    r = B.call("decision_history", "get_decisions", {"id": str(authority_id or "-")},
-               manifest=m)
-    if not r.get("ok") or r.get("unknown"):
-        # Unreadable or empty. Not an error, and deliberately not blocking: a
-        # store that cannot be read must not stop work it knows nothing about.
+
+    # EVERY bound store, not the first one. `decision_history` is multi-valued
+    # (ADR-013) and this repository binds two -- Dolt and GitHub -- with the
+    # second one bound deliberately because "GitHub already records decisions in
+    # stateReason and nothing was reading them". `B.call` returned bindings[0],
+    # so it still was not: a decision recorded only in the second store could
+    # not stop a rediscovery, and §39 was being enforced against half the
+    # evidence (issue 154).
+    #
+    # This is the half of the union that changes DISPOSITIONS rather than a
+    # display. Unioning `architecture` changes what status.py prints; unioning
+    # this changes whether work is executable.
+    results, err = B.call_all("decision_history", "get_decisions",
+                              {"id": str(authority_id or "-")}, manifest=m)
+    if err:
         return None, None
-    for rec in (r.get("value") or {}).get("decisions") or []:
-        if rec.get("decision_id") == want:
-            return rec, None
-    return None, None
+    found = []
+    for i, r in enumerate(results):
+        e = r["envelope"]
+        if not e.get("ok") or e.get("unknown"):
+            # Unreadable or empty. Not an error, and deliberately not blocking:
+            # a store that cannot be read must not stop work it knows nothing
+            # about. One unreachable store does not silence the others.
+            continue
+        for rec in (e.get("value") or {}).get("decisions") or []:
+            if rec.get("decision_id") == want:
+                found.append((_provider_name(r["binding"], i), rec))
+    if not found:
+        return None, None
+
+    # Stores may disagree. §39's own asymmetry decides which record answers,
+    # and it is not a ranking of providers -- ADR-013 rule 1 forbids that. The
+    # rule is that rediscovered work stays CAPTURE_ONLY unless a reversal
+    # condition is met, so a store saying "this was decided against" outranks a
+    # store saying nothing of the kind, whichever store it is. Failing toward
+    # the restrictive answer is the only direction that cannot invent authority.
+    blocking = [(n, r) for n, r in found
+                if r.get("disposition") in ("DEFERRED", "REJECTED")]
+    name, rec = (blocking or found)[0]
+    dispositions = {r.get("disposition") for _n, r in found}
+    if len(dispositions) > 1:
+        rec = dict(rec)
+        rec["disagreement"] = {
+            "stores": {n: r.get("disposition") for n, r in found},
+            "answered_from": name,
+            "why": "bound decision_history stores hold different dispositions for "
+                   "the same decision; the restrictive one answers, because §39 "
+                   "keeps rediscovered work captured rather than executable",
+        }
+    return rec, None
 
 
 def classify(envelope, dtype, target=None, claimed_necessary=False, completed=False,

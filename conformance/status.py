@@ -131,6 +131,37 @@ def main():
                        f"{line} — otherwise the check above passes for a reason unrelated "
                        "to criteria, and neither line means anything")
 
+    # A disposition NOTHING EMITS must not be listed as reachable, and one that
+    # is emitted must not be omitted. status.py claimed `CONFLICT reachable`
+    # whenever any role was multi-bound; no path in engine/ emits that
+    # disposition, and a validated manifest cannot even hold the case it was
+    # meant for -- two peers on a single-valued role is a load-time CARDINALITY
+    # error (ADR-013 rule 1). Meanwhile classify() returns ARCHITECTURE_REVIEW
+    # for every ARCHITECTURE_IMPLICATION and status.py did not list it.
+    #
+    # Wrong in both directions, on the surface whose entire job is saying what
+    # this repository can conclude. Same defect family as the architecture
+    # caveat issue 143 fixed, and the reason it went unnoticed is that no suite
+    # asserted the negative (issue 154).
+    print("\nIt claims only dispositions the engine can actually emit\n")
+    rc, out = run(ROOT)
+    seg = out.split("WHAT THIS REPOSITORY CAN CONCLUDE")[-1].split("OBLIGATIONS")[0]
+    conflict = [l for l in seg.splitlines() if l.strip().startswith("CONFLICT")]
+    fails += check("CONFLICT is not claimed reachable",
+                   bool(conflict) and "NOT reachable" in conflict[0],
+                   f"{conflict} — nothing in engine/ emits it; grep for it and the only "
+                   "hit is the line that claims it")
+    # The EXACT label, not a prefix. The first draft used startswith() and was
+    # satisfied by the neighbouring "ARCHITECTURE_REVIEW x2" line, so deleting
+    # the one it was written about left it green -- a check passing for the
+    # wrong reason, caught by mutating the thing it claimed to watch.
+    arch_line = [l for l in seg.splitlines()
+                 if l.split()[:1] == ["ARCHITECTURE_REVIEW"] and "\u00d7" not in l]
+    fails += check("ARCHITECTURE_REVIEW is listed reachable, because classify() emits it",
+                   bool(arch_line) and "NOT reachable" not in arch_line[0],
+                   f"{arch_line} — omitting an emittable disposition understates the "
+                   "repository the same way claiming an unemittable one overstates it")
+
     print("\nIt is not silently green\n")
     with tempfile.TemporaryDirectory() as td:
         r = bare_repo(td, manifest=None)          # no manifest at all
