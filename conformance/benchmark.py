@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -289,7 +290,8 @@ def main():
         """grades: id -> (grade, warnings). Never spawns anything."""
         it = iter(grades)
         def _m(host, target, prompt, model=None, control=False, debug=False,
-               permissions="unrestricted", transcript=None, timeout=900):
+               permissions="unrestricted", transcript=None, timeout=900,
+               early_stop=False):
             g, ws = next(it)
             if g == "ERROR":
                 return None, "host is not on PATH"
@@ -932,7 +934,8 @@ def main():
                         ("NONE", "rejected"), ("NONE", "allowed"), ("QUIET", "allowed")])
 
             def _m(host, target, prompt, model=None, control=False, debug=False,
-                   permissions="unrestricted", transcript=None, timeout=900):
+                   permissions="unrestricted", transcript=None, timeout=900,
+                   early_stop=False):
                 g, st = next(seq)
                 return {"host": host, "prompt": prompt, "control": control,
                         "grade": g, "warnings": [], "why": "", "model": "m",
@@ -1002,6 +1005,103 @@ def main():
                    "governance reached and then not carried across a delegation "
                    "boundary is the shape most worth seeing, and the grader "
                    "cannot yet tell it from one agent doing both")
+
+
+    # --- issue 128: the grade is terminal at the first mutation ---------------
+    #
+    # A real run reached the 900s ceiling still working, fifteen minutes into a
+    # refactor, and was killed and VOIDED although its verdict had been fixed at
+    # 230 seconds. `grade()` takes the FIRST consult and the FIRST mutation, so
+    # after a mutation the answer is NONE or PARTIAL and nothing later moves it.
+    print("\nThe grade is terminal at the first mutation (issue 128)\n")
+
+    # THE CORRECTNESS PROPERTY. Everything else here is a performance argument;
+    # this is the one saying the MEASUREMENT is unchanged. Checked over every
+    # ordering that reaches a terminal grade, not one example -- if stopping
+    # early changed a verdict, every number after this change would be
+    # incomparable with every number before it.
+    ORDERS = ([EDIT], [EDIT, READ], [ENGINE, EDIT], [SKILL_LOAD, EDIT],
+              [EDIT, ENGINE], [ENGINE, EDIT, EDIT, READ],
+              [READ, ENGINE, EDIT, ENGINE, EDIT])
+    same, differing = 0, []
+    for calls in ORDERS:
+        full = B.observe(transcript(*calls))
+        if not B.terminal(full):
+            continue
+        # Truncate at the first point the verdict becomes terminal.
+        for i in range(1, len(calls) + 1):
+            part = B.observe(transcript(*calls[:i]))
+            if B.terminal(part):
+                break
+        if B.grade(part)[0] == B.grade(full)[0]:
+            same += 1
+        else:
+            differing.append((([c[0] for c in calls]),
+                              B.grade(part)[0], B.grade(full)[0]))
+    fails += check("truncating at the mutation does not change the grade",
+                   not differing and same >= 5,
+                   f"{differing} — {same} orderings agreed")
+
+    # THE FAILURE THAT WOULD LOOK LIKE SUCCESS. Stopping on CONSULTATION would
+    # make every governed session read FULL, and FULL is precisely the grade
+    # that needs a finished session: a later write turns it into PARTIAL.
+    consulted = B.observe(transcript(ENGINE))
+    fails += check("a consult-only session is not terminal, so FULL stays reachable",
+                   B.grade(consulted)[0] == "FULL" and not B.terminal(consulted),
+                   "an early stop that fired on consultation would make FULL "
+                   "unreachable and would look like governance working perfectly")
+    fails += check("a session that has done nothing yet is not terminal",
+                   not B.terminal(B.observe(transcript(READ))))
+
+    # issue 104's distinction, applied to a new stop reason: a broken harness
+    # must not look like evidence against the skill, and a DECIDED verdict must
+    # not look like a broken harness.
+    tdir = Path(tempfile.mkdtemp())
+    tf = tdir / "t.jsonl"
+    tf.write_text(transcript(ENGINE, EDIT))
+    real = B.run_once
+
+    def fake(stopped, timed):
+        def _f(*_a, **_k):
+            return {"raw": tf.read_text(), "stderr": "", "workdir": None,
+                    "transcript": str(tf), "argv": [], "timed_out": timed,
+                    "stopped_early": stopped, "elapsed": 230, "timeout": 900,
+                    "permission_regime": "unrestricted"}, None
+        return _f
+
+    B.run_once = fake(True, False)
+    stopped_rec, _ = B.measure("claude", "/tmp", "p")
+    B.run_once = fake(False, True)
+    timed_rec, _ = B.measure("claude", "/tmp", "p")
+    B.run_once = real
+
+    fails += check("stopping early is a complete measurement, not a void one",
+                   stopped_rec["grade"] == "PARTIAL" and not stopped_rec["warnings"],
+                   f"grade={stopped_rec['grade']} warnings={stopped_rec['warnings']}")
+    # THE CONTROL. Without it the check above passes by voiding nothing at all,
+    # which would silently promote every timeout into a measurement.
+    fails += check("a run killed at the ceiling is still void",
+                   timed_rec["grade"] == "VOID" and timed_rec["partial_grade"] == "PARTIAL",
+                   f"grade={timed_rec['grade']}")
+
+    # THE COST, RECORDED. The tail is what a human reads (issue 114) and issue
+    # 93 came out of one. A truncated transcript that does not say so invites a
+    # reader to conclude the agent stopped there of its own accord.
+    se = stopped_rec.get("stopped_early") or {}
+    fails += check("the record says the transcript was truncated by design",
+                   se.get("reason") == "grade_terminal"
+                   and se.get("transcript_truncated") is True
+                   and se.get("grade_at_stop") == "PARTIAL"
+                   and "--early-stop=off" in (se.get("detail") or ""),
+                   f"{se}")
+
+    # A FLAG, NOT A SILENT DEFAULT. An arm of twenty prompts is infeasible
+    # without it; a prompt being STUDIED needs its tail.
+    fails += check("early stop is off for a single prompt and on for a suite",
+                   B.resolve_early_stop("auto", None) is False
+                   and B.resolve_early_stop("auto", "arm-a.json") is True
+                   and B.resolve_early_stop("off", "arm-a.json") is False
+                   and B.resolve_early_stop("on", None) is True)
 
     print(f"\n{'BENCHMARK: CONFORMANT' if not fails else f'BENCHMARK: NON-CONFORMANT ({fails})'}")
     return 0 if not fails else 1

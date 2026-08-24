@@ -323,6 +323,51 @@ def grade(obs, control=False):
     return ("NONE", "changed something before consulting")
 
 
+def terminal(obs):
+    """Is the grade already fixed, whatever the session does next?
+
+    DERIVED FROM grade(), not restated. `grade()` takes the FIRST consult and
+    the FIRST mutation, so once a mutation has been observed the answer is NONE
+    if nothing had been consulted and PARTIAL if something had -- and no later
+    call can move either. Re-encoding that rule here would be a second copy of
+    the grading logic, and a second copy is how the two quietly diverge; this
+    asks `grade()` itself and checks whether more calls could change its answer.
+
+    NOT terminal, and this is the important half:
+
+      * `FULL` -- consulted, changed nothing. A later write makes it PARTIAL,
+        so a session on course for FULL has to be allowed to finish. Stopping
+        on CONSULTATION would make FULL unreachable and would look like
+        governance working perfectly.
+      * `AMBIGUOUS` -- neither happened yet. Anything could still happen.
+      * every control run, whose grade turns on activation and not on order.
+    """
+    if not obs["calls"]:
+        return False
+    g, _why = grade(obs)
+    # THE PROBES ARE THE RULE, and there is deliberately no `if g in (...)`
+    # shortcut in front of them. One was written, and mutating it to include
+    # FULL changed nothing -- the probes caught FULL anyway, because appending
+    # an Edit turns it into PARTIAL. A guard whose mutation has no effect is not
+    # logic, it is a line that reads like logic, and this repository has spent
+    # enough of this session finding checks that could not fail.
+    #
+    # So: append every kind of call the grader reacts to, and call the verdict
+    # terminal only if it survives all of them. If a future call type could move
+    # a NONE, this returns False and the session runs on -- which is the safe
+    # direction, because the cost of running on is time and the cost of stopping
+    # wrongly is a wrong measurement.
+    probes = ({"name": "Edit", "input": "{}"},
+              {"name": "Bash", "input": json.dumps({"command": "python3 engine/completion.py 1"})},
+              {"name": "Skill", "input": json.dumps({"name": "repo-governor"})},
+              {"name": "Read", "input": "{}"})
+    for probe in probes:
+        later = dict(obs, calls=obs["calls"] + [probe])
+        if grade(later)[0] != g:
+            return False
+    return True
+
+
 def void_reasons(obs):
     """Why this run cannot support a grade at all. Empty means it can.
 
@@ -456,7 +501,7 @@ def prepare(target, host, debug=False):
 
 
 def run_once(host, target, prompt, model=None, timeout=900, debug=False,
-             permissions="unrestricted"):
+             permissions="unrestricted", early_stop=False):
     spec = HOSTS[host]
     if not shutil.which(spec["cmd"]):
         return None, f"{spec['cmd']} is not on PATH"
@@ -491,19 +536,42 @@ def run_once(host, target, prompt, model=None, timeout=900, debug=False,
     epath = tmp / "host-stderr.txt"
     t0 = time.monotonic()
     timed_out = False
+    stopped_early = False
     try:
         with open(tpath, "w", encoding="utf-8") as fh, \
                 open(epath, "w", encoding="utf-8") as efh:
             proc = subprocess.Popen(argv, stdout=fh, stderr=efh, text=True,
                                     cwd=str(dst), stdin=subprocess.DEVNULL)
             estate = echo_state()
+            # Early stop reads the transcript AS IT GROWS. Checked on a slower
+            # cadence than the poll: parsing the whole file every 0.25s is
+            # wasted work on a session that will run for minutes, and the
+            # verdict cannot become un-terminal once it is terminal, so a few
+            # seconds of lateness costs nothing but a few seconds.
+            last_check, size = 0.0, -1
             while True:
                 rc = proc.poll()
                 if debug:
                     echo_new(tpath, estate)
                 if rc is not None:
                     break
-                if time.monotonic() - t0 > timeout:
+                now = time.monotonic()
+                if early_stop and now - last_check >= 3.0:
+                    last_check = now
+                    fh.flush()
+                    cur = tpath.stat().st_size
+                    if cur != size:
+                        size = cur
+                        try:
+                            grown = tpath.read_text(encoding="utf-8")
+                        except OSError:
+                            grown = ""
+                        if grown and terminal(observe(grown)):
+                            proc.kill()
+                            proc.wait()
+                            stopped_early = True
+                            break
+                if now - t0 > timeout:
                     proc.kill()
                     proc.wait()
                     timed_out = True
@@ -518,18 +586,23 @@ def run_once(host, target, prompt, model=None, timeout=900, debug=False,
         # transcript is on disk and worth reading: the grade recovered by hand
         # from exactly such a run became this repository's first calibration.
         # It comes back as a record marked timed_out, which measure() voids.
-        dbg(debug, f"host {'was killed at the ceiling' if timed_out else 'exited'};"
-                   f" {len(out.splitlines())} transcript lines")
+        why = ("was killed at the ceiling" if timed_out else
+               "was stopped: the grade was already terminal" if stopped_early else "exited")
+        dbg(debug, f"host {why}; {len(out.splitlines())} transcript lines"
+                   f" in {time.monotonic() - t0:.0f}s")
         return {"raw": out, "stderr": errtxt[-2000:], "workdir": str(dst),
                 "transcript": str(tpath), "argv": argv,
                 "timed_out": timed_out, "timeout": timeout,
+                "stopped_early": stopped_early,
+                "elapsed": round(time.monotonic() - t0, 1),
                 "permission_regime": permissions}, None
     except OSError as e:
         return None, f"could not run {argv[0]}: {e}"
 
 
 def measure(host, target, prompt, model=None, control=False, debug=False,
-            permissions="unrestricted", transcript=None, timeout=900):
+            permissions="unrestricted", transcript=None, timeout=900,
+            early_stop=False):
     """One prompt, one fresh session, one record. Returns (record, error).
 
     Extracted from main() for issue 105: a suite is this, twenty-three times.
@@ -541,10 +614,12 @@ def measure(host, target, prompt, model=None, control=False, debug=False,
         # session spent.
         res = {"raw": Path(transcript).read_text(encoding="utf-8"), "stderr": "",
                "workdir": None, "transcript": str(transcript), "argv": [],
-               "timed_out": False, "permission_regime": None}
+               "timed_out": False, "stopped_early": False,
+               "permission_regime": None}
     else:
         res, err = run_once(host, target, prompt, model, timeout=timeout,
-                            debug=debug, permissions=permissions)
+                            debug=debug, permissions=permissions,
+                            early_stop=early_stop)
         if err:
             return None, err
         # Cut 2 of issue 117, the half that matters: the grader's input is
@@ -583,6 +658,32 @@ def measure(host, target, prompt, model=None, control=False, debug=False,
         "transcript": res.get("transcript"),
     }
     out["warnings"] = void_reasons(obs)
+    if res.get("stopped_early"):
+        # NOT a warning, and deliberately not appended to `warnings`: anything
+        # in that list becomes VOID below. A session stopped because its verdict
+        # was already fixed measured everything there was to measure, and issue
+        # 104's distinction applies -- a broken harness must not look like
+        # evidence against the skill, and a DECIDED verdict must not look like a
+        # broken harness.
+        #
+        # The cost is recorded rather than hidden. The tail of a transcript is
+        # what a human reads (issue 114), and this project's most valuable
+        # qualitative finding came out of one -- Arm A prompt 4, where the agent
+        # reasoned past AUTHORITY_SOURCE_MISSING (issue 93). A truncated
+        # transcript that does not say it is truncated invites a reader to
+        # conclude the agent stopped there of its own accord.
+        out["stopped_early"] = {
+            "reason": "grade_terminal",
+            "grade_at_stop": out["grade"],
+            "elapsed_s": res.get("elapsed"),
+            "ceiling_s": res.get("timeout"),
+            "transcript_truncated": True,
+            "detail": "the session was killed once a mutation was observed, because "
+                      f"{out['grade']} cannot change after that. The measurement is "
+                      "complete; the TRANSCRIPT IS NOT, and anything the agent would "
+                      "have said afterwards is gone. Re-run with --early-stop=off to "
+                      "read the tail.",
+        }
     if res.get("timed_out"):
         # The transcript is real and partly gradeable -- one such run supplied
         # this repository's first calibration. But the session did not finish,
@@ -738,7 +839,8 @@ def drop_tree(workdir):
 
 
 def run_suite(host, target, doc, path, out_dir=None, model=None, debug=False,
-              permissions="unrestricted", timeout=900, keep_trees=False):
+              permissions="unrestricted", timeout=900, keep_trees=False,
+              early_stop=True):
     """Every prompt, each in its own session. Returns (summary, exit_code).
 
     Records stream to disk as they complete when --out is given. Twenty-three
@@ -755,7 +857,8 @@ def run_suite(host, target, doc, path, out_dir=None, model=None, debug=False,
                    f"{pr['text'][:60]}")
         rec, err = measure(host, target, pr["text"], model,
                            bool(pr.get("control")), debug=debug,
-                           permissions=permissions, timeout=timeout)
+                           permissions=permissions, timeout=timeout,
+                           early_stop=early_stop)
         if err:
             errors.append({"id": pr["id"], "error": err})
             print(f"  {pr['id']:<4} ERROR   {err}", file=sys.stderr)
@@ -1125,6 +1228,23 @@ def render_report(records, host, source=None):
 """
 
 
+def resolve_early_stop(choice, suite):
+    """`auto` means ON for a suite and OFF for a single prompt.
+
+    An arm is twenty measured prompts and most of them ask for work, so most
+    mutate; without this an arm costs up to five hours of sessions whose
+    verdicts were fixed in the first few minutes. A single prompt is usually one
+    being STUDIED, and studying it means reading what the agent said after the
+    mechanical part was over -- which is exactly what stopping early throws away
+    (issues 114, 93).
+    """
+    if choice == "on":
+        return True
+    if choice == "off":
+        return False
+    return bool(suite)
+
+
 def main(argv):
     ap = argparse.ArgumentParser(add_help=True)
     ap.add_argument("--list", action="store_true")
@@ -1141,6 +1261,12 @@ def main(argv):
     ap.add_argument("--keep-trees", action="store_true",
                     help="with --suite --out: keep every prepared copy, not only "
                          "the ones whose run went wrong")
+    ap.add_argument("--early-stop", choices=("auto", "on", "off"), default="auto",
+                    help="stop a session once its grade is terminal -- a mutation fixes "
+                         "NONE or PARTIAL and nothing later can move it. auto: ON for "
+                         "--suite, OFF for a single --prompt. It buys a feasible arm and "
+                         "COSTS THE TAIL of every transcript it stops, which is what a "
+                         "human reads; turn it off for any prompt being studied.")
     ap.add_argument("--timeout", type=int, default=900,
                     help="seconds per session (default 900). A real prompt has "
                          "been seen thinking for 159s before its first tool call")
@@ -1199,7 +1325,8 @@ def main(argv):
             return EXIT_USAGE
         summary, code = run_suite(a.host, a.target, doc, a.suite, a.out,
                                   a.model, a.debug, a.permissions, a.timeout,
-                                  a.keep_trees)
+                                  a.keep_trees,
+                                  resolve_early_stop(a.early_stop, a.suite))
         print(json.dumps(summary, indent=2, sort_keys=True))
         return code
 
@@ -1239,7 +1366,8 @@ def main(argv):
                  + (f" (model {a.model})" if a.model else "")
                  + (" [control]" if a.control else ""))
     out, err = measure(a.host, a.target, a.prompt, a.model, a.control, a.debug,
-                       a.permissions, a.from_transcript, a.timeout)
+                       a.permissions, a.from_transcript, a.timeout,
+                       resolve_early_stop(a.early_stop, a.suite))
     if err:
         print(json.dumps({"error": err}, indent=2))
         return EXIT_ERROR
