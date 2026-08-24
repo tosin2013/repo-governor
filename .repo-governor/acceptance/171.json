@@ -1,0 +1,60 @@
+{
+  "$comment": "Acceptance criteria for issue 171. completion.py's own resolution text says 'split the uncovered part into its own authority with its own bar', and nothing implements the state after you follow it: the parent keeps reading the prose and keeps answering CONTINUE forever. Six bars on disk carry a covers block. Issue 117 is the historical precedent -- its covers says in as many words 'split out to issue 131 by hand AFTER this bar had already read STOP_COMPLETE' -- and 143, 154, 155 and 156 are live. THE REFUSAL MUST SURVIVE. A bar may not become complete by deleting `covers`; it must POINT at where the uncovered work went, and the pointer is checked by evaluating those authorities rather than by trusting the text. An unresolvable or outstanding child leaves the parent CONTINUE. WHAT THIS DOES NOT DO, said plainly because the issue could be read as promising it: it does not close three issues today. Issue 155 points at 156, which still carries branch-dependence, so 155 correctly stays CONTINUE -- and unblocking it requires filing branch-dependence as its own authority. The mechanism FORCES THE CHAIN TO BE EXPLICIT rather than closing anything. TWO HAZARDS ARE CRITERIA, NOT COMMENTS. A cycle must be reported as a typed refusal rather than recursing, and depth must be bounded and the bound REPORTED -- a resolver that silently truncates its own search reports a discharge it never established, which is ADR-007's line.",
+  "authority_id": "171",
+  "covers": {
+    "declared": "the lifecycle gap: a covers block can name where its uncovered half went, and completion.py resolves those authorities instead of reading prose.",
+    "uncovered": "whether any specific bar should now be discharged. That is per-issue judgement on 143, 154, 155, 156 and 117, and belongs on those issues. This authority builds the mechanism and deliberately adds `split_to` to NO existing bar -- doing so would be using a new mechanism to close issues in the same change that introduced it, with nobody having reviewed either.",
+    "split_to": []
+  },
+  "criteria": [
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/acceptance.py | grep -q \"\\[PASS\\] a covers block with no split_to still blocks completion\"'",
+      "$comment": "C1 NOTHING REGRESSES. Five of the six bars on disk have no split_to and must behave exactly as they did. This is the ADR-008 C7 shape applied to a decision path."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/acceptance.py | grep -q \"\\[PASS\\] split_to naming a complete authority discharges the covers block\"'",
+      "$comment": "C2 THE MECHANISM. Red at declaration -- split_to does not exist."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/acceptance.py | grep -q \"\\[PASS\\] split_to naming an incomplete authority does not discharge it\"'",
+      "$comment": "C3 THE CONTROL FOR C2. Without it, C2 passes by discharging everything, which turns `covers` into a comment and re-creates exactly what issue 133 was built to fix."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/acceptance.py | grep -q \"\\[PASS\\] an empty split_to does not discharge anything\"'",
+      "$comment": "C3b THE CHEAPEST WAY TO CHEAT. `split_to: []` is deleting `covers` with extra steps. all([]) is True, so this is the vacuous-truth trap that has appeared twice in this session already."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/acceptance.py | grep -q \"\\[PASS\\] a cycle is reported as a typed refusal, not a crash\"'",
+      "$comment": "C4 HAZARD ONE. 155 -> 156 -> 155 must not recurse. A stack overflow is not a governance disposition (ADR-005 rule 5)."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/acceptance.py | grep -q \"\\[PASS\\] exceeding the depth bound refuses rather than truncating\"'",
+      "$comment": "C5 HAZARD TWO, and the more dangerous one. A resolver that silently stops searching and reports success declares a discharge it never established -- ADR-007's line exactly. Truncation must be a refusal, never a shrug."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/acceptance.py | grep -q \"\\[PASS\\] the verdict names which child authority is outstanding\"'",
+      "$comment": "C6 A reader must be able to act. 'CONTINUE, because of covers' sends nobody anywhere; 'CONTINUE, because 156 is not complete' does."
+    },
+    {
+      "$comment": "C7 the acceptance suite entire.",
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh acceptance"
+    },
+    {
+      "$comment": "C8 the completion firewall and the schema still hold; this touches the decision path.",
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh envelope manifest"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh --hermetic"
+    }
+  ]
+}

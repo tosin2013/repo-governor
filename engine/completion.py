@@ -102,12 +102,65 @@ def execution_evidence(authority_id, manifest=None):
     return out
 
 
-def evaluate(authority_id, manifest=None):
+# How far a covers chain may be followed before the resolver refuses. A parent
+# split into a child that was itself split is ordinary; four levels of that is a
+# roadmap problem, not a governance one. The bound is REPORTED when it is hit --
+# a resolver that silently stops searching and answers "discharged" declares a
+# completion it never established, which is ADR-007's line.
+MAX_COVERS_DEPTH = 3
+
+
+def _resolve_split(covers, manifest, seen, depth):
+    """Did the uncovered half actually land? (discharged, note).
+
+    `completion.py` has always told an author to "split the uncovered part into
+    its own authority with its own bar" and then had no way to tell that they
+    did, so the parent read CONTINUE forever. Six bars on disk carry a `covers`
+    block and issue 117's says in as many words that it was split to issue 131
+    BY HAND after already reading STOP_COMPLETE.
+
+    THE REFUSAL SURVIVES. A bar still cannot complete by deleting `covers`; it
+    has to NAME where the work went, and the names are checked by evaluating
+    those authorities rather than by trusting the sentence next to them. An
+    outstanding child, an unreachable one, a cycle or an over-deep chain all
+    leave the parent incomplete.
+    """
+    names = covers.get("split_to")
+    if not isinstance(names, list) or not names:
+        # Missing, malformed, or EMPTY. `split_to: []` is deleting `covers` with
+        # extra steps, and `all([])` is True -- the vacuous-truth shape this
+        # repository keeps shipping. Absence of a pointer is not a discharge.
+        return False, None
+    if depth >= MAX_COVERS_DEPTH:
+        return False, (f"covers chain exceeds {MAX_COVERS_DEPTH} levels at "
+                       f"{names!r}; refusing rather than truncating the search")
+    outstanding, notes = [], []
+    for child in [str(n) for n in names]:
+        if child in seen:
+            return False, (f"covers chain returns to {child!r}, which is already being "
+                           f"resolved ({' -> '.join(seen)}); a cycle cannot discharge "
+                           "anything")
+        kid = evaluate(child, manifest, _seen=seen + [child], _depth=depth + 1)
+        d = kid.get("decision")
+        if d != "STOP_COMPLETE":
+            outstanding.append(f"{child} is {d}")
+        notes.append(f"{child}={d}")
+    if outstanding:
+        return False, ("the uncovered half was split, and has not landed: "
+                       + "; ".join(outstanding))
+    return True, "the uncovered half was split and every part is complete: " + ", ".join(notes)
+
+
+def evaluate(authority_id, manifest=None, _seen=None, _depth=0):
     """Return the full governance decision for the completion axis.
 
     Named by role throughout. Which adapter answers `roadmap_authority` is the
     manifest's business, not this function's.
+
+    `_seen` and `_depth` exist only for `covers.split_to` resolution and are
+    never supplied by a caller from outside this module.
     """
+    _seen = _seen or [str(authority_id)]
     unknowns = []
     provenance = []
 
@@ -222,23 +275,37 @@ def evaluate(authority_id, manifest=None):
     elif covers:
         # Every declared criterion is met, and the bar itself says it covers
         # only part of this authority. Completion is therefore not something
-        # this bar can establish, whatever its criteria say.
-        #
-        # CONTINUE rather than a new disposition: STOP_PARTIAL would need
-        # section 32 and an ADR, and the safe direction needs no new
-        # vocabulary. The work continues, which is true.
-        decision, satisfied = "CONTINUE", False
-        unknowns.append({
-            "dimension": "evidence", "reason": "BAR_COVERS_PART", "blocking": False,
-            "meaning": "The declared bar is satisfied but covers only part of this item.",
-            "detail": (f"The bar covers {covers.get('declared')!r}. NOT covered: "
-                       f"{covers.get('uncovered')!r}. Every criterion passed, so the "
-                       "covered part is done; the item is not."),
-            "resolution": ("Split the uncovered part into its own authority with its "
-                           "own bar, or extend this bar to cover it. Removing 'covers' "
-                           "without doing either would declare completion the criteria "
-                           "do not establish."),
-        })
+        # this bar can establish, whatever its criteria say -- UNLESS the bar
+        # names where the uncovered half went and every part of it has landed.
+        discharged, note = _resolve_split(covers, manifest, _seen, _depth)
+        if discharged:
+            decision, satisfied = "STOP_COMPLETE", True
+            unknowns.append({
+                "dimension": "evidence", "reason": "BAR_COVERS_PART_DISCHARGED",
+                "blocking": False,
+                "meaning": "The bar covered part of this item, and the rest was split "
+                           "into authorities that are themselves complete.",
+                "detail": f"The bar covers {covers.get('declared')!r}. {note}",
+                "resolution": "None needed; recorded so the discharge is visible.",
+            })
+        else:
+            # CONTINUE rather than a new disposition: STOP_PARTIAL would need
+            # section 32 and an ADR, and the safe direction needs no new
+            # vocabulary. The work continues, which is true.
+            decision, satisfied = "CONTINUE", False
+            unknowns.append({
+                "dimension": "evidence", "reason": "BAR_COVERS_PART", "blocking": False,
+                "meaning": "The declared bar is satisfied but covers only part of this item.",
+                "detail": (f"The bar covers {covers.get('declared')!r}. NOT covered: "
+                           f"{covers.get('uncovered')!r}. Every criterion passed, so the "
+                           "covered part is done; the item is not."
+                           + (f" {note}" if note else "")),
+                "resolution": ("Split the uncovered part into its own authority with its "
+                               "own bar and name it in 'split_to', or extend this bar to "
+                               "cover it. Removing 'covers' without doing either would "
+                               "declare completion the criteria do not establish, and an "
+                               "empty 'split_to' is the same thing with extra steps."),
+            })
     else:
         decision, satisfied = "STOP_COMPLETE", True
 

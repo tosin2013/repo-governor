@@ -231,6 +231,99 @@ def main():
                    r.get("ok") and (r.get("value") or {}).get("covers") is None,
                    "otherwise the refusals above would pass for any bar at all")
 
+    # --- issue 171: a covers block can name where its uncovered half went ----
+    #
+    # completion.py has always told an author to "split the uncovered part into
+    # its own authority with its own bar" and then had no way to tell that they
+    # did: the parent kept reading the prose and kept answering CONTINUE. Six
+    # bars on disk carry a covers block, and issue 117's says in as many words
+    # that it was split to issue 131 BY HAND after already reading
+    # STOP_COMPLETE.
+    #
+    # Driven through _resolve_split with a stubbed child evaluation. What is
+    # under test is the RESOLUTION RULE -- outstanding, empty, cycle, depth --
+    # not provider plumbing, and routing each case through real adapters would
+    # test the plumbing far more than the rule.
+    print("\nA covers block can name where its uncovered half went (issue 171)\n")
+
+    real_eval = C.evaluate
+
+    def stub(decisions):
+        """id -> decision. Records the ids actually asked about."""
+        asked = []
+
+        def _e(authority_id, manifest=None, _seen=None, _depth=0):
+            asked.append(str(authority_id))
+            return {"decision": decisions.get(str(authority_id), "CONTINUE")}
+        return _e, asked
+
+    # NOTHING REGRESSES. Five of the six bars on disk carry no split_to and must
+    # behave exactly as before -- the ADR-008 C7 shape applied to a decision path.
+    for block, label in (({"declared": "x", "uncovered": "y"}, "no split_to"),
+                         ({"declared": "x", "uncovered": "y", "split_to": None}, "null"),
+                         ({"declared": "x", "uncovered": "y", "split_to": "156"}, "a string")):
+        got, _note = C._resolve_split(block, None, ["1"], 0)
+        fails += check(f"a covers block with no split_to still blocks completion ({label})",
+                       got is False,
+                       "absence of a pointer is not a discharge")
+
+    # THE CHEAPEST WAY TO CHEAT. `split_to: []` is deleting `covers` with extra
+    # steps, and all([]) is True -- the vacuous-truth shape this repository has
+    # shipped repeatedly.
+    got, _n = C._resolve_split({"uncovered": "y", "split_to": []}, None, ["1"], 0)
+    fails += check("an empty split_to does not discharge anything", got is False,
+                   "all([]) is True; an empty pointer list must not read as 'all landed'")
+
+    # THE MECHANISM.
+    C.evaluate, asked = stub({"156": "STOP_COMPLETE", "165": "STOP_COMPLETE"})
+    got, note = C._resolve_split({"uncovered": "y", "split_to": ["156", "165"]},
+                                 None, ["155"], 0)
+    C.evaluate = real_eval
+    fails += check("split_to naming a complete authority discharges the covers block",
+                   got is True and "156" in (note or "") and sorted(asked) == ["156", "165"],
+                   f"got={got} note={note!r} asked={asked}")
+
+    # THE CONTROL. Without it the check above passes by discharging everything,
+    # which turns `covers` into a comment and re-creates what issue 133 fixed.
+    C.evaluate, _ = stub({"156": "CONTINUE", "165": "STOP_COMPLETE"})
+    got, note = C._resolve_split({"uncovered": "y", "split_to": ["156", "165"]},
+                                 None, ["155"], 0)
+    C.evaluate = real_eval
+    fails += check("split_to naming an incomplete authority does not discharge it",
+                   got is False, f"got={got} note={note!r}")
+    # A reader must be able to ACT: "CONTINUE because of covers" sends nobody
+    # anywhere; "CONTINUE because 156 is not complete" does.
+    fails += check("the verdict names which child authority is outstanding",
+                   "156" in (note or "") and "CONTINUE" in (note or "")
+                   and "165" not in (note or ""),
+                   f"note={note!r} — it must name the outstanding child and not the "
+                   "one that landed")
+
+    # HAZARD ONE. 155 -> 156 -> 155 must not recurse. A stack overflow is not a
+    # governance disposition (ADR-005 rule 5).
+    C.evaluate, _ = stub({})
+    got, note = C._resolve_split({"uncovered": "y", "split_to": ["155"]},
+                                 None, ["155", "156"], 0)
+    C.evaluate = real_eval
+    fails += check("a cycle is reported as a typed refusal, not a crash",
+                   got is False and "cycle" in (note or "").lower()
+                   and "155" in (note or ""),
+                   f"got={got} note={note!r}")
+
+    # HAZARD TWO, and the more dangerous one. A resolver that silently stops
+    # searching and answers "discharged" declares a completion it never
+    # established -- ADR-007's line exactly.
+    C.evaluate, asked = stub({"999": "STOP_COMPLETE"})
+    got, note = C._resolve_split({"uncovered": "y", "split_to": ["999"]},
+                                 None, ["1"], C.MAX_COVERS_DEPTH)
+    C.evaluate = real_eval
+    fails += check("exceeding the depth bound refuses rather than truncating",
+                   got is False and str(C.MAX_COVERS_DEPTH) in (note or "")
+                   and asked == [],
+                   f"got={got} note={note!r} asked={asked} — the bound must be REPORTED, "
+                   "and no child evaluated past it")
+
+
     print(f"\n{'ACCEPTANCE: CONFORMANT' if not fails else f'ACCEPTANCE: NON-CONFORMANT ({fails})'}")
     return 0 if not fails else 1
 

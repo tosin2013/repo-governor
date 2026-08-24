@@ -67,6 +67,14 @@ REASONS = {
     "BAR_COVERS_PART":               ("evidence", False,
                                       "The declared bar is satisfied but covers only part of "
                                       "this item; STOP_COMPLETE unavailable."),
+    # The other side of BAR_COVERS_PART. A bar that named where its uncovered
+    # half went, and every named authority is complete, HAS established the
+    # whole item -- so this is recorded rather than merely absent, because
+    # "completed with a discharged split" and "completed with nothing to split"
+    # are different facts about how a decision was reached (issue 171).
+    "BAR_COVERS_PART_DISCHARGED":    ("evidence", False,
+                                      "The bar covered part of this item and the rest was "
+                                      "split into authorities that are themselves complete."),
     "ACCEPTANCE_UNSTATED":           ("acceptance", False,
                                       "Provider cannot supply machine-checkable acceptance conditions."),
     "NON_GOALS_UNSTATED":            ("scope", False,
