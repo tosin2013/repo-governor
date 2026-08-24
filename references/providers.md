@@ -63,6 +63,30 @@ Multi-valued: `architecture`, `change_signals`, `retirement`, `decision_history`
 
 Two candidates for a single-valued role halt onboarding. No ranking is applied.
 
+### Which architecture provider do I bind?
+
+Two ship, and they answer different questions. A repository that has both should
+bind both — neither is a substitute for the other.
+
+| | answers | shipped as |
+|---|---|---|
+| **ADRs** | **what was decided.** Immutable: a decision is superseded by a new one, never edited. True regardless of what is being built now. | `adapters/adr` |
+| **OpenSpec** | **what is being built.** `changes/<id>/` is in flight; it moves to `changes/archive/<id>/` when it lands, and `specs/` holds what the system must currently satisfy. | `adapters/openspec` |
+
+`adapters/adr` returns empty for `get_specs` by declaration and names OpenSpec as
+the resolution; `adapters/openspec` returns empty for `get_superseded_decisions`
+by declaration, because **archiving a change is completion, not supersession.**
+Each states what it cannot supply rather than guessing.
+
+You should not have to work this out. `engine/onboard.py` detects both and
+proposes what it finds — it never binds (ADR-010), so the choice stays yours,
+but it is made from evidence rather than from memory.
+
+**What the choice costs you is a report, not a decision.** No disposition
+consults `architecture` today, and `engine/status.py` says so where an operator
+reads it. Binding the wrong one, or neither, changes what you are told and
+changes no verdict.
+
 **Every binding on a multi-valued role is queried, and the evidence is unioned**
 (ADR-013 rule 3). Two `architecture` providers contribute their constraints
 together, attributed per provider; two `decision_history` stores are both read,

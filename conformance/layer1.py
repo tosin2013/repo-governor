@@ -63,6 +63,20 @@ SUITE = {
         "break_env": {"REPO_GOVERNOR_ADR_DIR": "/nonexistent-path-xyz"},
         "unknown_fn": None,
     },
+    "adapters/openspec": {
+        "role": "architecture",
+        "env": {"REPO_GOVERNOR_OPENSPEC_DIR": "conformance/fixtures/openspec/full"},
+        "probe": {},
+        "capability_fn": {
+            "active_decisions": ("get_active_decisions", {}),
+            "completed_changes": ("get_completed_changes", {}),
+            "constraints": ("get_constraints", {}),
+            "specs": ("get_specs", {}),
+            "provenance": ("get_provenance", {}),
+        },
+        "break_env": {"REPO_GOVERNOR_OPENSPEC_DIR": "/nonexistent-path-xyz"},
+        "unknown_fn": None,
+    },
     "adapters/file-roadmap": {
         "malformed": ("REPO_GOVERNOR_ROADMAP", '{"items":[{"id":"AUTHORIZED-1"}]}'),
         "role": "roadmap_authority",
@@ -411,6 +425,107 @@ def check_adapter(adapter, spec, rep):
             os.unlink(bad_path)
 
 
+def _q(fixture, fn):
+    """One openspec query against a fixture directory."""
+    env = dict(os.environ, REPO_GOVERNOR_OPENSPEC_DIR=f"conformance/fixtures/openspec/{fixture}")
+    env.pop("REPO_GOVERNOR_BINDING", None)
+    r = subprocess.run([sys.executable, str(ROOT / "adapters" / "openspec"),
+                        "query", "architecture", fn],
+                       capture_output=True, text=True, cwd=str(ROOT), env=env, timeout=60)
+    return json.loads(r.stdout)
+
+
+def _openspec_design(rep):
+    """The decisions the census forced, asserted rather than left in comments.
+
+    Protocol conformance above says the adapter is well-formed. It says nothing
+    about whether the mapping from an OpenSpec tree onto the §12 contract is
+    honest, and two of those choices are traps that a well-formed adapter would
+    walk straight into (issue 155).
+    """
+    A = "adapters/openspec"
+
+    # 41.7% of measured repositories have changes/ and no specs/. An empty
+    # success would state "this architecture has no specs" as a FACT; the truth
+    # is that specs are recorded elsewhere or not yet accumulated (ADR-003
+    # rule 6, INV-012).
+    d = _q("delta", "get_specs")
+    u = d.get("unknown") or {}
+    rep.add(A, "openspec: specs/ absent yields a typed UNKNOWN, not an empty success",
+            d.get("value") is None and u.get("reason") == "NO_ARCHITECTURE_EVIDENCE"
+            and u.get("blocking") is False,
+            f"value={d.get('value')} unknown={u or None}")
+
+    # THE TRAP. Archiving is completion. Reporting archived changes as
+    # superseded would make every finished change look like a withdrawn
+    # decision.
+    d = _q("full", "get_superseded_decisions")
+    v = d.get("value") or {}
+    comp = (_q("full", "get_completed_changes").get("value") or {}).get("count")
+    rep.add(A, "openspec: an archived change is completed, never superseded",
+            v.get("count") == 0 and "supersession" in (v.get("note") or "") and comp == 1,
+            f"superseded={v.get('count')} completed={comp} — the fixture has one "
+            "archived change; it must appear as completed and not as superseded")
+
+    # THE TRAP, END TO END. The unit check can pass while the union still
+    # escalates, so this binds a real ADR provider beside a real OpenSpec one
+    # over a fixture whose archived change is NAMED ADR-0001 -- the exact id the
+    # ADR provider holds as Accepted. ADR-013 rule 3 escalates "active in one
+    # provider, superseded in another"; nothing here is superseded, so nothing
+    # may escalate.
+    sys.path.insert(0, str(ROOT / "engine"))
+    import envelope as _E
+    import manifest as _MF
+    m, errs = _MF.load(ROOT / "conformance" / "fixtures" / "openspec" / "manifest-with-adr.json")
+    env = _E.compile_envelope("155", manifest=m) if not errs else {}
+    provs = [e["provider"] for e in env.get("architecture_evidence") or []]
+    rep.add(A, "openspec: a change and an ADR with the same id do not contradict",
+            not errs and "architecture_review" not in env and len(provs) == 2
+            and "ADR-0001" in env.get("architecture_constraints", []),
+            f"errs={errs} providers={provs} "
+            f"review={(env.get('architecture_review') or {}).get('contradictions')}")
+
+    # 11.2% keep loose files beside the change directories. Dropping them
+    # silently reports a smaller change set as the whole one (issue 25).
+    d = _q("loose", "get_active_decisions")
+    u = d.get("unknown") or {}
+    rep.add(A, "openspec: loose files in changes/ are reported as skipped, not dropped",
+            u.get("reason") == "ARCHITECTURE_PARTIALLY_READ" and "2 entr" in (u.get("detail") or "")
+            and (_q("loose", "get_provenance").get("value") or {}).get("unreadable_entries") == 2,
+            f"unknown={u or None} — the fixture has two loose files beside one change dir")
+
+    # The corrected census: project.md is present in 20.7% of OpenSpec
+    # repositories under an independent selector, not the 97.8% a self-selecting
+    # sample first reported. Detection keyed on it would miss four in five.
+    #
+    # ASSERTED BEHAVIOURALLY. The first version of this check grepped the
+    # adapter source for "project.md" and failed on the COMMENT saying the
+    # adapter does not use it -- the same defect as conformance/imports.py
+    # refusing to grep for imports, and as SUPERSEDED_RE matching prose about
+    # supersession. A file that talks about a thing is not an instance of it.
+    with tempfile.TemporaryDirectory() as td:
+        no_pm = Path(td) / "no-project-md" / "openspec" / "changes" / "add-x"
+        no_pm.mkdir(parents=True)
+        (no_pm / "proposal.md").write_text("# p\n")
+        only_pm = Path(td) / "only-project-md" / "openspec"
+        only_pm.mkdir(parents=True)
+        (only_pm / "project.md").write_text("# p\n")
+
+        def probes(d):
+            env = dict(os.environ, REPO_GOVERNOR_OPENSPEC_DIR=str(d))
+            env.pop("REPO_GOVERNOR_BINDING", None)
+            r = subprocess.run([sys.executable, str(ROOT / "adapters" / "openspec"), "describe"],
+                               capture_output=True, text=True, cwd=str(ROOT), env=env, timeout=60)
+            return bool(json.loads(r.stdout).get("capabilities"))
+
+        without = probes(no_pm.parent.parent)
+        only = probes(only_pm)
+    rep.add(A, "openspec: detection keys on the directory, not on project.md",
+            without and not only,
+            f"changes/-without-project.md advertises={without} (must be True); "
+            f"project.md-alone advertises={only} (must be False)")
+
+
 def main(argv):
     absent = _preflight.banner()
     targets = argv or list(SUITE)
@@ -420,6 +535,9 @@ def main(argv):
             print(f"unknown adapter {adapter!r}", file=sys.stderr)
             return 2
         check_adapter(adapter, SUITE[adapter], rep)
+
+    if "adapters/openspec" in targets:
+        _openspec_design(rep)
 
     cur = None
     for adapter, check, ok, detail in rep.rows:

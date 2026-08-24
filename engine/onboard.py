@@ -214,6 +214,31 @@ def detect(repo: Path):
                                                   "have a readable Status")],
                 path=d)
 
+    # architecture — OpenSpec. A SECOND provider for the same role, which
+    # ADR-013 allows ("zero or many — constraints accumulate; ADRs and specs
+    # coexist legitimately") and the union built for issue 154 makes real.
+    #
+    # Keys on the directory plus one half of the layout, NEVER on project.md.
+    # A census on 2026-08-24 first reported project.md at 97.8% and that was a
+    # selection artifact -- the sample had been found by searching for it. An
+    # independent selector puts it at 20.7%, so keying detection there would
+    # miss four repositories in five (issue 155).
+    osp = repo / "openspec"
+    if osp.is_dir():
+        halves = [d for d in ("changes", "specs") if (osp / d).is_dir()]
+        if halves:
+            changes = osp / "changes"
+            n = len([q for q in changes.iterdir() if q.is_dir() and q.name != "archive"]) \
+                if changes.is_dir() else 0
+            arch = (changes / "archive").is_dir()
+            add("architecture", "openspec", "adapters/openspec",
+                "PROVIDER_DETECTED",
+                [_cite(repo, "openspec", f"holds {', '.join(halves)}"),
+                 _cite(repo, "openspec/changes", f"{n} active change(s)")]
+                + ([_cite(repo, "openspec/changes/archive", "completed changes present")]
+                   if arch else []),
+                path="openspec")
+
     # change_signals — Renovate / Dependabot
     for f, t in (("renovate.json", "renovate"), (".renovaterc.json", "renovate"),
                  (".github/dependabot.yml", "dependabot")):
