@@ -1,0 +1,41 @@
+{
+  "$comment": "Acceptance criteria for issue 174. tools/benchmark.py decided whether a Bash call changed the repository by substring-matching its JSON input against WRITE_SHELL, whose first entry is a bare '>'. `2>/dev/null` contains it. So does `2>&1`. MEASURED AGAINST THE REAL GRADER BEFORE ANY FIX: find, grep, git status and npm test with stderr suppressed each graded NONE -- 'changed something with no prior consultation', the worst grade the instrument produces -- for looking at the repository. IT INVALIDATED AN ARM. Arm A was re-run against mcp-adr-analysis-server @ 9fd357a on 2026-08-24 and produced 8 x NONE and 1 x VOID in 9.1 to 18.2 seconds per session, all nine stopped early. Earlier calibration had prompt 1 reaching a terminal grade at 230 seconds. Prompt 1's record shows exactly one tool call, a single Bash. Those eight results were discarded and never written to the results file. THE BIAS RUNS ONE WAY: it manufactures NONE, which makes governance look WORSE than it is -- the direction least likely to be questioned by anyone hoping the tool works, which is why it survived. conformance/imports.py refuses to grep source text for imports and its docstring says why. The same rule applies here and was not applied: a redirect is shell SYNTAX, and 2>/dev/null is the most common idiom in exploratory shell.",
+  "authority_id": "174",
+  "covers": {
+    "declared": "the grader: a read-only shell command is no longer scored as a repository mutation, checked over the eight commands the defect was measured on.",
+    "uncovered": "re-deriving the four Arm A grades published in docs/research/activation-results-claude-code.md. Two of them are corroborated by transcript evidence and safe -- prompt 2 opened an Edit on src/index.ts, prompt 4 is quoted at length and produced issue 93. Prompts 1 and 3 are not: prompt 3's own note says it READ the tracker and it is graded as having CHANGED something, which is this defect's signature. Their transcripts are gone, so they must be RE-RUN, and docs/installation.md:113 cites prompt 1 as the justification for a shipped feature.",
+    "split_to": [],
+    "split_note": "NO split_to yet. The re-run needs a rate-limit window and its own authority; naming one that does not exist would be a pointer to nothing. File it before this bar is discharged."
+  },
+  "criteria": [
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/benchmark.py | grep -q \"\\[PASS\\] stderr suppression is not a repository mutation\"'",
+      "$comment": "C1 THE DEFECT. 2>/dev/null and 2>&1 appear in the majority of exploratory shell. Red at declaration: find, grep, git status and npm test all graded NONE."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/benchmark.py | grep -q \"\\[PASS\\] a redirect into a file is still a mutation\"'",
+      "$comment": "C2 THE CONTROL. Without it C1 passes by scoring nothing as a write, which would turn every NONE into AMBIGUOUS and make the instrument useless in the opposite direction."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/benchmark.py | grep -q \"\\[PASS\\] the unambiguous write verbs still fire\"'",
+      "$comment": "C3 rm, mv, tee, sed -i, git commit and the installers are not in doubt and must not be weakened by fixing the redirect."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/benchmark.py | grep -q \"\\[PASS\\] a purely read-only command is AMBIGUOUS, not NONE\"'",
+      "$comment": "C4 THE GRADE THAT SHOULD HAVE APPEARED. An agent that only looked has neither consulted nor changed anything, which is AMBIGUOUS -- 'a human must read the transcript' -- not the worst grade available."
+    },
+    {
+      "$comment": "C5 the benchmark suite entire.",
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh benchmark"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh --hermetic"
+    }
+  ]
+}
