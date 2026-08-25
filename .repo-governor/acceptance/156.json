@@ -3,7 +3,12 @@
   "authority_id": "156",
   "covers": {
     "declared": "an `adapters/speckit` answering the section 12 contract from the measured layout, detection that proposes it on .specify/ and never on specs/, and the three refusals this provider has to make: an unfilled template is UNKNOWN, tasks.md completion never reaches a disposition, and Spec Kit supplies no decision ledger.",
-    "uncovered": "TWO THINGS. (1) The branch-dependence problem. specs/ is populated per feature branch, so what this provider reports depends on which branch is checked out - unlike adapters/adr, whose directory does not move underneath it. The adapter reports the fact in provenance and does nothing about it; whether a governance provider may return different architecture per branch is not settled here. (2) Whether .specify/ should count toward the architecture_history difficulty indicator - the same question issue 165 asks for openspec/, and it should be answered once for both."
+    "uncovered": "TWO THINGS. (1) The branch-dependence problem. specs/ is populated per feature branch, so what this provider reports depends on which branch is checked out - unlike adapters/adr, whose directory does not move underneath it. The adapter reports the fact in provenance and does nothing about it; whether a governance provider may return different architecture per branch is not settled here. (2) Whether .specify/ should count toward the architecture_history difficulty indicator - the same question issue 165 asks for openspec/, and it should be answered once for both.",
+    "split_to": [
+      "173",
+      "165"
+    ],
+    "split_note": "branch-dependence became issue 173; the .specify/ architecture_history question was answered by issue 165, which covered both spec providers."
   },
   "criteria": [
     {

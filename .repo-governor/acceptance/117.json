@@ -17,6 +17,10 @@
   ],
   "covers": {
     "declared": "cut 1 -- one path to the transcript, whatever --debug says",
-    "uncovered": "cut 2 -- splitting run from grade. Split out to issue 131 by hand AFTER this bar had already read STOP_COMPLETE, which is the defect issue 133 exists for. Recorded retroactively so the record shows what the bar actually covered rather than what it was read as covering."
+    "uncovered": "cut 2 -- splitting run from grade. Split out to issue 131 by hand AFTER this bar had already read STOP_COMPLETE, which is the defect issue 133 exists for. Recorded retroactively so the record shows what the bar actually covered rather than what it was read as covering.",
+    "split_to": [
+      "131"
+    ],
+    "split_note": "cut 2 became issue 131, which is closed. This bar is the reason the mechanism exists: its own text records that the split was done BY HAND after the bar had already read STOP_COMPLETE."
   }
 }

@@ -3,7 +3,12 @@
   "authority_id": "155",
   "covers": {
     "declared": "an `adapters/openspec` that answers the section 12 contract from the layout measured in the census, detection that proposes it, and documentation saying what the ADR and OpenSpec providers each answer so a person can tell which to bind.",
-    "uncovered": "TWO THINGS. (1) Spec Kit -- issue 156, unstarted, and its own census is not run. (2) Whether openspec/ should count toward the architecture_history difficulty indicator. Issue 161 deliberately excluded it and asserts it stays L1; now that an adapter can read the evidence, the exclusion should be REVISITED rather than silently flipped, because raising a repository's required roles is a governance consequence and this bar does not measure whether it is the right one."
+    "uncovered": "TWO THINGS. (1) Spec Kit -- issue 156, unstarted, and its own census is not run. (2) Whether openspec/ should count toward the architecture_history difficulty indicator. Issue 161 deliberately excluded it and asserts it stays L1; now that an adapter can read the evidence, the exclusion should be REVISITED rather than silently flipped, because raising a repository's required roles is a governance consequence and this bar does not measure whether it is the right one.",
+    "split_to": [
+      "156",
+      "165"
+    ],
+    "split_note": "Spec Kit became issue 156; the openspec/ architecture_history question became issue 165."
   },
   "criteria": [
     {

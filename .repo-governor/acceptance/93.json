@@ -13,6 +13,7 @@
   ],
   "covers": {
     "declared": "the decision half -- recording the question and the reasoning",
-    "uncovered": "the wording half: any change to SKILL.md's AUTHORITY_SOURCE_MISSING text. Deliberately not attempted -- prompts 1-4 of Arm A were graded against the current wording, and editing it mid-arm makes them incomparable with 5-20. Blocked on issue 36 completing or restarting."
+    "uncovered": "the wording half: any change to SKILL.md's AUTHORITY_SOURCE_MISSING text. Deliberately not attempted -- prompts 1-4 of Arm A were graded against the current wording, and editing it mid-arm makes them incomparable with 5-20. Blocked on issue 36 completing or restarting.",
+    "split_note": "NO split_to, deliberately. The wording half was DEFERRED, not split: it waits on issue 36 finishing or restarting so prompts 1-4 stay comparable with 5-20. Naming 36 here would claim the work moved there, and it did not."
   }
 }
