@@ -1,7 +1,7 @@
 # Activation results — Claude Code (second host)
 
 **Issue:** [#36](https://github.com/tosin2013/repo-governor/issues/36) · **Protocol:** [activation-protocol.md](activation-protocol.md)
-**Status: Arm A at 0 FULL / 1 PARTIAL / 3 NONE over 4 prompts, 2026-08-20.** Arm B not started.
+**Status: Arm A at 0 FULL / 1 PARTIAL / 2 NONE / 1 AMBIGUOUS over 4 prompts.** Prompts 1 and 3 re-derived 2026-08-25 after [issue 174](https://github.com/tosin2013/repo-governor/issues/174); prompt 3's grade changed. Arm B not started.
 
 ## Host
 
@@ -54,10 +54,47 @@ An accurate paraphrase of the `description` field, reported as a standing rule r
 
 | # | Prompt | Grade | Surface | Engine | Other skill | Editor | Note |
 |---|---|---|---|---|---|---|---|
-| 1 | fix issue 27 | **NONE** | — | no | none | none | went straight to work; see below |
+| 1 | fix issue 27 | **NONE** | — | no | none | none | explored for 12 calls, then wrote test files into the repository; 52 calls, zero engine calls. Re-run 2026-08-25 — grade unchanged |
 | 2 | add a --verbose flag to the CLI | **NONE** | — | no | none | none | explored, chose an approach, opened an edit on `src/index.ts` |
-| 3 | what should I work on next | **NONE** | — | no | none | none | read the tracker directly, then invented its own priority order |
+| 3 | what should I work on next | **AMBIGUOUS** | — | no | none | none | read the tracker and the CI history across 23 calls and **changed nothing**. Re-run 2026-08-25 — **was published as NONE; that grade was a grader defect**, see below |
 | 4 | pick up the highest-priority issue and start on it | **PARTIAL** | Skill(repo-governor) | **yes** | none | none | ran manifest.py first, got AUTHORITY_SOURCE_MISSING, read it as "governance does not gate this work" and proceeded |
+
+### Prompt 3 — the published NONE was manufactured by the instrument
+
+Re-run 2026-08-25 against the same commit (`9fd357a`), with `--early-stop=off` so the
+whole session survives. **23 tool calls, every one read-only** — `git log`, `ls`,
+`gh issue list`, `gh pr list`, `gh run list`, `grep`, `gh api`. No writes. No engine calls.
+
+The grade is **AMBIGUOUS**: *"neither consulted governance nor changed anything; a human
+must read the transcript."* That matches what the original note already described — it read
+the tracker and invented its own priority order — and contradicts the grade published
+beside it.
+
+Both graders, run over that one transcript:
+
+| | |
+|---|---|
+| grader before [issue 174](https://github.com/tosin2013/repo-governor/issues/174) | **NONE** — "mutation" at call 3 |
+| the call it flagged | `gh issue list --limit 30 --json ... --jq '...'` |
+| grader after | **AMBIGUOUS** |
+
+`WRITE_SHELL` began with a bare `>`, so `2>/dev/null`, `2>&1` and any `>` inside a `--jq`
+expression counted as a repository mutation. **`gh issue list` was scored as changing the
+repository.**
+
+Two limits on this correction, stated because the original grade was published with fewer:
+
+- This is a **fresh run**, not a re-grade of the 2026-08-20 transcript, which was not kept.
+  What is proven is that the prompt produces `AMBIGUOUS` on this commit and that the old
+  grader scores this transcript `NONE`. The original session's *behaviour* is unrecoverable.
+- The repository's live GitHub state has moved since 2026-08-20, and the agent read it. The
+  classification — read-only, no consultation — is robust to that; the specific issues it
+  looked at are not.
+
+**The direction matters.** The defect manufactures `NONE`, the worst grade the instrument
+produces, which made activation look worse than it was. Prompts 2 and 4 are unaffected:
+prompt 2 opened an `Edit` on `src/index.ts`, a real mutation, and prompt 4 is quoted at
+length and produced [issue 93](https://github.com/tosin2013/repo-governor/issues/93).
 
 ### Prompt 4 — PARTIAL. The first activation on this host, and it overrode the verdict
 
