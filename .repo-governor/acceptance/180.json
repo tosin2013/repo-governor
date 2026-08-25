@@ -1,0 +1,45 @@
+{
+  "$comment": "Acceptance criteria for issue 180. Two surfaces disagree about one fact. Reproduced on main at ac21a4f, same repository, same run: engine/manifest.py --validate prints PROVIDER_UNAVAILABLE and exits 1; engine/status.py prints 'That is a configuration gap, not a verdict. Nothing here refuses to answer because of it' and exits 0. conformance/status.py:238-248 already asserts the second position in as many words -- 'an unmet requirement must not turn the report into a failure' -- and manifest.py disagrees with it. Same family as issue 161: two places that must agree, with nothing asserting it. THE TRIGGER IS ONE TERNARY at engine/manifest.py:331-332. `findings` mixes an adapter that genuinely cannot run with a profile wanting a role nobody bound, so one unbound role is indistinguishable from a broken backend. THE PARTITION IS EXHAUSTIVE, NOT GUESSED. check_adapters() produces seven kinds: NOT_CONFIGURED, TRANSPORT_UNREACHABLE, UNREACHABLE, CONTRACT_MISMATCH, ROLE_MISMATCH and WRITE_GRANTED_BUT_TRANSPORT_READONLY are blocking; REQUIRED_ROLE_UNBOUND is advisory. Anything unrecognised defaults to BLOCKING -- a missed advisory is noise, a missed blocker is a false green. WHAT THIS DOES NOT CLAIM, said because the issue could be read as claiming it: I filed 180 saying the repository gets no verdict, and that was WRONG. The UNKNOWN I saw came from `gh: Could not resolve to a Repository with the name 'acme/widget'` -- my fixture's fake remote. REQUIRED_ROLE_UNBOUND never reaches load(), bindings.py or completion.py. Corrected publicly on the issue. So this does NOT answer issue 167's question about whether a real repository is blocked; that stays open. AND policies/high-assurance.json IS NOT CHANGED. The profile stating what high assurance needs is not the bug; refusing to answer because of it is. Whether `execution` belongs there -- its only adapter reads a file that does not exist, and this project's own manifest calls binding it dishonest -- is a policy question with its own issue.",
+  "authority_id": "180",
+  "criteria": [
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/manifest.py | grep -q \"\\[PASS\\] an unmet required role does not turn validation into a failure\"'",
+      "$comment": "C1 THE DEFECT. An L4 repository with unbound required roles must read READY_FOR_GOVERNANCE and exit 0. Red at declaration: PROVIDER_UNAVAILABLE, exit 1."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/manifest.py | grep -q \"\\[PASS\\] an adapter that cannot answer still fails validation\"'",
+      "$comment": "C2 THE CONTROL, and the reason this is criterion 2 rather than an afterthought. Without it C1 passes by accepting everything, which makes --validate vacuous -- worse than the bug. Driven on an L1 fixture where no required-role finding can fire, with a Dolt binding pointed at a database that does not exist."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/manifest.py | grep -q \"\\[PASS\\] the advisory finding is still reported, not silently dropped\"'",
+      "$comment": "C3 NON-FATAL IS NOT INVISIBLE. The gap is real and a reader must see it; ADR-031's phrasing is 'report the fact, state the consequence, block nothing'. Dropping it would trade a false refusal for a false silence."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/manifest.py | grep -q \"\\[PASS\\] validate and status agree about one repository\"'",
+      "$comment": "C4 THE ACTUAL BUG, asserted directly rather than inferred from the two halves. Same fixture through both surfaces; neither may contradict the other."
+    },
+    {
+      "$comment": "C5 SELFTEST STOPS CALLING A CONFIGURED REPOSITORY UN-ONBOARDED. Behavioural: build an L4 repository whose only binding is `repository`, run selftest, and require the governed line to PASS. The first version of this criterion grepped for the word 'blocking' in the source -- it asserted an implementation I then did not write, and failed for a reason unrelated to the behaviour. A criterion that pins how something is done rather than what it does is the same defect as a check that greps for a string instead of asking the code.",
+      "check": "command_exit",
+      "target": "python3 -c \"import json,os,subprocess,sys,tempfile,pathlib;td=tempfile.mkdtemp();r=pathlib.Path(td)/'repo';r.mkdir();subprocess.run(['git','init','-q',str(r)],capture_output=True);m={'repo_governor':{'version':1,'engine_min_version':'0.1.0'},'repository':{'id':'tosin2013/repo-governor'},'condition':{'assessed':'L4','profile':'GOVERNOR_HIGH_ASSURANCE'},'permissions':{'repository':{'read':True,'write':False}},'providers':{'repository':{'type':'git','adapter':'adapters/git','contract_version':1}}};(r/'.repo-governor.json').write_text(json.dumps(m));o=subprocess.run([sys.executable,'tools/selftest.py',str(r)],capture_output=True,text=True).stdout;sys.exit(0 if '[PASS] repository is governed' in o else 1)\""
+    },
+    {
+      "$comment": "C6 the manifest suite entire.",
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh manifest"
+    },
+    {
+      "$comment": "C7 the surfaces this touches stay green -- status.py already held the correct position and must keep it, and onboarding asserts the interactive tool's proposal validates.",
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh status onboarding"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh --hermetic"
+    }
+  ]
+}

@@ -152,6 +152,84 @@ def main():
     print(f"  [{'PASS' if ok3 else 'FAIL'}] control: the same binding WITH identity is ready"
           + ("" if ok3 else f"\n         {out_good.strip()[:180]}"))
 
+    # --- issue 180: an unmet requirement is a finding, not a failure --------
+    #
+    # Two surfaces disagreed about one repository. --validate printed
+    # PROVIDER_UNAVAILABLE and exited 1; engine/status.py printed "That is a
+    # configuration gap, not a verdict. Nothing here refuses to answer because
+    # of it" and exited 0. conformance/status.py:238-248 already asserted the
+    # second position. Same family as issue 161 -- two places that must agree,
+    # with nothing asserting it.
+    print("\nAn unmet requirement is a finding; a broken binding is a failure\n")
+
+    def _validate_rc(manifest_obj):
+        """(stdout, returncode) -- the exit code is half the contract here."""
+        with _tf.TemporaryDirectory() as td:
+            r = pathlib.Path(td) / "repo"
+            r.mkdir()
+            _sp.run(["git", "init", "-q", str(r)], capture_output=True)
+            (r / ".repo-governor.json").write_text(json.dumps(manifest_obj))
+            env = dict(_os.environ); env["REPO_GOVERNOR_TARGET"] = str(r)
+            pr = _sp.run([sys.executable, str(ROOT / "engine" / "manifest.py"), "--validate"],
+                         capture_output=True, text=True, cwd=str(r), env=env, timeout=120)
+            return pr.stdout, pr.returncode
+
+    # L4 wants five roles; only `repository` is bound. Nothing here is broken --
+    # the binding that exists answers fine.
+    gap = {"repo_governor": {"version": 1, "engine_min_version": "0.1.0"},
+           "repository": {"id": "tosin2013/repo-governor"},
+           "condition": {"assessed": "L4", "profile": "GOVERNOR_HIGH_ASSURANCE"},
+           "permissions": {"repository": {"read": True, "write": False}},
+           "providers": {"repository": {"type": "git", "adapter": "adapters/git",
+                                        "contract_version": 1}}}
+    out_gap, rc_gap = _validate_rc(gap)
+    okg = "READY_FOR_GOVERNANCE" in out_gap and rc_gap == 0
+    extra += not okg
+    print(f"  [{'PASS' if okg else 'FAIL'}] an unmet required role does not turn validation into a failure"
+          + ("" if okg else f"\n         rc={rc_gap} {out_gap.strip()[-160:]}"))
+
+    okr = "REQUIRED_ROLE_UNBOUND" in out_gap and "advisory" in out_gap
+    extra += not okr
+    print(f"  [{'PASS' if okr else 'FAIL'}] the advisory finding is still reported, not silently dropped"
+          + ("" if okr else "\n         non-fatal must not mean invisible: the gap is real and a reader needs it"))
+
+    # THE CONTROL, and the reason it is second rather than an afterthought:
+    # without it the check above passes by accepting everything, which makes
+    # --validate vacuous -- worse than the bug. L1 requires only `repository`,
+    # so no required-role finding can fire and the ONLY finding is a real one.
+    broke = {"repo_governor": {"version": 1, "engine_min_version": "0.1.0"},
+             "repository": {"id": "tosin2013/repo-governor"},
+             "condition": {"assessed": "L1", "profile": "GOVERNOR_LITE"},
+             "permissions": {"repository": {"read": True, "write": False},
+                             "decision_history": {"read": True, "write": False}},
+             "providers": {
+               "repository": {"type": "git", "adapter": "adapters/git", "contract_version": 1},
+               "decision_history": [{"type": "decision-history-dolt",
+                                     "adapter": "adapters/decision-history-dolt",
+                                     "contract_version": 1,
+                                     "env": {"REPO_GOVERNOR_DECISIONS_DB": "/nonexistent-db"}}]}}
+    out_broke, rc_broke = _validate_rc(broke)
+    okb = "PROVIDER_UNAVAILABLE" in out_broke and rc_broke != 0
+    extra += not okb
+    print(f"  [{'PASS' if okb else 'FAIL'}] an adapter that cannot answer still fails validation"
+          + ("" if okb else f"\n         rc={rc_broke} {out_broke.strip()[-160:]}"))
+
+    # THE ACTUAL BUG, asserted directly rather than inferred from the two halves
+    # above. One fixture through both surfaces; neither may contradict the other.
+    with _tf.TemporaryDirectory() as td:
+        r2 = pathlib.Path(td) / "repo"
+        r2.mkdir()
+        _sp.run(["git", "init", "-q", str(r2)], capture_output=True)
+        (r2 / ".repo-governor.json").write_text(json.dumps(gap))
+        env2 = dict(_os.environ); env2["REPO_GOVERNOR_TARGET"] = str(r2)
+        st = _sp.run([sys.executable, str(ROOT / "engine" / "status.py"), str(r2)],
+                     capture_output=True, text=True, cwd=str(ROOT), env=env2, timeout=120)
+    oka = (rc_gap == 0) == (st.returncode == 0)
+    extra += not oka
+    print(f"  [{'PASS' if oka else 'FAIL'}] validate and status agree about one repository"
+          + ("" if oka else f"\n         validate rc={rc_gap}, status rc={st.returncode} "
+                            "-- an operator has to decide which to believe"))
+
     # A DECLARED transport is not a reached one (issue 130). Declaring
     # transport.kind=mcp made the adapter report reachable and writable, which
     # silenced WRITE_GRANTED_BUT_TRANSPORT_READONLY for a transport that has no

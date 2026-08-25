@@ -48,11 +48,23 @@ def mechanical(repo: Path):
 
     r = subprocess.run([sys.executable, str(SKILL / "engine" / "manifest.py"), "--validate"],
                        capture_output=True, text=True, cwd=str(repo))
-    governed = "READY_FOR_GOVERNANCE" in r.stdout
+    # Reads the same partition manifest.py --validate reports. This gated on the
+    # literal READY_FOR_GOVERNANCE, so a correctly-configured L4 repository with
+    # an unbound required role was told "not onboarded" -- while engine/status.py
+    # called the same fact a configuration gap and answered anyway (issue 180).
+    governed = r.returncode == 0
+    advisory = "advisory" in r.stdout
     ok &= check("repository is governed (manifest validates)", governed,
                 "" if governed else
                 "not onboarded -- run tools/onboard-interactive.py first, or the "
                 "engine can only ever answer AUTHORITY_SOURCE_MISSING")
+    if governed and advisory:
+        # Reported, never fatal. The gap is real and a reader must see it; what
+        # it costs is a question for engine/status.py, which enumerates the
+        # dispositions it puts out of reach.
+        print("       note: the manifest carries advisory findings -- required roles")
+        print("       the profile names and nothing bound. Run engine/status.py to")
+        print("       see which dispositions that puts out of reach.")
 
     always_on = any((repo / f).exists() for f in ("AGENTS.md", "CLAUDE.md"))
     check("repository announces governance in an always-on file", always_on,

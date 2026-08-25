@@ -105,6 +105,12 @@ SUPPORTED_VERSIONS = (1,)
 SCALAR_ROLES = ("roadmap_authority", "execution", "repository", "acceptance_criteria")
 ARRAY_ROLES = ("architecture", "change_signals", "retirement", "decision_history")
 
+# Findings that describe a CONFIGURATION GAP rather than a broken binding.
+# Closed set, deliberately: `--validate` treats any other kind as blocking, so
+# forgetting to list one costs a false refusal and never a false green
+# (issue 180).
+ADVISORY_FINDINGS = ("REQUIRED_ROLE_UNBOUND",)
+
 VERBS = ("read", "write", "create", "update", "archive", "comment", "transition")
 RESERVED_VERBS = ("execute",)
 
@@ -327,10 +333,37 @@ def main(argv):
                              "is a human's to change (ADR-006 rule 1)."))
         for role, adapter, kind, detail in findings:
             print(f"  [{kind}] {role} -> {adapter}: {detail}")
-        n = len(m["providers"]) 
-        print(f"\n{'READY_FOR_GOVERNANCE' if not findings else 'PROVIDER_UNAVAILABLE'} "
-              f"({n} bindings, {len(findings)} finding(s))")
-        return 0 if not findings else 1
+
+        # An unmet requirement is a CONFIGURATION GAP, not a broken binding, and
+        # the two were indistinguishable here: `findings` mixed an adapter that
+        # cannot run with a profile wanting a role nobody bound, and any entry
+        # at all flipped the banner and the exit code.
+        #
+        # engine/status.py:292 already says the right thing about the same fact
+        # -- "That is a configuration gap, not a verdict. Nothing here refuses
+        # to answer because of it" -- and returns 0, and
+        # conformance/status.py:238-248 asserts it. This surface disagreed with
+        # that one about one repository (issue 180). ADR-031 names the field:
+        # "An unmet `required_roles` is a configuration gap, not a verdict...
+        # Report the fact, state the consequence, block nothing."
+        #
+        # ADVISORY IS A CLOSED SET AND EVERYTHING ELSE BLOCKS. A kind nobody
+        # listed here is treated as blocking, because a missed advisory is noise
+        # and a missed blocker is a false green.
+        advisory = [f for f in findings if f[2] in ADVISORY_FINDINGS]
+        blocking = [f for f in findings if f[2] not in ADVISORY_FINDINGS]
+        n = len([r for r in (m.get("providers") or {}) if not r.startswith("$")])
+        state = "PROVIDER_UNAVAILABLE" if blocking else "READY_FOR_GOVERNANCE"
+        counts = f"{n} bindings, {len(blocking)} finding(s)"
+        if advisory:
+            counts += f", {len(advisory)} advisory"
+        print(f"\n{state} ({counts})")
+        if advisory and not blocking:
+            print("  The advisory finding(s) above are a configuration gap, not a verdict.")
+            print("  Nothing refuses to answer because of them, and the assessed level is")
+            print("  a human's to change. engine/status.py says which dispositions the")
+            print("  gap puts out of reach.")
+        return 0 if not blocking else 1
 
     if argv and argv[0] == "--explain":
         if len(argv) < 3:
