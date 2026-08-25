@@ -246,6 +246,39 @@ def main():
     # test the plumbing far more than the rule.
     print("\nA covers block can name where its uncovered half went (issue 171)\n")
 
+    # Every covers block on disk is a DECISION about its own remainder, and the
+    # decision has to be legible. `split_to` records where work WENT; a bar whose
+    # remainder was DEFERRED -- pending evidence, or pending another run
+    # finishing -- has not split anything, and naming its blocker there would
+    # make discharge mean "the thing I waited for happened" rather than "the work
+    # was done elsewhere". Using the field as a dependency tracker would turn
+    # every blocker into a discharge (issue 171).
+    bars = sorted(Path(ROOT / ".repo-governor" / "acceptance").glob("*.json"))
+    undecided, malformed = [], []
+    for b in bars:
+        try:
+            d = json.loads(b.read_text())
+        except Exception:
+            continue
+        c = d.get("covers")
+        if not c:
+            continue
+        st = c.get("split_to")
+        if not (st or c.get("split_note")):
+            undecided.append(b.stem)
+        for i in (st or []):
+            if not (isinstance(i, str) and i.isdigit()):
+                malformed.append((b.stem, i))
+    fails += check("every covers block either splits or says why it does not",
+                   not undecided,
+                   f"{undecided} declare uncovered scope with neither a split_to nor a "
+                   "split_note; an absence with no reason is indistinguishable from an "
+                   "oversight, which is the state `covers` was built to replace")
+    fails += check("every split_to entry is a well-formed authority id",
+                   not malformed,
+                   f"{malformed} — a typo'd id names an authority that never completes, so "
+                   "the parent can never discharge and nothing says why")
+
     real_eval = C.evaluate
 
     def stub(decisions):

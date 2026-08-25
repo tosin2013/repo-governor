@@ -41,6 +41,14 @@ of reading the sentence beside them. Every one `STOP_COMPLETE` → the item may
 complete, recorded as **`BAR_COVERS_PART_DISCHARGED`**. Any one outstanding →
 `CONTINUE`, *naming which*, so a reader knows where to go.
 
+**`split_to` records where work WENT, never what it waits ON.** That distinction
+is load-bearing: a bar whose remainder was *deferred* — pending evidence, or
+pending another run finishing — has not split anything, and naming its blocker
+would make discharge mean "the thing I was waiting for happened" rather than
+"the work was done somewhere else". Two bars in this repository carry no
+`split_to` for exactly that reason and say so in `split_note`; using the field
+as a dependency tracker would quietly turn every blocker into a discharge.
+
 The refusal survives: a bar still cannot complete by deleting `covers`, and an
 empty `split_to` is that with extra steps — `all([])` is `True`, so it is
 rejected explicitly. A cycle and an over-deep chain are both refusals rather
