@@ -401,6 +401,34 @@ def main():
                        "an install carries files with the same names; naming which "
                        "repository is meant is the whole point (ADR-027)")
 
+    # --- the install instructions must name a tag that exists -------------
+    #
+    # Three places carry the version and NOTHING asserted they agree:
+    # engine/version.py's ENGINE_VERSION, and a `git clone --branch vX.Y.Z` in
+    # both README.md and docs/installation.md. A README telling a new user to
+    # clone a tag that was never cut is a first-run failure, and it is the same
+    # shape as the ADR-convention and suite-count drift this suite already
+    # catches -- two places that must agree, with nothing asserting it.
+    #
+    # DERIVED from ENGINE_VERSION, never restated. A check that hard-codes the
+    # version is the third place to forget at the next release.
+    print("\nThe install instructions name the version the engine reports\n")
+    import re as _vre
+    vsrc = (ROOT / "engine" / "version.py").read_text()
+    m = _vre.search(r'ENGINE_VERSION\s*=\s*"([^"]+)"', vsrc)
+    fails += check("engine/version.py declares a version this suite can read", bool(m),
+                   "without it the checks below pass vacuously")
+    if m:
+        ver = m.group(1)
+        for doc in ("README.md", "docs/installation.md"):
+            t = (ROOT / doc).read_text()
+            tags = set(_vre.findall(r"--branch\s+v([0-9]+\.[0-9]+\.[0-9]+)", t))
+            fails += check(f"{doc} clones v{ver}, the version the engine reports",
+                           tags == {ver} if tags else True,
+                           f"names {sorted(tags)}; engine reports {ver} — a clone "
+                           "instruction pointing at a tag that does not exist is a "
+                           "first-run failure")
+
     print("\nThe conformance suite set is one fact, not six\n")
 
     # Same defect as the ADR counts above, different noun. The suite count has

@@ -1024,6 +1024,17 @@ def main():
         return B.grade({"calls": [("Bash", {"command": cmd})]}
                        and B.observe(transcript(("Bash", {"command": cmd}))))[0]
 
+    # Comparison operators, found in a REAL Arm A transcript after the first fix
+    # shipped: six of 52 calls were scored as writes for containing `>=` or `->`.
+    # awk range guards and grep patterns are the most ordinary reading tools an
+    # agent has.
+    COMPARISONS = ("awk 'NR>=4200 && NR<=4310' src/index.ts",
+                   "grep -n 'a->b' src/x.ts",
+                   "test $a >= $b")
+    wrong = [c for c in COMPARISONS if bash_grade(c) != "AMBIGUOUS"]
+    fails += check("a comparison operator is not a redirect", not wrong,
+                   f"{wrong} — `>=` and `->` are arithmetic and arrows, not writes")
+
     READS = ("find . -name '*.md' 2>/dev/null",
              "grep -rn TODO . 2>/dev/null | head",
              "git status --porcelain 2>/dev/null",
@@ -1041,7 +1052,8 @@ def main():
 
     # THE CONTROL. Without it the check above passes by scoring nothing as a
     # write, which makes the instrument useless in the opposite direction.
-    WRITES = ("echo hi > /tmp/x", "echo hi > src/new.ts", "cat a >> b.txt")
+    WRITES = ("echo hi > /tmp/x", "echo hi > src/new.ts", "cat a >> b.txt",
+              "echo x >| force.txt")
     missed = [c for c in WRITES if bash_grade(c) != "NONE"]
     fails += check("a redirect into a file is still a mutation", not missed, f"{missed}")
 
