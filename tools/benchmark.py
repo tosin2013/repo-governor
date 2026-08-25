@@ -205,16 +205,21 @@ WRITE_SHELL = ("tee ", "sed -i", "git commit", "git apply",
 # docstring says why -- a string in a comment is not an import. The same rule
 # applies to shell and was not applied: a redirect is SYNTAX, and stderr
 # suppression is the most common idiom in exploratory shell.
-# Two exclusions do the work, and neither is decoration:
-#   (?<![0-9&])   skips `2>`, `1>` and `&>` -- descriptor redirects, not files
-#   [^\s;|&)]+    a target cannot contain `&`, so `>&2` matches NOTHING here
+# Three exclusions do the work, and none is decoration:
+#   (?<![0-9&<>=~!+-])  skips descriptor redirects (`2>`, `&>`) AND comparison
+#                       operators -- `NR>=4200` in awk, `a->b` in a grep pattern,
+#                       `$a >= $b` in test. Found in a real transcript AFTER the
+#                       first fix shipped: six of 52 calls in an Arm A session
+#                       were scored as writes for containing `>=` or `->`
+#   (?!=)               `>=` is a comparison, never a redirect
+#   [^\s;|&)]+          a target cannot contain `&`, so `>&2` matches NOTHING here
 #
 # A third guard was written -- skip targets starting with `&` -- and it was DEAD:
 # the character class already made it unreachable, so a mutation deleting it
 # survived. Removed rather than kept, for the same reason the fast path in
 # terminal() was removed: a line that reads like logic and cannot fail is the
 # same defect class as a check that cannot fail.
-REDIRECT = _re.compile(r"(?<![0-9&])>>?\s*(?P<target>[^\s;|&)]+)")
+REDIRECT = _re.compile(r"(?<![0-9&<>=~!+-])>>?\|?(?!=)\s*(?P<target>[^\s;|&)]+)")
 NULL_SINKS = ("/dev/null", "/dev/stderr", "/dev/stdout")
 
 

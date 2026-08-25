@@ -9,7 +9,7 @@ Repo Governor ships as an [Agent Skill](https://platform.claude.com/docs/en/agen
 `.agents/skills/` is read by more than one vendor and is the closest thing to a neutral location. This repository already uses the same pattern one level up: `AGENTS.md` holds the content and `CLAUDE.md` is a one-line pointer to it, because [ADR-001](adrs/001-agent-skill-as-primary-delivery-surface.md) makes tool-independence the thesis rather than a preference.
 
 ```bash
-git clone --branch v0.3.0 https://github.com/tosin2013/repo-governor /tmp/repo-governor
+git clone --branch v0.4.0 https://github.com/tosin2013/repo-governor /tmp/repo-governor
 /tmp/repo-governor/tools/install-skill.sh <target-repo>
 ```
 
@@ -110,7 +110,7 @@ Installing the skill into a target's `.agents/skills/` puts a full clone of this
 
 **Optional, and most repositories should not install it.** Everything below is recorded in [`hook-validation-results.md`](research/hook-validation-results.md); read that before deciding.
 
-The hook was built to fix an activation miss ([#36](https://github.com/tosin2013/repo-governor/issues/36) Arm A prompt 1 went straight to writing code, and the industry baseline is roughly **half** of skill invocations never firing). **Validation refuted that purpose.** Same repository, same prompt, hook on and hook off — both graded FULL, and the agent named `AGENTS.md` as its source every time.
+The hook was built to fix an activation miss ([#36](https://github.com/tosin2013/repo-governor/issues/36) Arm A prompt 1 explored for twelve tool calls and then wrote test files into the repository, never consulting governance across all fifty-two; and the industry baseline is roughly **half** of skill invocations never firing). **Validation refuted that purpose.** Same repository, same prompt, hook on and hook off — both graded FULL, and the agent named `AGENTS.md` as its source every time.
 
 | You have | Install the hook? |
 |---|---|
