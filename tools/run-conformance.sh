@@ -40,13 +40,19 @@ cd "$ROOT" || exit 1
 # (conformance/bindings.py does exactly that), so scrubbing here hides nothing.
 unset REPO_GOVERNOR_TARGET REPO_GOVERNOR_SUBJECT REPO_GOVERNOR_BINDING
 
+# `install` is LIVE for a different reason than `hooks`: it asks a REMOTE
+# whether the tag the README tells people to clone actually exists. That is a
+# claim about the outside world, and a suite comparing two files in this
+# repository can only ever prove they agree with each other -- which they did,
+# perfectly, while both were wrong, during the v0.4.0 release (issue 178).
+#
 # `hooks` is last and deliberately separate: it runs engine/completion.py
 # against the LIVE repository (conformance/hooks.py:163), so its verdict
 # depends on issue 36's current milestone and assignee. Someone moving a card
 # on the board would turn it red with no code change, which is why --hermetic
 # exists and why CI runs it as a non-blocking job.
 HERMETIC=(layer1 layer2 transport manifest onboarding vocabulary bindings skill envelope execution imports status acceptance coverage benchmark union)
-LIVE=(hooks)
+LIVE=(hooks install)
 
 case "${1:-}" in
   --hermetic) SUITES=("${HERMETIC[@]}"); shift ;;

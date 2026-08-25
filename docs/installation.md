@@ -84,7 +84,7 @@ The engine is Python stdlib only ([ADR-011](adrs/011-python-stdlib-only-engine-w
 |---|---|---|
 | `python3` **3.11+** | the engine ([ADR-011](adrs/011-python-stdlib-only-engine-with-language-agnostic-adapters.md) declares the floor) | nothing works |
 | `git` | provider resolution, target detection | nothing works |
-| `dolt` | `decision_history` via `adapters/dolt-decisions` | **4 of 17 conformance suites fail** |
+| `dolt` | `decision_history` via `adapters/dolt-decisions` | **4 of 18 conformance suites fail** |
 | `gh`, authenticated | the GitHub roadmap provider | live GitHub queries fail; offline suites are unaffected |
 
 **`dolt` is the one that misleads.** Without it, `layer1`, `layer2`, `bindings` and `execution` all fail — including the portability thesis test, which reports `NOT EQUIVALENT`. That reads like a real result and is not one. The suites print a preflight line naming the missing binary, and `tools/bootstrap-decisions.sh` refuses before you reach them, but never report a red verdict from a box without `dolt`.
@@ -94,7 +94,7 @@ The engine is Python stdlib only ([ADR-011](adrs/011-python-stdlib-only-engine-w
 ./tools/run-conformance.sh
 ```
 
-Expect 17/17 from a fresh clone.
+Expect 18/18 from a fresh clone.
 
 ## Governing a repository other than this one
 
