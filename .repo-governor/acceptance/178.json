@@ -1,0 +1,36 @@
+{
+  "$comment": "Acceptance criteria for issue 178. PR 177 added a check that the install docs name the version engine/version.py reports. It cannot see the failure it was written to prevent. OBSERVED, NOT HYPOTHESISED, during the v0.4.0 release: between the version bump merging and the draft being published, main told a new user to `git clone --branch v0.4.0` a tag that did not exist, and the check was GREEN throughout -- README.md and ENGINE_VERSION agreed perfectly and both were wrong. INTERNAL CONSISTENCY IS NOT CORRECTNESS. A check comparing two files I control can only ever prove the first. That is the sixth finding this week with one shape: a method that could not have produced the answer it gave. THE NO-NETWORK CASE IS A CRITERION, NOT A COMMENT, and it is the part most likely to be got wrong. A suite that passes because it COULD NOT CHECK is the vacuous-green shape this repository has shipped repeatedly; conformance/layer1.py's _preflight reports a missing binary rather than skipping quietly, and this follows it. No network means the assertion is UNRESOLVED and the suite is non-conformant -- never satisfied. IT LIVES IN THE LIVE SET, beside hooks, because a claim about a remote is not hermetic. That means it does NOT run in the hermetic CI job, which is stated rather than implied. TWO THINGS WENT WRONG WHILE BUILDING THIS AND BOTH ARE RECORDED. (1) A FORK BOMB, 466 PROCESSES. The offline path is exercised by SPAWNING the suite against an unreachable remote. My mutation harness restored every mutation from one shared /tmp path, so a nested invocation overwrote the backup and a mutation survived into the working file -- a hardcoded REMOTE alongside the self-spawn, so every child ignored the override, reached the probe, and spawned again. The suite now carries a STRUCTURAL guard: a spawned child never spawns. Same reasoning as the cycle check in completion.py's split_to resolution -- anything that can call itself needs a reason it must stop, and 'the code is right' is not one. Every mutation now uses its own mktemp backup and the revert is verified before the next runs. (2) A STRAY MUTATION SHIPPED INTO THE WORKING FILE from the same shared-backup defect: `return set()` where `return None` belonged, which made an unreachable remote read as a remote with no tags -- precisely the absence-versus-unknown conflation this suite's docstring cites ADR-003 rule 6 about. Caught because the child printed 'The remote has 0 tag(s)' instead of failing to reach it. THE CHILD GUARD SURVIVES MUTATION AND STAYS. Removing it changes nothing while the file is correct, because a child returns early at the offline branch. That is NOT the dead code removed from terminal() and from the redirect rule: those were unreachable given any input. This one is reachable exactly when something else is wrong, and its job is bounding blast radius. It was demonstrated directly instead -- run with REPO_GOVERNOR_INSTALL_CHILD=1 the suite skips the probe and spawns nothing.",
+  "authority_id": "178",
+  "criteria": [
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/install.py | grep -q \"\\[PASS\\] every branch named in the install docs resolves on the remote\"'",
+      "$comment": "C1 THE CLAIM THE HERMETIC CHECK CANNOT MAKE. Red at declaration: the suite does not exist. It asks the REMOTE, not another file in this repository."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/install.py | grep -q \"\\[PASS\\] a tag that does not exist is reported, not passed over\"'",
+      "$comment": "C2 THE CONTROL. Driven against a deliberately absent tag. Without it C1 passes by asserting nothing -- and asserting nothing is exactly what the check being replaced did."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/install.py | grep -q \"\\[PASS\\] no network is UNRESOLVED, never satisfied\"'",
+      "$comment": "C3 THE PART MOST LIKELY TO BE GOT WRONG. A suite green because it could not reach the remote reports safety it never established (ADR-007). _preflight is the precedent: name what is missing and fail, rather than skip."
+    },
+    {
+      "$comment": "C4 the new suite is wired into the runner's LIVE array and nowhere else. conformance/skill.py already asserts the runner names every suite on disk, so a suite added and never run would redden that instead.",
+      "check": "command_exit",
+      "target": "bash -c 'grep -qE \"^LIVE=\\\\(.*install.*\\\\)\" tools/run-conformance.sh && ! grep -qE \"^HERMETIC=\\\\(.*install\" tools/run-conformance.sh'"
+    },
+    {
+      "$comment": "C5 the hermetic set is unchanged and still passes; this adds a claim rather than moving one.",
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh --hermetic"
+    },
+    {
+      "$comment": "C6 the new suite runs and is conformant here, where there is a network.",
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh install"
+    }
+  ]
+}
