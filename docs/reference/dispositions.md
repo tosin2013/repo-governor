@@ -1,7 +1,7 @@
 # Governance Dispositions
 
 > Extracted from PRD v0.2 §41–§42 on 2026-08-17. Original section numbering preserved.
-> **Normative.** ADR-007 closes this vocabulary at nineteen values, engine-owned. Profiles select which are *reachable*; they cannot define new ones. Providers never emit dispositions.
+> **Normative.** ADR-007 closes this vocabulary, engine-owned: **twelve governance dispositions and eight onboarding dispositions**, which are separate alphabets and are not interchangeable. Profiles select which are *reachable*; they cannot define new ones. Providers never emit dispositions.
 
 ---
 

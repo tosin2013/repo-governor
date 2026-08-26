@@ -12,7 +12,7 @@ The ADRs in [`../adrs/`](../adrs/) are the *decisions*. These files are the *spe
 | --- | --- | --- |
 | [invariants.md](invariants.md) | §5–§6 — INV-001 … INV-014 | ✅ Yes |
 | [product-scope.md](product-scope.md) | §1–§4, §7–§9, §66–§70 — definition, problem, thesis, goals, non-goals, positioning, ownership | Partly — §8 non-goals are binding |
-| [provider-roles.md](provider-roles.md) | §10–§17, §45–§50 — the seven roles and their conformance minimums | ✅ Yes |
+| [provider-roles.md](provider-roles.md) | §10–§17, §45–§50 — the eight roles and their conformance minimums | ✅ Yes |
 | [onboarding.md](onboarding.md) | §18–§22, §57–§61 — onboarding, detection, conflict, manifest, permissions, simulation, gate | ✅ Yes |
 | [repository-conditions.md](repository-conditions.md) | §23–§29 — L0–L4, profiles, architecture budget | ✅ Yes |
 | [domain-model.md](domain-model.md) | §30–§32, §43–§44, §52 — objects, ScopeEnvelope, discovery, output contract, observability | ✅ Yes |
@@ -27,7 +27,7 @@ The ADRs in [`../adrs/`](../adrs/) are the *decisions*. These files are the *spe
 | §1–§4 | Summary, definition, problem, thesis | product-scope.md |
 | §5–§6 | Principle, INV-001 … INV-014 | **invariants.md** |
 | §7–§9 | Goals, non-goals, architecture | product-scope.md |
-| §10–§17 | Provider model and the seven roles | provider-roles.md |
+| §10–§17 | Provider model and the eight roles | provider-roles.md |
 | §18–§22 | Onboarding, detection, conflict, manifest, permissions | onboarding.md |
 | §23–§29 | Repository conditions L0–L4, architecture budget | repository-conditions.md |
 | §30–§32 | Domain objects, ScopeEnvelope, discovery model | domain-model.md |

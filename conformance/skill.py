@@ -429,6 +429,113 @@ def main():
                            "instruction pointing at a tag that does not exist is a "
                            "first-run failure")
 
+    # --- issue 187: counts in the tiers nothing recounted ---------------------
+    #
+    # The count checks above cover six named files. docs/reference/, references/
+    # and docs/workflows/ were outside all of them, and two claims in that zone
+    # were wrong: "the seven roles" in the section map that resolves 640+ §NN
+    # citations, and "nineteen values" for a vocabulary of 12 + 8.
+    #
+    # THE HARD PART IS NOT FINDING NUMBERS, IT IS NOT FLAGGING HISTORY.
+    # docs/reference/criteria.md:146 says "seven" and is CORRECT -- it is an
+    # amendment note recording what the set was before ADR-017 added an eighth
+    # role. A check that greps number words and compares them to the code
+    # demands that history be rewritten to match the present.
+    #
+    # That is this repository's oldest defect wearing a new hat: imports.py
+    # refusing to grep source for imports because a string in a comment is not
+    # an import; SUPERSEDED_RE matching prose ABOUT supersession. Text about a
+    # fact is not the fact.
+    #
+    # So the rule is NOUN ADJACENCY: only a number bound directly to a noun the
+    # engine can count is checked. "eight roles" is a claim; "this minimum set
+    # is seven" is prose about a claim, and is left alone. Anything ambiguous
+    # goes unchecked rather than being flagged -- unchecked is not wrong, and a
+    # check that fails on correct history teaches people to weaken it.
+    print("\nCounts in the reference tiers agree with the engine\n")
+
+    # Loaded BY PATH, not by name. `import manifest` resolves to
+    # conformance/manifest.py -- the suite, not the engine -- because
+    # conformance/ is first on sys.path. It failed loudly here; the same
+    # collision silently rebound a name in two suites once (issue 67).
+    import importlib.util as _ilu  # noqa: PLC0415
+    _spec = _ilu.spec_from_file_location("_engine_manifest", ROOT / "engine" / "manifest.py")
+    _MF = _ilu.module_from_spec(_spec)
+    _sys_path_added = str(ROOT / "engine")
+    if _sys_path_added not in sys.path:
+        sys.path.insert(0, _sys_path_added)
+    _spec.loader.exec_module(_MF)
+    NUMWORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+                "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11,
+                "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15,
+                "sixteen": 16, "seventeen": 17, "eighteen": 18, "nineteen": 19,
+                "twenty": 20}
+    # Only nouns the ENGINE can count. Deliberately excludes "categories" and
+    # "values": both appear in immutable ADR history, and a rule that relies on
+    # a path exclusion to avoid flagging them is one refactor from breaking.
+    COUNTABLE = {
+        "roles": len(_MF.SCALAR_ROLES) + len(_MF.ARRAY_ROLES),
+        "invariants": len(set(re.findall(
+            r"INV-0\d\d", (ROOT / "docs" / "reference" / "invariants.md").read_text()))),
+    }
+    CLAIM = re.compile(r"\*{0,2}(" + "|".join(NUMWORDS) + r")\*{0,2}\s+("
+                        + "|".join(COUNTABLE) + r")\b", re.I)
+
+    TIERS = ("docs/reference/*.md", "references/*.md", "docs/workflows/*.md")
+    by_tier = {g: sorted(ROOT.glob(g)) for g in TIERS}
+    tiers = sorted(f for fs in by_tier.values() for f in fs)
+    # EACH tier, not the total. A single broken glob still left 16 of 26 files,
+    # which cleared a >= 15 threshold and hid the breakage.
+    empty = [g for g, fs in by_tier.items() if len(fs) < 3]
+    fails += check(f"every reference tier was actually scanned ({len(tiers)} files)",
+                   not empty,
+                   f"matched almost nothing: {empty} -- a glob that finds no files "
+                   "passes every check below vacuously")
+
+    def bad_claims(text, where):
+        """(mismatches, claims_seen) for one blob. ONE comparator, two callers.
+
+        The control below feeds this the same function the file scan uses. An
+        earlier version re-implemented the comparison inline, so a mutation
+        disabling the real loop left the control passing -- a control that tests
+        a COPY of the logic tests nothing about the logic.
+        """
+        bad, n = [], 0
+        for i, line in enumerate(text.splitlines(), 1):
+            for m in CLAIM.finditer(line):
+                n += 1
+                got, noun = NUMWORDS[m.group(1).lower()], m.group(2).lower()
+                if got != COUNTABLE[noun]:
+                    bad.append(f"{where}:{i} says {got} {noun}, "
+                               f"engine says {COUNTABLE[noun]}")
+        return bad, n
+
+    wrong, seen = [], 0
+    for f in tiers:
+        b, n = bad_claims(f.read_text(), f.relative_to(ROOT))
+        wrong += b
+        seen += n
+    fails += check(f"every bound count in the reference tiers is right ({seen} claim(s))",
+                   not wrong, "; ".join(wrong))
+    # Without this the check above passes by matching nothing -- and the zone is
+    # consistent today, so a broken matcher and a working one look identical.
+    fails += check("and the matcher found claims to check", seen >= 3,
+                   f"only {seen} bound count(s) matched; the pattern has probably stopped "
+                   "matching rather than the claims having gone away")
+
+    # POSITIVE CONTROL. Every real claim in this zone is correct today, so a
+    # comparator that never reports a mismatch looks exactly like one that
+    # works -- a mutation disabling the comparison survived until this existed.
+    # Feed it a claim that is known wrong and require it to say so.
+    probe_n = COUNTABLE["roles"] + 1
+    probe_word = [w for w, v in NUMWORDS.items() if v == probe_n]
+    caught, _ = bad_claims(f"the {probe_word[0]} roles this repository does not have",
+                           "<control>") if probe_word else ([], 0)
+    fails += check("control: a deliberately wrong claim IS reported",
+                   bool(caught),
+                   f"a synthetic '{probe_n} roles' claim was not flagged, so the "
+                   "comparison above proves nothing about the real files")
+
     print("\nThe conformance suite set is one fact, not six\n")
 
     # Same defect as the ADR counts above, different noun. The suite count has
