@@ -1,0 +1,45 @@
+{
+  "$comment": "Acceptance criteria for issue 187. conformance/skill.py recounted ADRs, adapters and suites over six named files; docs/reference/, references/ and docs/workflows/ were outside every count check. Two claims there were wrong and neither was found by a suite: 'the seven roles' at docs/reference/README.md:15 and :30 -- the section map that resolves 640+ section citations and is linked from 24 files -- and 'nineteen values' at docs/reference/dispositions.md:4 for a vocabulary of 12 + 8. THE FIXES WERE MADE BEFORE THIS BAR WAS DECLARED, which is not the usual order and is recorded rather than hidden. Redness was demonstrated afterwards by restoring the exact pre-fix text: the new check reports 'docs/reference/README.md:30 says 7 roles, engine says 8'. THE HARD PART IS NOT FINDING NUMBERS, IT IS NOT FLAGGING HISTORY. docs/reference/criteria.md:146 says 'seven' and is CORRECT -- an amendment note recording what the set was before ADR-017 added an eighth role. docs/adrs/003 says it too, in Context, about PRD v0.2. A check that greps number words and compares them to the code demands history be rewritten, and in the ADR's case demands editing an immutable document. That is this repository's oldest defect in a new hat -- imports.py refusing to grep source for imports, SUPERSEDED_RE matching prose ABOUT supersession. Text about a fact is not the fact. So the rule is NOUN ADJACENCY: only a number bound directly to a noun the engine can count is checked. Verified: it catches 'seven roles' and matches neither correct-history case. Ambiguous prose goes UNCHECKED rather than flagged -- unchecked is not wrong, and a check that fails on correct history teaches people to weaken it. TWO OF MY OWN CHECKS WERE VACUOUS AND MUTATION FOUND BOTH. A single broken glob still left 16 of 26 files, clearing a >= 15 threshold -- each tier is now checked separately. And the positive control re-implemented the comparison inline, so disabling the real loop left the control passing; a control that tests a COPY of the logic tests nothing about the logic. There is now one comparator, `bad_claims`, and both callers use it.",
+  "authority_id": "187",
+  "criteria": [
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/skill.py | grep -q \"\\[PASS\\] every bound count in the reference tiers is right\"'",
+      "$comment": "C1 THE DEFECT. Demonstrated red by restoring the pre-fix text: 'says 7 roles, engine says 8'."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/skill.py | grep -q \"\\[PASS\\] control: a deliberately wrong claim IS reported\"'",
+      "$comment": "C2 THE CONTROL, and the one that took two attempts. Every real claim in the zone is correct today, so a comparator that never reports a mismatch is indistinguishable from one that works. It must run the SAME comparator the file scan runs."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/skill.py | grep -q \"\\[PASS\\] every reference tier was actually scanned\"'",
+      "$comment": "C3 A GLOB THAT MATCHES NOTHING passes everything below it vacuously. Checked per tier, because one broken glob left enough files to clear a total threshold."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/skill.py | grep -q \"\\[PASS\\] and the matcher found claims to check\"'",
+      "$comment": "C4 THE PATTERN STILL MATCHES. skill.py:161-166 already treats 'found 0 count claims' as a failure; the same reasoning applies here."
+    },
+    {
+      "$comment": "C5 THE HISTORY IS NOT FLAGGED. criteria.md:146 says 'seven' correctly, as an amendment note. A check that fails on it is worse than no check.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/skill.py 2>&1 | grep -q \"criteria.md\" && exit 1 || exit 0'"
+    },
+    {
+      "$comment": "C6 the corrected documents agree with the engine, not with each other.",
+      "check": "command_exit",
+      "target": "bash -c '! grep -rqn \"seven roles\" docs/reference references && ! grep -rqn \"nineteen values\" docs/reference references'"
+    },
+    {
+      "$comment": "C7 the agent-surface suite entire.",
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh skill"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh --hermetic"
+    }
+  ]
+}

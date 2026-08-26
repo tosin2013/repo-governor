@@ -1,8 +1,20 @@
 name: conformance (live)
 
-# conformance/hooks.py is the one suite that is not hermetic: line 163 runs
-# engine/completion.py against the LIVE board, so its verdict depends on an
-# issue's current milestone and assignee -- facts that change with no commit.
+# TWO suites are not hermetic, and they go red for unlike reasons.
+#
+#   hooks    line 163 runs engine/completion.py against the LIVE BOARD, so its
+#            verdict depends on an issue's current milestone and assignee --
+#            facts that change with no commit. Nobody fixes this; it self-heals
+#            when the board moves back, or it is a real regression.
+#
+#   install  asks the REMOTE whether the tag the README tells people to clone
+#            actually exists (issue 178). It goes red for the WINDOW between a
+#            version bump merging and the tag being cut, and a HUMAN closes it
+#            by tagging. It is not noise and it does not self-heal.
+#
+# Reading one as the other is the trap. A job named only for `hooks` reporting
+# `FAILED: install` teaches whoever sees it that live red means "someone moved a
+# card" -- which is how a check stops being read.
 #
 # It is deliberately NOT a `continue-on-error` job inside conformance.yml. A
 # continue-on-error job reports SUCCESS to the checks API; its failure shows
@@ -26,36 +38,40 @@ permissions:
   issues: read
 
 jobs:
-  hooks:
-    name: hooks (live board)
+  live:
+    name: live (board and remote)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           # hooks.py runs tools/install-skill.sh into temp repos several times,
-          # and that clones this checkout.
+          # and that clones this checkout. install.py needs the tags.
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: hooks conformance
+      - name: live conformance (hooks, install)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./tools/run-conformance.sh --live
-      - name: Say which half broke
+      - name: Say which suite broke
         if: failure()
         run: |
           {
-            echo "### hooks.py is red"
+            echo "### a live suite is red"
             echo
-            echo "Two very different causes, and the distinction matters:"
+            echo "Three very different causes, and the distinction matters:"
             echo
-            echo "- **Board state.** The capture check runs the engine against a live"
-            echo "  issue. If that issue's milestone or assignee moved, this is not a"
-            echo "  code defect and no commit caused it."
-            echo "- **The installer half.** Everything below the capture block is"
+            echo "- **\`install\` — the README names a tag that does not exist yet.**"
+            echo "  Expected between a version bump merging and the release being cut."
+            echo "  A HUMAN closes it by tagging; it will not self-heal. If no release"
+            echo "  is in flight, the install docs are wrong and that IS a defect."
+            echo "- **Board state.** hooks runs the engine against a live issue. If that"
+            echo "  issue's milestone or assignee moved, this is not a code defect and"
+            echo "  no commit caused it."
+            echo "- **The installer half.** Everything below hooks.py's capture block is"
             echo "  hermetic -- it drives tools/install-skill.sh into temp repositories"
             echo "  and pins the host templates. A failure there IS a code defect."
             echo
-            echo "Open the step log and read which check failed before concluding either."
+            echo "Open the step log and read WHICH SUITE failed before concluding any."
           } >> "$GITHUB_STEP_SUMMARY"
