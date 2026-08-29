@@ -1,0 +1,44 @@
+{
+  "$comment": "Acceptance criteria for issue 191. Most of what a Copilot cloud-agent install needs already exists: .agents/skills is install-skill.sh:28's default and one of the three paths Copilot reads; SKILL.md carries exactly the required frontmatter, name (lowercase-hyphen) and description, and nothing else; ADR-011's zero dependencies mean Python 3 in the runner has nothing to install; gh and a token are already in the environment so admission='milestone' needs no configuration. What is missing is documentation and two declared decisions. THIS BAR COVERS THE MECHANISM AND NOT THE EVIDENCE, and says so in 'covers' rather than in prose -- two earlier bars recorded their scope in a comment and both read STOP_COMPLETE for work that was half undone (issue 133). Copilot chooses skills 'based on your prompt and the skill's description', the same pull-based description-matched mechanism as Claude Code, where Arm A stands at 0 FULL / 1 PARTIAL / 2 NONE / 1 AMBIGUOUS over four prompts. Nothing in this issue improves that number and nothing here should claim to. THE DECISION THAT MUST NOT DRIFT: allowed-tools ships UNSET. GitHub's own documentation warns it removes the confirmation step, and a skill that runs shell without asking is a posture the installing repository declares, not one this project assumes on its behalf. C1 is a check that it stays unset -- the easiest thing in this issue to 'helpfully' add later.",
+  "authority_id": "191",
+  "covers": {
+    "declared": "the mechanism -- a documented, opt-in install path for the Copilot cloud agent, with allowed-tools left unset and no hook installed automatically",
+    "uncovered": "whether the skill activates on that host. Copilot's discovery is description-matched, identical in kind to the mechanism issue 5 measures, and no arm of docs/research/activation-protocol.md has been run against Copilot. Documenting an install path is not evidence that governance reaches the model.",
+    "split_note": "NO split_to. The activation arm was not split out of this work -- it is the same shape as issues 36 and 37 and belongs with them under RG-VALIDATION, gated on access to the host rather than on anything here."
+  },
+  "criteria": [
+    {
+      "$comment": "C1 THE DECISION THAT MUST HOLD. allowed-tools stays out of SKILL.md's frontmatter. Green today and it must stay green -- this is a control against a future convenience, not a defect to fix.",
+      "check": "command_exit",
+      "target": "python3 -c \"import sys,pathlib;t=pathlib.Path('SKILL.md').read_text().split('---')[1];sys.exit(1 if 'allowed-tools' in t else 0)\""
+    },
+    {
+      "$comment": "C2 the host table names the Copilot cloud agent and the paths it reads, so a reader is not left to infer it from .agents/skills being cross-vendor.",
+      "check": "command_exit",
+      "target": "bash -c 'grep -qi \"copilot\" docs/installation.md && grep -q \"\\.github/skills\" docs/installation.md'"
+    },
+    {
+      "$comment": "C3 the allowed-tools line is DOCUMENTED with its argument and its risk, not merely omitted. An undocumented omission is indistinguishable from an oversight, and the next person adds it.",
+      "check": "command_exit",
+      "target": "bash -c 'grep -q \"allowed-tools\" docs/installation.md'"
+    },
+    {
+      "$comment": "C4 nothing installs automatically. The installer must not offer or write a hook for the cloud agent, which has no prompt-submit surface of its own -- and must say so, the way it already does for Codex.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/install.py | grep -q \"\\[PASS\\].*no hook is offered for the cloud agent\"'"
+    },
+    {
+      "$comment": "C5 THE CLAIM THIS MUST NOT MAKE. No document may report an activation result for Copilot, because none has been run. conformance/skill.py already fails an unmarked claim of this shape; this criterion states it for the host.",
+      "check": "command_exit",
+      "target": "bash -c '! grep -rniE \"copilot.*(verified|activation rate|FULL activation)\" docs/ README.md'"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh skill install"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh --hermetic"
+    }
+  ]
+}

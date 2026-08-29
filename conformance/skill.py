@@ -543,11 +543,18 @@ def main():
     # 12. A count is a DERIVABLE fact, and a derivable fact restated in prose
     # is duplicated state that eventually disagrees.
     #
-    # Three sources must agree, not two. Checking the filesystem against prose
+    # Four sources must agree, not two. Checking the filesystem against prose
     # alone would go vacuous the moment the pasted loops are replaced by a call
     # to tools/run-conformance.sh -- the runner deletes the very enumeration
     # the check inspects. So the RUNNER's own arrays are the third source, and
     # they are what catches a new suite file nobody wired in.
+    #
+    # The fourth is the LIVE WORKFLOW, which names its suites in its own step
+    # title. Added after adding `roadmap` to LIVE left that title reading
+    # "(hooks, install)" -- a job whose name lies about what it ran, which is
+    # the failure the workflow's own header comment warns about: "a job named
+    # only for `hooks` reporting `FAILED: install` teaches whoever sees it that
+    # live red means someone moved a card".
     truth = {f.stem for f in sorted((ROOT / "conformance").glob("[a-z]*.py"))
              if "sys.exit(main(" in f.read_text(encoding="utf-8")}
 
@@ -571,6 +578,23 @@ def main():
                        f"runner-only={sorted(declared - truth)} "
                        f"disk-only={sorted(truth - declared)} -- a suite the runner "
                        "does not name never runs, and nothing else would notice")
+
+    # The live workflow's step title is the fourth source. It is prose about a
+    # set the runner owns, so it drifts the moment LIVE changes.
+    wf = ROOT / ".github" / "workflows" / "conformance-live.yml"
+    if runner.is_file() and wf.is_file():
+        live = set()
+        m = re.search(r"^LIVE=\(([^)]*)\)", rsrc, re.M)
+        if m:
+            live = set(m.group(1).split())
+        wsrc = wf.read_text(encoding="utf-8")
+        title = re.search(r"name:\s*live conformance\s*\(([^)]*)\)", wsrc)
+        named = {t.strip() for t in title.group(1).split(",")} if title else set()
+        fails += check("the live workflow's step names exactly the LIVE suites",
+                       bool(live) and named == live,
+                       f"LIVE={sorted(live)} step-title={sorted(named)} -- a job "
+                       "whose name lies about what it ran is how a live failure "
+                       "gets read as the wrong kind of failure")
 
     # Any loop still pasted into prose is a second source of truth. The runner
     # replaced them; one surviving is drift waiting to happen.

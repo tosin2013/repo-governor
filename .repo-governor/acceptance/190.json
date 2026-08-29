@@ -1,0 +1,34 @@
+{
+  "$comment": "Acceptance criteria for issue 190. GitHub's Copilot cloud agent reads project skills from .github/skills, .claude/skills or .agents/skills. tools/install-skill.sh:193 maps any path containing .github to HOST=vscode, which selects HOST_CFG='.github/hooks/repo-governor.json' -- the VS Code Copilot HOOK surface, unvalidated per issue 49. So a .github/skills install for the CLOUD agent is offered a hook config belonging to a different product. The comment immediately above that case block is the rule it breaks: 'the defect ADR-028 exists for -- an identity guessed from incidental filesystem evidence ... indistinguishable from a hook that does not work, which is the exact confusion this whole surface is built to avoid'. .github/ was unambiguous when the case was written and is not any more: two Copilot products with different delivery mechanisms now share the prefix, and one of them is a skills path rather than a hooks path. Second defect, same file: install-skill.sh:199 rejects 'copilot' as a harness name, so a user naming the host they actually run is refused. THE VACUITY THIS BAR IS BUILT AGAINST: a fixture that only exercises .github/skills. The property is that NO skills-directory argument selects a hook config for a host the user did not name, and a check pinned to one prefix goes green the day a third ambiguous one appears -- so C4 derives its cases from the script's own mapping table rather than restating them.",
+  "authority_id": "190",
+  "criteria": [
+    {
+      "$comment": "C1 THE DEFECT. A .github/skills install must not select the VS Code hook config. Red today.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/install.py | grep -q \"\\[PASS\\].*\\.github/skills.*names no host\"'"
+    },
+    {
+      "$comment": "C2 'copilot' is an accepted harness name and appears in every place the script offers the list -- the error, the prompt and the non-terminal NOTE. Three literals today, and a fix that updates one of them leaves a user reading a list that refuses their answer.",
+      "check": "command_exit",
+      "target": "bash -c '[ \"$(grep -c \"copilot\" tools/install-skill.sh)\" -ge 3 ]'"
+    },
+    {
+      "$comment": "C3 CONTROL -- the unambiguous paths still resolve as before. .claude/skills names Claude Code and .cursor/skills names Cursor; typing one of those IS a declaration and must keep working.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/install.py | grep -q \"\\[PASS\\].*a named host directory still selects its own host\"'"
+    },
+    {
+      "$comment": "C4 THE PROPERTY, not the instance. No skills-directory argument may select a hook config for a host the user did not name; the cases come from the script's mapping so a new ambiguous prefix cannot pass silently.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/install.py | grep -q \"\\[PASS\\].*no skills directory selects a hook for an unnamed host\"'"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh install"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh --hermetic"
+    }
+  ]
+}

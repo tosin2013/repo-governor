@@ -1,0 +1,49 @@
+{
+  "$comment": "Acceptance criteria for issue 181. ADR-006 is Accepted and Ratified 2026-08-17; decision 3 says the floor 'may not be overridden downward' and calls it 'the one place human override is constrained'. engine/onboard.py:227 derives the floor from FLOOR_INDICATORS; engine/manifest.py never re-derives it, so condition.assessed is taken on trust and a hand edit from L4 to L1 turns PROVIDER_UNAVAILABLE/exit 1 into READY_FOR_GOVERNANCE/0 findings with nothing about the repository changed. SEQUENCING SATISFIED: the issue requires 180 to land first, because until an unmet required_role became a finding rather than a failure the hand edit was the only way a floored repository could finish onboarding. 180 is CLOSED, so enforcing the floor no longer costs a user their only escape. THE VACUITY THIS BAR IS BUILT AGAINST is refusing everything: a check that only asserts 'L1 on a floored repository is refused' passes for an implementation that refuses every manifest. C2, C3 and C4 are three separate controls -- the floor level itself accepted, a level ABOVE the floor accepted because ADR-006 decision 1 keeps that discretionary, and an unfloored repository unaffected. THE SECOND-SOURCE TRAP: manifest.py must reuse onboard.py's FLOOR_INDICATORS and its derivation, not copy them. Two places that must agree with nothing asserting it is this repository's most repeated defect (161, 177, 178, 180, 187, 189). C5 asserts the single definition. WHAT THIS BAR CANNOT CHECK: whether the floor thresholds are calibrated at all. Issue 167 measured two-thirds of ordinary repositories floored to HIGH_ASSURANCE, and making the floor real removes the escape hatch from that population. If 167 concludes the rate is wrong, this enforcement is enforcing a miscalibration -- recorded here rather than discovered later.",
+  "authority_id": "181",
+  "covers": {
+    "declared": "enforcement of ADR-006 decision 3 -- a declared level below the derived floor is refused, citing the indicator that raised it",
+    "uncovered": "whether the floor indicators are calibrated. Issue 167 is the measurement; this bar deliberately does not wait on it, because a ratified decision going unenforced is a defect whatever the thresholds turn out to be.",
+    "split_note": "NO split_to. Calibration was not split out of this work -- it is issue 167, filed before this one, and answering it would tell someone whether to change the thresholds rather than complete this enforcement."
+  },
+  "criteria": [
+    {
+      "$comment": "C1 THE DEFECT. A manifest declaring a level below the derived floor is refused, and the refusal names the indicator.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/manifest.py | grep -q \"\\[PASS\\].*below the floor is refused\"'"
+    },
+    {
+      "$comment": "C2 CONTROL 1 -- the floor level itself is accepted. Without this, refusing every manifest satisfies C1.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/manifest.py | grep -q \"\\[PASS\\].*at the floor is accepted\"'"
+    },
+    {
+      "$comment": "C3 CONTROL 2 -- a level ABOVE the floor is accepted. ADR-006 decision 1 keeps that discretionary; this is a floor check, not a recomputation of the assessed level.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/manifest.py | grep -q \"\\[PASS\\].*above the floor is accepted\"'"
+    },
+    {
+      "$comment": "C4 CONTROL 3 -- an UNfloored repository is unaffected at every level. Guards the other direction: an implementation that floors everything to L4 passes C1-C3.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/manifest.py | grep -q \"\\[PASS\\].*no floor indicator\"'"
+    },
+    {
+      "$comment": "C5 ONE DEFINITION. manifest.py must reuse onboard.py's FLOOR_INDICATORS rather than restate the three names, or the two drift and the drift is invisible.",
+      "check": "command_exit",
+      "target": "bash -c 'grep -q \"FLOOR_INDICATORS\" engine/manifest.py && [ \"$(grep -c \"public_api_surface\" engine/manifest.py)\" = 0 ]'"
+    },
+    {
+      "$comment": "C6 this repository still onboards. It is L1/GOVERNOR_LITE with no floor indicator, so enforcement must change nothing here -- an end-to-end control on the live manifest.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 engine/manifest.py >/dev/null 2>&1; [ $? -ne 2 ]'"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh manifest"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh --hermetic"
+    }
+  ]
+}
