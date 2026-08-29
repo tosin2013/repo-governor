@@ -1,0 +1,54 @@
+{
+  "$comment": "Acceptance criteria for issue 173, the uncovered half of issue 156 and the one open link in the chain 155 -> 156 -> 173. THE EXIT IS A DECISION, NOT CODE. The issue says so: 'Not in scope: Changing adapters/speckit. It reports the fact correctly. This asks whether the fact is acceptable, and the answer may well be yes.' C7 holds that line mechanically. THIS BAR IS ANSWER-AGNOSTIC AND MUST STAY SO. Issue 173 offers three readings -- the per-branch answer is correct; it is a provenance problem; the provider should refuse off the default branch -- and choosing between them is a governance decision that is ratified by a human (section 68), not one a bar may pre-empt. So every criterion below checks that the decision was RECORDED and ADDRESSES what 173 itself said would settle it. None checks which way it went. RESEARCH ALREADY DONE, so the ADR does not start cold: (1) engine/envelope.py:123,124,166 does consult the architecture role -- get_active_decisions, get_superseded_decisions, get_constraints -- and folds the result into the evidence chain, so two branches produce different facts under identical provenance, which is issue 24's defect in a new place. Issue 143's narrower claim, that no DISPOSITION consults the role, remains true and is not the same statement. (2) The property is general rather than Spec Kit's alone: every file-backed provider answers about the checked-out revision; adapters/adr and adapters/openspec read paths that do not move per branch so the variance is invisible, while Spec Kit keys documents to feature branches by design. (3) ADR-027:68 states the adjacent gap and declines it -- 'Good enough to tell two different projects apart, not good enough to tell two checkouts apart. Stated rather than solved.' WHAT THIS BAR CANNOT CHECK, stated rather than discovered later: a grep can see that a question is ADDRESSED. It cannot see whether the answer is right, and for a decision document that is the whole substance. The honest test is ratification by the maintainer, which section 68 reserves and no criterion here simulates.",
+  "authority_id": "173",
+  "criteria": [
+    {
+      "$comment": "C1 A DECISION EXISTS and names this issue. Precedent: ADR-015, ADR-017 and ADR-021 all carry a Resolves line.",
+      "check": "command_exit",
+      "target": "bash -c 'grep -rlE \"\\*\\*Resolves\\*\\*.*173\" docs/adrs/*.md | grep -q .'"
+    },
+    {
+      "$comment": "C2 IT CARRIES A CONFIRMATION SECTION. ADR-032 rule 1 makes this mandatory from 032 onward, and issue 159 is open precisely because two ADRs declare no acceptance conditions. Adding a third would be filing the defect and committing it in the same week.",
+      "check": "command_exit",
+      "target": "bash -c 'f=$(grep -rlE \"\\*\\*Resolves\\*\\*.*173\" docs/adrs/*.md | head -1); [ -n \"$f\" ] && grep -q \"^## Confirmation\" \"$f\"'"
+    },
+    {
+      "$comment": "C3 EACH OBLIGATION IS CLASSIFIED. ADR-032 rule 3: structural, procedural or substantive -- 'a confirmation that does not say which kind it is will not survive review'.",
+      "check": "command_exit",
+      "target": "bash -c 'f=$(grep -rlE \"\\*\\*Resolves\\*\\*.*173\" docs/adrs/*.md | head -1); [ -n \"$f\" ] && grep -qiE \"structural|procedural|substantive\" \"$f\"'"
+    },
+    {
+      "$comment": "C4 IT SAYS WHETHER THE PROPERTY IS GENERAL. 173: 'If it is general, it belongs in references/providers.md as a property of repo-local providers rather than as a Spec Kit note.' Either answer satisfies this; silence does not.",
+      "check": "command_exit",
+      "target": "bash -c 'f=$(grep -rlE \"\\*\\*Resolves\\*\\*.*173\" docs/adrs/*.md | head -1); [ -n \"$f\" ] && grep -qiE \"repo-local provider|every file-backed|general to\" \"$f\"'"
+    },
+    {
+      "$comment": "C5 IT ADDRESSES THE CONSUMER QUESTION. envelope.py folds architecture into the evidence chain, so the provenance reading is not hypothetical; an ADR that answers 'nothing consults it' without meeting that is answering issue 143's question instead of this one.",
+      "check": "command_exit",
+      "target": "bash -c 'f=$(grep -rlE \"\\*\\*Resolves\\*\\*.*173\" docs/adrs/*.md | head -1); [ -n \"$f\" ] && grep -qiE \"envelope|evidence chain|provenance\" \"$f\"'"
+    },
+    {
+      "$comment": "C6 IT SAYS WHAT ADR-027 LEFT OPEN. 027 named revision identity and declined it; this is the issue that decides whether to close it, so the ADR must state which.",
+      "check": "command_exit",
+      "target": "bash -c 'f=$(grep -rlE \"\\*\\*Resolves\\*\\*.*173\" docs/adrs/*.md | head -1); [ -n \"$f\" ] && grep -qE \"ADR-027|027-\" \"$f\"'"
+    },
+    {
+      "$comment": "C7 THE ADAPTER IS UNCHANGED. 173 puts changing adapters/speckit out of scope; this holds that line mechanically rather than by intention. Same shape as issue 165's engine-diff criterion, which still passes after merge because it fails on the presence of a change, not the absence of a diff.",
+      "check": "command_exit",
+      "target": "bash -c 'git diff origin/main -- adapters/speckit | grep \"^[+-]\" | grep -qv \"^[+-][+-]\" && exit 1 || exit 0'"
+    },
+    {
+      "$comment": "C8 THE INDEX LISTS IT. conformance/skill.py parses docs/adrs/README.md to verify sequence and explained gaps; an ADR absent from it is invisible to the surface that resolves citations.",
+      "check": "command_exit",
+      "target": "bash -c 'n=$(grep -rlE \"\\*\\*Resolves\\*\\*.*173\" docs/adrs/*.md | head -1 | grep -oE \"[0-9]{3}\"); [ -n \"$n\" ] && grep -q \"$n\" docs/adrs/README.md'"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh skill"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh --hermetic"
+    }
+  ]
+}
