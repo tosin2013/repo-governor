@@ -8,7 +8,7 @@
       "156",
       "165"
     ],
-    "split_note": "Spec Kit became issue 156; the openspec/ architecture_history question became issue 165."
+    "split_note": "Spec Kit became issue 156; the openspec/ architecture_history question became issue 165. NAMED IN split_to as of this edit, for the reason given on 156's bar: a split recorded only in prose is invisible to _resolve_split and the parent reads CONTINUE forever. This chains -- 156 carries its own covers block naming 173 -- and the engine resolves it to a depth of 2, inside MAX_COVERS_DEPTH."
   },
   "criteria": [
     {

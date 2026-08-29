@@ -8,7 +8,7 @@
       "173",
       "165"
     ],
-    "split_note": "branch-dependence became issue 173; the .specify/ architecture_history question was answered by issue 165, which covered both spec providers."
+    "split_note": "branch-dependence became issue 173; the .specify/ architecture_history question was answered by issue 165, which covered both spec providers. NAMED IN split_to as of this edit. The note was already accurate and the engine could not see it: _resolve_split returns (False, None) on a missing pointer, so a split recorded only in prose reads identically to no split at all. Recording it here does not discharge anything -- 165 is STOP_COMPLETE and 173 is not -- it makes the outstanding child NAMED instead of silent."
   },
   "criteria": [
     {
