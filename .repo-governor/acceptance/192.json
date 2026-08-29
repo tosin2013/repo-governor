@@ -1,0 +1,39 @@
+{
+  "$comment": "Acceptance criteria for issue 192. The engine can run in two places and no document says so. docs/installation.md documents hosts and paths; it does not document where the ENGINE runs, or which acts stay with a human when it runs somewhere the human is not. Standalone: engine on a laptop, agent in an editor, every non-blocking unknown read by someone. In-repository: engine inside a cloud agent's run, no human in the loop for its duration -- same engine, same dispositions, and an advisory unknown is advice to nobody. THE DEPENDENCY IS A CRITERION, NOT A NOTE (C4). This document cannot honestly describe the unattended mode as supported while issue 189 is open: escalate_to_blocking is inert in completion.py, so a barless item reads CONTINUE with STOP_COMPLETE unreachable whatever the repository's assessed profile, and the mode's central safety property does not hold. A document that describes it anyway would be the completion firewall's failure restated as prose. THE TRAP THIS BAR IS BUILT AGAINST is the one AGENTS.md:80 records this repository losing once: a new document that hand-writes a derivable fact becomes the second source of truth section 54 opens with. C3 asserts the page states no count at all -- it cites adapters and ADRs by path and lets the reader follow them.",
+  "authority_id": "192",
+  "criteria": [
+    {
+      "$comment": "C1 the document exists and names BOTH modes. A page describing only the local case is what already exists.",
+      "check": "file_exists",
+      "target": "docs/execution-locations.md"
+    },
+    {
+      "$comment": "C2 THE HAZARD IS STATED. Assignment is the handoff -- assigning an issue to a cloud agent is already what the milestone signal reads as authorization -- and if anything ever lets an agent assign itself, admission collapses into self-authorization. AGENTS.md:48 forbids the milestone version of that move; nothing states the assignee equivalent.",
+      "check": "command_exit",
+      "target": "bash -c 'grep -qi \"assign\" docs/execution-locations.md && grep -qiE \"self-?authoriz\" docs/execution-locations.md'"
+    },
+    {
+      "$comment": "C3 IT CITES, IT DOES NOT RECOUNT. No adapter, suite, role or ADR count anywhere on the page. A number here is a second source of truth that no suite is watching, which is exactly how 'the seven roles' survived (issue 187).",
+      "check": "command_exit",
+      "target": "python3 -c \"import re,sys,pathlib;t=pathlib.Path('docs/execution-locations.md').read_text();W='one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty';p=re.compile(r'(\\\\d+|'+W+r')\\\\s+(?:conformance\\\\s+|provider\\\\s+)?(adapters?|suites?|roles?|ADRs?|invariants?)\\\\b',re.I);m=p.findall(t);sys.exit(1 if m else 0)\""
+    },
+    {
+      "$comment": "C4 THE DEPENDENCY. Issue 189's assertion must be green before this page may describe the unattended mode as supported. Red today by construction, and deliberately so.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/acceptance.py | grep -q \"\\[PASS\\].*GOVERNOR_HIGH_ASSURANCE\"'"
+    },
+    {
+      "$comment": "C5 the page is reachable. A document nothing links to is a document nobody reads; installation.md is where someone asking 'how do I run this' already is.",
+      "check": "command_exit",
+      "target": "bash -c 'grep -q \"execution-locations\" docs/installation.md'"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh skill"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh --hermetic"
+    }
+  ]
+}

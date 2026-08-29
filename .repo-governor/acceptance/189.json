@@ -1,0 +1,40 @@
+{
+  "$comment": "Acceptance criteria for issue 189. policies/high-assurance.json escalates four reasons to blocking; engine/completion.py never reads the profile, so escalate_to_blocking is unreachable from that module and every profile behaves as GOVERNOR_LITE. Verified before this bar was written: vocabulary.classify('NO_CRITERIA_DECLARED','GOVERNOR_HIGH_ASSURANCE') returns blocking=True, while completion.py:239 sets \"blocking\": False as a literal and returns before any classification, and the three _classify calls at :175, :209 and :259 omit the profile argument so the GOVERNOR_LITE default is always taken. engine/retirement.py:68 does it correctly -- V.classify(u['reason'], m['condition']['profile']) -- which is what makes this a defect rather than a deliberate asymmetry. THE VACUITY THIS BAR IS BUILT AGAINST: fixing only the :239 path. Four reasons are escalated by high-assurance and three call sites take the default; a bar that checks NO_CRITERIA_DECLARED alone would go green with ACCEPTANCE_UNSTATED, NON_GOALS_UNSTATED and NO_ACCEPTED_DECISIONS still inert. C5 exists for that, and C5's own first draft was vacuous -- it called vocabulary.classify directly, which already works, so it went green against the unfixed engine; running it is what found that. NOTE C2 IS AN EXISTING ASSERTION, NOT A NEW ONE: conformance/acceptance.py:73 currently asserts a missing bar is non-blocking, unconditionally. That assertion partly encodes the bug. It must gain a profile dimension and keep passing for GOVERNOR_LITE -- absence of a bar genuinely does not stop work at LITE, and a fix that makes everything block everywhere is a different defect wearing this issue's number. WHY THE ASSERTIONS AND NOT ONLY THIS BAR: a bar stops being consulted the moment the issue closes; conformance/acceptance.py runs forever.",
+  "authority_id": "189",
+  "criteria": [
+    {
+      "$comment": "C1 THE DEFECT. A barless authority under GOVERNOR_HIGH_ASSURANCE must read blocking. Red today: the literal at completion.py:239 makes it False at every profile.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/acceptance.py | grep -q \"\\[PASS\\].*GOVERNOR_HIGH_ASSURANCE\"'"
+    },
+    {
+      "$comment": "C2 THE CONTROL, and it is an EXISTING assertion that must survive. At GOVERNOR_LITE a missing bar is non-blocking and must stay so. A fix that blocks at every profile satisfies C1 and is wrong.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/acceptance.py | grep -q \"\\[PASS\\] and it is non-blocking (absence of a bar does not stop work)\"'"
+    },
+    {
+      "$comment": "C3 NO CALL SITE TAKES THE DEFAULT. Structural, in the spirit of conformance/imports.py: _classify must never be called with one argument, or the defect returns silently the next time a site is added.",
+      "check": "command_exit",
+      "target": "bash -c '! grep -nE \"_classify\\\\([^,)]+\\\\)\" engine/completion.py'"
+    },
+    {
+      "$comment": "C4 THE LITERAL IS GONE. completion.py must not hardcode a blocking verdict for a reason the vocabulary classifies.",
+      "check": "command_exit",
+      "target": "bash -c '! grep -n \"NO_CRITERIA_DECLARED\" -A8 engine/completion.py | grep -q \"\\\"blocking\\\": False\"'"
+    },
+    {
+      "$comment": "C5 ALL FOUR ESCALATED REASONS, not one. Derived from policies/high-assurance.json rather than hardcoded, so adding a fifth reason to the policy turns this red again. MY FIRST DRAFT OF C5 WAS VACUOUS and running it is what found that: it called vocabulary.classify directly, which already honours the policy correctly, so it passed green against the unfixed engine and proved nothing about completion.py. The suite is what must cover the reasons, because the suite is what runs after this issue closes.",
+      "check": "command_exit",
+      "target": "python3 -c \"import json,pathlib,sys;r=json.loads(pathlib.Path('policies/high-assurance.json').read_text())['escalate_to_blocking'];s=pathlib.Path('conformance/acceptance.py').read_text();missing=[x for x in r if x not in s];sys.exit(1 if (missing or not r) else 0)\""
+    },
+    {
+      "$comment": "C6 the acceptance suite entire.",
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh acceptance"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh --hermetic"
+    }
+  ]
+}

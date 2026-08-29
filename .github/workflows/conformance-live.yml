@@ -1,6 +1,6 @@
 name: conformance (live)
 
-# TWO suites are not hermetic, and they go red for unlike reasons.
+# THREE suites are not hermetic, and they go red for unlike reasons.
 #
 #   hooks    line 163 runs engine/completion.py against the LIVE BOARD, so its
 #            verdict depends on an issue's current milestone and assignee --
@@ -11,6 +11,13 @@ name: conformance (live)
 #            actually exists (issue 178). It goes red for the WINDOW between a
 #            version bump merging and the tag being cut, and a HUMAN closes it
 #            by tagging. It is not noise and it does not self-heal.
+#
+#   roadmap  asks the TRACKER which open issues are milestoned AND assigned --
+#            authorized -- and fails any that declare no acceptance criteria.
+#            Like `hooks` it moves with the board and not with a commit, but
+#            unlike `hooks` it does NOT self-heal: a human closes it by writing
+#            the bar, or by removing the milestone from work that is not
+#            actually committed. Both are admission acts and neither is code.
 #
 # Reading one as the other is the trap. A job named only for `hooks` reporting
 # `FAILED: install` teaches whoever sees it that live red means "someone moved a
@@ -50,7 +57,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: live conformance (hooks, install)
+      - name: live conformance (hooks, install, roadmap)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./tools/run-conformance.sh --live
@@ -60,7 +67,7 @@ jobs:
           {
             echo "### a live suite is red"
             echo
-            echo "Three very different causes, and the distinction matters:"
+            echo "Four very different causes, and the distinction matters:"
             echo
             echo "- **\`install\` — the README names a tag that does not exist yet.**"
             echo "  Expected between a version bump merging and the release being cut."
@@ -69,6 +76,10 @@ jobs:
             echo "- **Board state.** hooks runs the engine against a live issue. If that"
             echo "  issue's milestone or assignee moved, this is not a code defect and"
             echo "  no commit caused it."
+            echo "- **\`roadmap\` — an AUTHORIZED issue with no acceptance record.**"
+            echo "  Milestoned and assigned means cleared to execute; with no bar,"
+            echo "  STOP_COMPLETE is unreachable and the work can only be abandoned."
+            echo "  A HUMAN closes it: write the bar, or drop the milestone. Not code."
             echo "- **The installer half.** Everything below hooks.py's capture block is"
             echo "  hermetic -- it drives tools/install-skill.sh into temp repositories"
             echo "  and pins the host templates. A failure there IS a code defect."

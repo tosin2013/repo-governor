@@ -52,7 +52,7 @@ unset REPO_GOVERNOR_TARGET REPO_GOVERNOR_SUBJECT REPO_GOVERNOR_BINDING
 # on the board would turn it red with no code change, which is why --hermetic
 # exists and why CI runs it as a non-blocking job.
 HERMETIC=(layer1 layer2 transport manifest onboarding vocabulary bindings skill envelope execution imports status acceptance coverage benchmark union)
-LIVE=(hooks install)
+LIVE=(hooks install roadmap)
 
 case "${1:-}" in
   --hermetic) SUITES=("${HERMETIC[@]}"); shift ;;
