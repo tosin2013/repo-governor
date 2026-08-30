@@ -1,0 +1,39 @@
+{
+  "$comment": "Acceptance criteria for issue 205. tools/onboard-interactive.py initialised `label` inside `if choice == \"github-projects\"` and passed it to build_providers() unconditionally, so choosing Linear or file-roadmap raised UnboundLocalError after every question had been answered -- the last step before the proposal is written. The tool could onboard a GitHub repository and nothing else; two of the three providers in ROADMAP were unreachable through it. `admission`, two lines above, was initialised before the branch, which is what the fix should have looked like. Shipped in #145. WHY NO SUITE CAUGHT IT, which is the part worth keeping: every assertion in conformance/onboarding.py calls build_providers() DIRECTLY, always with \"github-projects\", and nothing drives main(). The assertions added for issue 199 did the same thing. So the suite exercised the function while the crash lived in its caller, on the two branches nobody tested -- a test can only fail on a path it takes. THE VACUITY THIS BAR IS BUILT AGAINST is asserting 'Linear onboarding works', which pins the check to the branch that happened to break and passes the day a fourth roadmap provider is added with the same mistake. C1 is the property: every argument build_providers receives is bound on every path through main. STATIC, DELIBERATELY: driving the GitHub path end-to-end needs a live `gh` probe against a real repository -- the admission options are filtered by counts from that probe, and an unavailable signal is correctly refused -- so a dynamic check would make this suite LIVE and would still only cover the branch that already worked. WHAT THIS BAR CANNOT CHECK: whether the tool's questions are the right questions for a Linear repository. It now reaches the end and writes a proposal; whether that proposal is one a Linear maintainer would accept is issue 203's territory, and the honest test is a stranger running it.",
+  "authority_id": "205",
+  "criteria": [
+    {
+      "$comment": "C1 THE PROPERTY, not the instance. Every build_providers argument is bound on every path through main -- a conditional initialisation passed unconditionally is the defect class, whatever the variable is called.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -q \"\\[PASS\\] every build_providers argument is bound on every path\"'"
+    },
+    {
+      "$comment": "C2 FLOOR CONTROL. A check that cannot locate the call passes over zero arguments. Demonstrated by aliasing build_providers to a local name: the finder reports 0 and this fails.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -qE \"\\[PASS\\] build_providers.{0,3} arguments were found \\([4-9]\"'"
+    },
+    {
+      "$comment": "C3 FLOOR CONTROL for C1's parse. If main() is not found the walk yields nothing and every claim above it is vacuous.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -q \"\\[PASS\\] onboard-interactive declares main()\"'"
+    },
+    {
+      "$comment": "C4 END TO END, the branch that was unreachable. Drives the real tool with the Linear choice and requires a proposal on disk -- the static check proves the name is bound, this proves the path completes.",
+      "check": "command_exit",
+      "target": "bash -c 'd=$(mktemp -d); mkdir -p \"$d/docs/adr\"; printf \"# 1. T\\n\\n**Status**: Accepted\\n\" > \"$d/docs/adr/001-t.md\"; git -C \"$d\" init -q .; printf \"acme/widget\\n2\\n\\n\\n\\n\\n\\n\" | python3 tools/onboard-interactive.py \"$d\" >/dev/null 2>&1; r=1; [ -f \"$d/.repo-governor.proposed.json\" ] && r=0; rm -rf \"$d\"; exit $r'"
+    },
+    {
+      "$comment": "C5 ...and it bound the roadmap the operator chose, not the one the table happened to list first.",
+      "check": "command_exit",
+      "target": "bash -c 'd=$(mktemp -d); mkdir -p \"$d/docs/adr\"; printf \"# 1. T\\n\\n**Status**: Accepted\\n\" > \"$d/docs/adr/001-t.md\"; git -C \"$d\" init -q .; printf \"acme/widget\\n2\\n\\n\\n\\n\\n\\n\" | python3 tools/onboard-interactive.py \"$d\" >/dev/null 2>&1; r=1; python3 -c \"import json,sys;d=json.load(open(sys.argv[1]));sys.exit(0 if d[\\\"providers\\\"][\\\"roadmap_authority\\\"][\\\"adapter\\\"]==\\\"adapters/linear\\\" else 1)\" \"$d/.repo-governor.proposed.json\" && r=0; rm -rf \"$d\"; exit $r'"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh onboarding"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh --hermetic"
+    }
+  ]
+}

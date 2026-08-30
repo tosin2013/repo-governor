@@ -754,6 +754,55 @@ def main():
                         bool(_cs) and not any(c.get("adapter") for c in _cs),
                         "adapters/change-signals-file reads a local signals file, not a "
                         "Renovate config")
+
+                # EVERY ARGUMENT build_providers RECEIVES IS BOUND ON EVERY PATH.
+                # `label` was initialised only inside `if choice ==
+                # "github-projects"` and passed unconditionally, so picking
+                # Linear or file-roadmap raised UnboundLocalError -- the tool
+                # could onboard a GitHub repository and nothing else. It shipped
+                # in #145 and was found by an external user, not here, because
+                # every assertion in this suite calls build_providers() directly
+                # with "github-projects" and never drives main().
+                #
+                # Static, not driven: exercising the GitHub path end-to-end needs
+                # a live `gh` probe, so a dynamic check would make this LIVE and
+                # would still only cover the branch that already worked.
+                import ast as _ast
+                _src = (ROOT / "tools" / "onboard-interactive.py").read_text(encoding="utf-8")
+                _tree = _ast.parse(_src)
+                _main = next((n for n in _ast.walk(_tree)
+                              if isinstance(n, _ast.FunctionDef) and n.name == "main"), None)
+                rep.add("proposal-e2e", "onboard-interactive declares main()", _main is not None,
+                        "the scope check below reads main(); without it, it checks nothing")
+                if _main is not None:
+                    _args = []
+                    for _n in _ast.walk(_main):
+                        if (isinstance(_n, _ast.Call) and isinstance(_n.func, _ast.Name)
+                                and _n.func.id == "build_providers"):
+                            _args = [a.id for a in _n.args if isinstance(a, _ast.Name)]
+                    # Bound unconditionally = assigned in main's own body, or a
+                    # parameter. An assignment nested inside if/for/try is not.
+                    _bound = {t.id for st in _main.body if isinstance(st, (_ast.Assign, _ast.AugAssign))
+                              for t in (st.targets if isinstance(st, _ast.Assign) else [st.target])
+                              if isinstance(t, _ast.Name)}
+                    _bound |= {a.arg for a in _main.args.args}
+                    # Tuple unpacking at body level counts too.
+                    for st in _main.body:
+                        if isinstance(st, _ast.Assign):
+                            for t in st.targets:
+                                if isinstance(t, _ast.Tuple):
+                                    _bound |= {e.id for e in t.elts if isinstance(e, _ast.Name)}
+                    rep.add("proposal-e2e",
+                            f"build_providers' arguments were found ({len(_args)})",
+                            len(_args) >= 4,
+                            "the call was not located, so the binding check below is vacuous")
+                    _unbound = [a for a in _args if a not in _bound]
+                    rep.add("proposal-e2e",
+                            "every build_providers argument is bound on every path",
+                            not _unbound,
+                            f"conditionally bound: {_unbound} -- assigned inside a branch and "
+                            "passed unconditionally, so a roadmap choice that skips that branch "
+                            "raises UnboundLocalError before any manifest is written")
                 shutil.rmtree(_fx, ignore_errors=True)
 
                 _allowed = set(_spec) | {"repository", "roadmap_authority"}
