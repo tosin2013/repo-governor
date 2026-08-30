@@ -35,6 +35,7 @@ sys.path.insert(0, str(ROOT / "engine"))
 import completion as C  # noqa: E402
 import manifest as MF  # noqa: E402
 
+import vocabulary as V  # noqa: E402
 import _count as _CNT  # noqa: E402 -- alias avoids `C`, already bound to
 # `completion` in two suites, where the collision silently rebound it (issue 67).
 _CNT.watch("acceptance")
@@ -153,6 +154,134 @@ def main():
     finally:
         if stub.exists():
             stub.unlink()
+
+    # ISSUE 189. policies/*.json name the reasons a profile escalates to
+    # blocking and vocabulary.classify honours them -- completion.py never
+    # asked. `escalate_to_blocking` was unreachable from that module, so
+    # GOVERNOR_HIGH_ASSURANCE, which escalates four reasons, behaved exactly
+    # like GOVERNOR_LITE, which escalates none. Governance was weaker than the
+    # manifest declared, silently, on the repositories asking for the most.
+    #
+    # Driven end to end with the REAL adapter and one field changed, because
+    # calling vocabulary.classify directly proves only that the vocabulary
+    # works -- which it always did. The first draft of issue 189's bar made
+    # exactly that mistake and passed against the unfixed engine.
+    print("\nThe declared profile decides what blocks (issue 189)\n")
+
+    def _under(profile, level, adapter_rel="adapters/acceptance-file"):
+        """A barless authority evaluated by the engine under one profile."""
+        with tempfile.TemporaryDirectory() as td:
+            r = Path(td) / "repo"
+            (r / ".repo-governor" / "acceptance").mkdir(parents=True)
+            subprocess.run(["git", "init", "-q", str(r)], capture_output=True)
+            subprocess.run(["git", "-C", str(r), "remote", "add", "origin",
+                            "https://github.com/acme/w.git"], capture_output=True)
+            (r / "roadmap.json").write_text(json.dumps({"items": {
+                "P-1": {"title": "x", "status": "IN_PROGRESS", "authority": "AUTHORIZED",
+                        "admitted": True, "required_outcome": "x", "in_scope": [],
+                        "decision_history": []}}}))
+            (r / ".repo-governor" / "acceptance" / "P-1.json").write_text(
+                json.dumps({"authority_id": "P-1", "criteria": []}))
+            (r / ".repo-governor.json").write_text(json.dumps({
+                "repo_governor": {"version": 1, "engine_min_version": "0.1.0"},
+                "repository": {"id": "acme/w"},
+                "condition": {"assessed": level, "profile": profile},
+                "permissions": {"repository": {"read": True, "write": False},
+                                "roadmap_authority": {"read": True, "write": False},
+                                "acceptance_criteria": {"read": True, "write": False}},
+                "providers": {
+                    "repository": {"type": "git", "adapter": "adapters/git",
+                                   "contract_version": 1},
+                    "roadmap_authority": {"type": "file-roadmap",
+                                          "adapter": "adapters/file-roadmap",
+                                          "contract_version": 1,
+                                          "env": {"REPO_GOVERNOR_ROADMAP": "roadmap.json"}},
+                    "acceptance_criteria": {"type": "acceptance-file",
+                                            "adapter": adapter_rel,
+                                            "contract_version": 1}}}))
+            env = dict(os.environ); env["REPO_GOVERNOR_TARGET"] = str(r)
+            pr = subprocess.run([sys.executable, str(ROOT / "engine" / "completion.py"), "P-1"],
+                                capture_output=True, text=True, cwd=str(r), env=env, timeout=300)
+            try:
+                return json.loads(pr.stdout)
+            except Exception:
+                return {}
+
+    def _ncd(got):
+        for u in got.get("unknowns") or []:
+            if u.get("reason") == "NO_CRITERIA_DECLARED":
+                return u
+        return None
+
+    _lite = _under("GOVERNOR_LITE", "L1")
+    _ha = _under("GOVERNOR_HIGH_ASSURANCE", "L4")
+    # Floor control. If neither run reaches the acceptance step the two claims
+    # below are about nothing, and "not blocking" would pass on an absent key.
+    fails += check("both profiles reached the acceptance step",
+                   _ncd(_lite) is not None and _ncd(_ha) is not None,
+                   f"lite={_lite.get('decision')!r} ha={_ha.get('decision')!r} -- a run that "
+                   "failed earlier proves nothing about escalation")
+    if _ncd(_lite) and _ncd(_ha):
+        fails += check("a barless item blocks under GOVERNOR_HIGH_ASSURANCE",
+                       _ncd(_ha).get("blocking") is True,
+                       "policies/high-assurance.json escalates NO_CRITERIA_DECLARED and "
+                       "completion.py ignored it, so the profile bought nothing")
+        # The other direction, and the one that makes the first meaningful: a
+        # fix that blocks everywhere satisfies the check above and is wrong.
+        fails += check("control: the same item does NOT block under GOVERNOR_LITE",
+                       _ncd(_lite).get("blocking") is False,
+                       "LITE escalates nothing; absence of a bar must still let work proceed")
+        fails += check("...and the meaning says which profile escalated it",
+                       "GOVERNOR_HIGH_ASSURANCE" in (_ncd(_ha).get("meaning") or ""),
+                       "a blocking unknown that does not say what made it blocking sends "
+                       "the reader to the wrong file")
+
+    # TWO ROUTES REACH NO_CRITERIA_DECLARED, and the pair above exercises only
+    # one. When the adapter refuses an empty array the engine classifies the
+    # adapter's unknown; when an adapter SERVES one, completion.py raises the
+    # reason itself. That second line carried the hardcoded "blocking": False.
+    # Restoring it left every assertion above green -- the mutation did not
+    # fire, because the real adapter never takes that route. A structural check
+    # that no literal remains is not the same as a test that the path behaves,
+    # and this repository has shipped that gap before.
+    _stub2_rel = "adapters/_stub-acceptance-profile"
+    _stub2 = ROOT / _stub2_rel
+    _src = ACC.read_text(encoding="utf-8")
+    _g = '    if not data["criteria"]:\n        return _no_criteria("get_criteria", kw["id"], p)\n'
+    fails += check("the guard is still removable for the profile route", _g in _src,
+                   "the mutation target moved; the two checks below prove nothing")
+    try:
+        _stub2.write_text(_src.replace(_g, "", 1), encoding="utf-8")
+        _stub2.chmod(0o755)
+        _sl = _under("GOVERNOR_LITE", "L1", _stub2_rel)
+        _sh = _under("GOVERNOR_HIGH_ASSURANCE", "L4", _stub2_rel)
+        fails += check("both profiles reached the engine's own no-criteria branch",
+                       _ncd(_sl) is not None and _ncd(_sh) is not None,
+                       f"lite={_sl.get('decision')!r} ha={_sh.get('decision')!r}")
+        if _ncd(_sl) and _ncd(_sh):
+            fails += check("the engine's own branch blocks under GOVERNOR_HIGH_ASSURANCE",
+                           _ncd(_sh).get("blocking") is True,
+                           "completion.py raised this reason itself with a hardcoded "
+                           "blocking value, so the profile never reached it")
+            fails += check("control: and does not under GOVERNOR_LITE",
+                           _ncd(_sl).get("blocking") is False,
+                           "LITE escalates nothing")
+    finally:
+        if _stub2.exists():
+            _stub2.unlink()
+
+    # Every reason the policy escalates, not the one that was reported. The
+    # comment in onboard.py counted three instances of a class before; this is
+    # derived from the policy so a fifth reason cannot be added and ignored.
+    _pol = json.loads((ROOT / "policies" / "high-assurance.json").read_text())["escalate_to_blocking"]
+    fails += check(f"the escalation policy was read ({len(_pol)} reason(s))", bool(_pol),
+                   "an empty policy makes the check below vacuous")
+    _inert = [r_ for r_ in _pol
+              if not V.classify(r_, "GOVERNOR_HIGH_ASSURANCE")[1]
+              or V.classify(r_, "GOVERNOR_LITE")[1]]
+    fails += check("every escalated reason blocks at HIGH_ASSURANCE and not at LITE",
+                   not _inert,
+                   f"inert or always-blocking: {_inert}")
 
     print("\nThe template scaffolds a bar without declaring one\n")
 
