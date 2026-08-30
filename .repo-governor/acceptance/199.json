@@ -1,0 +1,54 @@
+{
+  "$comment": "Acceptance criteria for issue 199. Detection computed the ADR location correctly -- ADR_DIRS lists docs/adr first and onboard.py:317-323 passes path=d into the candidate, which is issue 27's fix working -- and tools/onboard-interactive.py read the candidate only as a boolean gate, so the path never reached the manifest. The adapter then defaulted to docs/adrs, found nothing, and --validate said 'advertises no capabilities; transport is not configured', which is the vocabulary of a BROKEN ADAPTER. An external reporter read a correct adapter as a defective one and concluded 'detection could hint the singular form'; detection already does. TWO HALVES, BOTH REQUIRED. The fix carries the field, and the refusal explains itself -- C5 is the half worth more than C1, because a wrong path that says so costs a minute and a wrong path that does not cost the reporter their afternoon. WHAT MUTATION FOUND, recorded because it is the same defect twice in one sitting: C6's first version tested `c in message` and PASSED with the singular convention deleted from the message, since 'docs/adr' is a substring of 'docs/adrs' -- vacuous in exactly the case the issue is about. It now matches delimited tokens. And TWO mutation attempts silently failed to apply and reported PASS, once because a replacement string spanned two f-string lines; an unapplied mutation proves nothing, so every mutation here asserts the source actually changed. WHAT THIS BAR CANNOT CHECK: whether the convention list in the adapter's message is the RIGHT list for a stranger's repository. It matches ADR_DIRS, and whether ADR_DIRS covers real practice is issue 148's measurement, not this one.",
+  "authority_id": "199",
+  "criteria": [
+    {
+      "$comment": "C1 THE DEFECT. A detected path reaches the manifest.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -q \"\\[PASS\\] the detected path reaches the manifest\"'"
+    },
+    {
+      "$comment": "C2 CONTROL -- absence stays absence. Inventing a path would bind every repository to a directory nobody detected.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -q \"\\[PASS\\] control: no detected path, no path key\"'"
+    },
+    {
+      "$comment": "C3 THE FIELD WAS NOT THE ONLY ONE LOST. ZERO_INSTALL hardcodes architecture -> adr, so a repository carrying only openspec/ was proposed adapters/adr. The entry now comes from the candidate.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -q \"\\[PASS\\] the adapter comes from the candidate, not the table\"'"
+    },
+    {
+      "$comment": "C4 CONTROL -- an UNCONFIRMED candidate is not bound. docs/decisions holding zero readable files is the ordinary case, and binding it yields a provider that answers nothing.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -q \"\\[PASS\\] control: an UNCONFIRMED candidate is not bound\"'"
+    },
+    {
+      "$comment": "C5 THE DIAGNOSIS. The refusal names the directory it looked in. Worth more than C1: this is what turned a one-line manifest fix into a wrong conclusion about the adapter.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -q \"\\[PASS\\] an unreachable ADR provider names the directory it tried\"'"
+    },
+    {
+      "$comment": "C6 NO SECOND COPY OF ADR_DIRS. The adapter cannot import engine/onboard.py, so a suite assertion is the only thing holding the two lists together. Matches delimited tokens, not substrings.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -q \"\\[PASS\\] ...and its convention list matches ADR_DIRS\"'"
+    },
+    {
+      "$comment": "C7 THE PARTITION IS EXHAUSTIVE, derived by running detection rather than by listing fields in the check. A hardcoded list is the second source of truth that let `path` go missing with nothing to notice.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -q \"\\[PASS\\] every field detection emits is carried or named\"'"
+    },
+    {
+      "$comment": "C8 FLOOR CONTROL for C7. A detection run yielding no candidate fields makes the partition check vacuous, and it did on the first attempt -- O.detect() returns candidates keyed by role, not wrapped in a 'candidates' key.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -qE \"\\[PASS\\] detection emitted fields to classify \\([1-9]\"'"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh onboarding"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh --hermetic"
+    }
+  ]
+}

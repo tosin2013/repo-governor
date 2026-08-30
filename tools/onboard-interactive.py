@@ -246,6 +246,39 @@ ZERO_INSTALL = {
 }
 
 
+# Which candidate fields become manifest fields, and which are detection's own
+# bookkeeping. The partition is EXHAUSTIVE by assertion (conformance/onboarding
+# .py): a field detection starts emitting must be classified here, or the check
+# fails. Issue 199 was one field -- `path` -- silently absent from this list
+# because there was no list: detection computed `docs/adr`, the evidence
+# document recorded it, and the manifest writer read the candidate only as a
+# boolean. The adapter then defaulted to `docs/adrs`, found nothing, and
+# reported TRANSPORT_UNREACHABLE, which is what a broken adapter looks like.
+CARRIED = ("type", "adapter", "path")
+NOT_CARRIED = ("role", "disposition", "evidence", "not_evidence")
+
+
+def _entry(cand, spec):
+    """One provider entry, built from what detection FOUND, not from the table.
+
+    The table names an adapter per role. That is right for the roles nothing
+    detects -- their adapter reads a directory this tool creates -- and wrong
+    for a detected role, where the table's answer and the evidence can differ:
+    a repository carrying only `openspec/` was proposed `adapters/adr`, because
+    the entry was assembled from a constant while the candidate that triggered
+    it sat unread.
+    """
+    if cand is None:
+        return {"type": spec["type"], "adapter": spec["adapter"], "contract_version": 1}
+    out = {"type": cand.get("type", spec["type"]),
+           "adapter": cand.get("adapter", spec["adapter"]),
+           "contract_version": 1}
+    for k in CARRIED:
+        if k not in out and cand.get(k) is not None:
+            out[k] = cand[k]
+    return out
+
+
 def build_providers(choice, adapter, rid, admission, label, candidates):
     """The providers block, extracted so a test can read it without a terminal.
 
@@ -256,7 +289,8 @@ def build_providers(choice, adapter, rid, admission, label, candidates):
 
     Detection proposes; only an accepted manifest binds (ADR-010 rule 1). But
     the proposal has to contain the thing for a human to accept it, and that is
-    what was missing.
+    what was missing -- first the role itself, then (issue 199) the fields that
+    make the role's binding work.
     """
     prov = {
         "repository": {"type": "git", "adapter": "adapters/git", "contract_version": 1},
@@ -264,10 +298,23 @@ def build_providers(choice, adapter, rid, admission, label, candidates):
     }
 
     for role, spec in ZERO_INSTALL.items():
-        if spec["detect"] and not (candidates or {}).get(spec["detect"]):
+        found = (candidates or {}).get(spec["detect"]) or [] if spec["detect"] else []
+        if spec["detect"] and not found:
             continue
-        entry = {"type": spec["type"], "adapter": spec["adapter"], "contract_version": 1}
-        prov[role] = [entry] if spec["multi"] else entry
+        # PROVIDER_DETECTED only. An UNCONFIRMED candidate is evidence that
+        # something MIGHT be there -- `docs/decisions` holding zero readable
+        # files is the common case -- and binding it produces a provider that
+        # answers nothing. Detection already made that distinction; this is the
+        # first place it is honoured.
+        strong = [c for c in found if c.get("disposition") == "PROVIDER_DETECTED"]
+        if spec["detect"] and not strong:
+            continue
+        if not spec["detect"]:
+            prov[role] = [_entry(None, spec)] if spec["multi"] else _entry(None, spec)
+        elif spec["multi"]:
+            prov[role] = [_entry(c, spec) for c in strong]
+        else:
+            prov[role] = _entry(strong[0], spec)
 
     if admission:
         prov["roadmap_authority"]["admission"] = {"signal": admission}
