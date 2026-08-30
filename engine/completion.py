@@ -41,7 +41,34 @@ except OSError:
     MF_HASH = None
 
 
-def _classify(u, profile="GOVERNOR_LITE"):
+# The profile assumed when the manifest cannot be read. LITE escalates nothing,
+# so an unreadable manifest never invents a blocking unknown -- it degrades to
+# the weakest policy rather than the strictest, which is the safe direction for
+# a value the engine failed to learn.
+DEFAULT_PROFILE = "GOVERNOR_LITE"
+
+
+def _profile(manifest):
+    """Which condition profile's policy decides what blocks here.
+
+    ADR-006 rule 4 makes profiles declarative policy packs: `policies/*.json`
+    names the reasons a profile escalates to blocking, and `vocabulary.classify`
+    honours them. This module never asked, so `escalate_to_blocking` was
+    unreachable from completion and EVERY profile behaved as GOVERNOR_LITE --
+    including GOVERNOR_HIGH_ASSURANCE, which escalates four reasons. Governance
+    was therefore weaker than the manifest declared, silently, on exactly the
+    repositories that asked for the most (#189). `engine/retirement.py` had it
+    right the whole time.
+    """
+    m = manifest
+    if m is None:
+        m, errs = MF.load()
+        if errs:
+            return DEFAULT_PROFILE
+    return ((m or {}).get("condition") or {}).get("profile") or DEFAULT_PROFILE
+
+
+def _classify(u, profile=DEFAULT_PROFILE):
     """Attach dimension and blocking from the closed vocabulary (gate 7).
 
     An adapter may not decide whether its own unknown blocks. It names a
@@ -163,6 +190,7 @@ def evaluate(authority_id, manifest=None, _seen=None, _depth=0):
     _seen = _seen or [str(authority_id)]
     unknowns = []
     provenance = []
+    profile = _profile(manifest)
 
     # 1. authority — is this authorized at all?
     auth = B.call("roadmap_authority", "get_authority", {"id": authority_id}, manifest=manifest)
@@ -172,7 +200,7 @@ def evaluate(authority_id, manifest=None, _seen=None, _depth=0):
                               "detail": auth["error"]["message"], "blocking": True}],
                 "provenance": []}
     if auth.get("unknown"):
-        u = _classify(auth["unknown"])
+        u = _classify(auth["unknown"], profile)
         return {"decision": "UNKNOWN", "authority_id": authority_id,
                 "unknowns": [u], "provenance": []}
     provenance += auth.get("provenance", [])
@@ -206,7 +234,7 @@ def evaluate(authority_id, manifest=None, _seen=None, _depth=0):
                 "provenance": provenance}
     if crit.get("unknown"):
         # No criteria declared => no completion bar => CONTINUE, not STOP.
-        u = _classify(crit["unknown"])
+        u = _classify(crit["unknown"], profile)
         unknowns.append(u)
         return {"decision": "CONTINUE", "authority_id": authority_id, "authority": authority,
                 "stop_condition": {"acceptance_conditions_satisfied": "UNKNOWN"},
@@ -228,16 +256,19 @@ def evaluate(authority_id, manifest=None, _seen=None, _depth=0):
     # nothing to check is not one, and this is the exact shape an unedited
     # template would have had on first contact (issue 58).
     if not criteria:
-        unknowns.append({
-            "dimension": "acceptance",
+        # Classified, not asserted. This dict carried "blocking": False as a
+        # literal and returned before any classification, so GOVERNOR_FULL and
+        # GOVERNOR_HIGH_ASSURANCE -- both of which escalate NO_CRITERIA_DECLARED
+        # -- were silently overruled by a hardcoded value three lines below the
+        # comment describing the firewall (#189).
+        unknowns.append(_classify({
             "reason": "NO_CRITERIA_DECLARED",
             "detail": (f"The acceptance record for {authority_id} exists but declares no "
                        "criteria. An empty bar is not a met bar; nothing has been stated "
                        "that completion could be checked against."),
             "resolution": "Declare at least one criterion, or accept that this work has no "
                           "completion bar and will never read STOP_COMPLETE.",
-            "blocking": False,
-        })
+        }, profile))
         return {"decision": "CONTINUE", "authority_id": authority_id, "authority": authority,
                 "criteria": [],
                 "stop_condition": {"acceptance_conditions_satisfied": "UNKNOWN"},
@@ -256,7 +287,7 @@ def evaluate(authority_id, manifest=None, _seen=None, _depth=0):
             results.append({**c, "satisfied": None})
             continue
         if ev.get("unknown"):
-            u = _classify(ev["unknown"])
+            u = _classify(ev["unknown"], profile)
             unknowns.append(u)
             results.append({**c, "satisfied": None})
             continue
@@ -280,22 +311,18 @@ def evaluate(authority_id, manifest=None, _seen=None, _depth=0):
         discharged, note = _resolve_split(covers, manifest, _seen, _depth)
         if discharged:
             decision, satisfied = "STOP_COMPLETE", True
-            unknowns.append({
-                "dimension": "evidence", "reason": "BAR_COVERS_PART_DISCHARGED",
-                "blocking": False,
-                "meaning": "The bar covered part of this item, and the rest was split "
-                           "into authorities that are themselves complete.",
+            unknowns.append(_classify({
+                "reason": "BAR_COVERS_PART_DISCHARGED",
                 "detail": f"The bar covers {covers.get('declared')!r}. {note}",
                 "resolution": "None needed; recorded so the discharge is visible.",
-            })
+            }, profile))
         else:
             # CONTINUE rather than a new disposition: STOP_PARTIAL would need
             # section 32 and an ADR, and the safe direction needs no new
             # vocabulary. The work continues, which is true.
             decision, satisfied = "CONTINUE", False
-            unknowns.append({
-                "dimension": "evidence", "reason": "BAR_COVERS_PART", "blocking": False,
-                "meaning": "The declared bar is satisfied but covers only part of this item.",
+            unknowns.append(_classify({
+                "reason": "BAR_COVERS_PART",
                 "detail": (f"The bar covers {covers.get('declared')!r}. NOT covered: "
                            f"{covers.get('uncovered')!r}. Every criterion passed, so the "
                            "covered part is done; the item is not."
@@ -305,7 +332,7 @@ def evaluate(authority_id, manifest=None, _seen=None, _depth=0):
                                "cover it. Removing 'covers' without doing either would "
                                "declare completion the criteria do not establish, and an "
                                "empty 'split_to' is the same thing with extra steps."),
-            })
+            }, profile))
     else:
         decision, satisfied = "STOP_COMPLETE", True
 
