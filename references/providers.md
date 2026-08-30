@@ -54,6 +54,10 @@ backend — HTTP, CLI, file, MCP — is invisible to the engine (ADR-016).
 - **Cite everything.** A fact without provenance is treated as unknown, not as true.
 - **Never coerce.** A value outside a closed vocabulary is `MALFORMED_SOURCE`.
 
+- **Answer about the checked-out revision, and say so.** A repo-local provider reads the working tree it is pointed at, so its answer is a function of the checkout. Most read paths that do not move between branches — `adapters/adr` reads `docs/adrs/`, `adapters/openspec` reads `openspec/` — and the variance is invisible. `adapters/speckit` reads `specs/<feature>/`, which Spec Kit populates **per feature branch**, so it is the first provider where the property is visible rather than theoretical. It is a property of the class, not that adapter's defect — ADR-033, **Proposed**: [a repo-local provider answers about the checked-out revision](../docs/adrs/033-repo-local-providers-answer-about-the-checked-out-revision.md).
+
+  The engine may not consult a method whose answer varies with the checkout until the recorded provenance names the revision. `conformance/bindings.py` fails if it starts to.
+
 Verify with `python3 conformance/layer1.py`.
 
 ## Cardinality
