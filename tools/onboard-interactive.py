@@ -400,7 +400,16 @@ def main(argv):
         return 1
     adapter = next(a for v, a, _ in ROADMAP if v == choice)
 
+    # BOTH initialised before the branch, and for the same reason. `admission`
+    # already was; `label` was not, and it is passed to build_providers()
+    # unconditionally -- so choosing Linear or file-roadmap raised
+    # UnboundLocalError and the tool could onboard a GitHub repository and
+    # nothing else. Shipped in #145 and found by an external user, because no
+    # test had ever driven onboarding with a non-GitHub roadmap: every
+    # assertion in conformance/onboarding.py called build_providers() with
+    # "github-projects", including the ones added for #199.
     admission = None
+    label = ""
     if choice == "github-projects":
         counts = _survey(rid)
         # Do NOT offer a signal that provably cannot work. The survey printed
@@ -421,7 +430,6 @@ def main(argv):
         # Asked HERE, while the choice is on screen. It used to be asked after
         # the condition question, three screens later, where it read as a
         # continuation of something else.
-        label = ""
         if admission == "label":
             label = input("  Which label means admitted? ").strip()
 
