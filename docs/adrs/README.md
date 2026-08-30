@@ -2,7 +2,7 @@
 
 Generated 2026-08-17 from PRD v0.2 (provider-oriented draft) using the MCP ADR Analysis Server's PRD-to-ADR protocol, informed by the external landscape research in [`../research/2026-08-17-external-landscape.md`](../research/2026-08-17-external-landscape.md).
 
-**23 of 30 ADRs are Accepted** as of 2026-08-17, ratified under [RATIFICATION-v0.1.0.md](RATIFICATION-v0.1.0.md). ADR-020, ADR-024, ADR-029, ADR-030, ADR-031 and ADR-032 are held `Proposed` — neither is referenced by the runtime; ADR-014 is `Superseded` by the 023/024 split. Per §61, the project cannot reach `IMPLEMENTATION_READY` until the `RG-SIM-ONBOARDING-v0.1` simulation passes.
+**23 of 31 ADRs are Accepted** as of 2026-08-17, ratified under [RATIFICATION-v0.1.0.md](RATIFICATION-v0.1.0.md). ADR-020, ADR-024, ADR-029, ADR-030, ADR-031, ADR-032 and ADR-033 are held `Proposed` — none is referenced by the runtime; ADR-014 is `Superseded` by the 023/024 split. Per §61, the project cannot reach `IMPLEMENTATION_READY` until the `RG-SIM-ONBOARDING-v0.1` simulation passes.
 
 > **`PRD.md` no longer exists.** Its normative content was extracted into [`../reference/`](../reference/) on 2026-08-17, with original § numbering preserved so every citation below still resolves. Start at the [section map](../reference/README.md#section-map).
 
@@ -41,6 +41,7 @@ Generated 2026-08-17 from PRD v0.2 (provider-oriented draft) using the MCP ADR A
 | [030](030-backend-recommendation-from-declared-capability.md) | Backend recommendation from declared capability | Providers | A level-to-product table would put adapter names in the engine and break on the third backend |
 | [031](031-authority-source-missing-obliges-disclosure-not-refusal.md) | AUTHORITY_SOURCE_MISSING obliges disclosure, not refusal | Agent surface | A measured run reasoned past a bare imperative, and may have been right |
 | [032](032-a-decision-declares-how-it-will-be-confirmed.md) | A decision declares how it will be confirmed | Architecture | 267 obligations across the Accepted ADRs, one discharge marker between them |
+| [033](033-repo-local-providers-answer-about-the-checked-out-revision.md) | A repo-local provider answers about the checked-out revision | Providers | The branch-varying methods are the two the engine never calls |
 
 ## Dependency order
 

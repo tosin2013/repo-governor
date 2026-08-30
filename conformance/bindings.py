@@ -303,6 +303,46 @@ def main():
     finally:
         _os.unlink(_probe)
 
+    # ADR-033 decision 3, the tripwire. A repo-local provider answers about the
+    # CHECKED-OUT REVISION. adapters/speckit reads specs/<feature>/, which Spec
+    # Kit populates per feature branch, so it can answer differently on two
+    # checkouts of one repository -- and its branch-varying methods, get_specs
+    # and get_provenance, are called by nothing in the engine. That is what
+    # makes the problem not live, and it is an accident of what the engine
+    # happens to call rather than a designed property.
+    #
+    # So this is not "the engine calls three methods" restated as a test. It is:
+    # the day a fourth is added, the recorded provenance has to name the
+    # revision, and this is what makes that day visible. The check cannot say
+    # what the right answer is when it fires -- only that ADR-033 is now due for
+    # a second reading.
+    print("\nThe engine reads no branch-varying architecture method (ADR-033)\n")
+
+    import re as _re
+    REVISION_STABLE = {"get_constraints", "get_active_decisions", "get_superseded_decisions"}
+    called, sites = set(), {}
+    for f in sorted((ROOT / "engine").glob("*.py")):
+        for m in _re.finditer(r'"architecture",\s*"(?P<fn>get_\w+)"', f.read_text(encoding="utf-8")):
+            fn = m.group("fn")
+            called.add(fn)
+            sites.setdefault(fn, []).append(f.name)
+
+    # Floor control. A regex that matches nothing makes every claim below
+    # vacuous, and "the engine calls no branch-varying method" would be the
+    # loudest possible false pass.
+    fails += check(f"the engine's architecture calls were actually found ({len(called)})",
+                   bool(called),
+                   "the scan matched nothing -- a broken pattern reads as an engine "
+                   "that consults no provider at all")
+
+    fails += check("engine architecture calls are all revision-stable",
+                   called <= REVISION_STABLE,
+                   f"branch-varying or unreviewed: "
+                   f"{ {k: sites[k] for k in sorted(called - REVISION_STABLE)} }. "
+                   "A repo-local provider answers about the checked-out revision; "
+                   "ADR-033 decision 3 requires the recorded provenance to name it "
+                   "before the engine may read such a method.")
+
     print(f"\n{'BINDINGS: CONFORMANT' if not fails else f'BINDINGS: NON-CONFORMANT ({fails})'}")
     if fails:
         _preflight.attribute(absent)
