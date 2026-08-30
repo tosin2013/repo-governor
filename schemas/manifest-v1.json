@@ -33,6 +33,13 @@
         "engine_min_version": {
           "type": "string",
           "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "enforcement": {
+          "enum": [
+            "advisory",
+            "blocking"
+          ],
+          "$comment": "ADR-029 decision 3: enforcement is opt-in PER REPOSITORY, and absent means advisory -- an un-onboarded repository is not a governed one, and blocking there would stop all editing wherever the manifest is absent. Read only by tools/hooks/governance-hook.py; the engine never reads it and gains no capability from it. AN ENUM, NOT A STRING, because the hook compares mode == \"blocking\": a typo would fall through to advisory and give a repository weaker governance than it declared, silently, which is exactly the defect issue 189 fixed one layer down. docs/installation.md documented this key while additionalProperties refused it, so following the instructions produced MANIFEST_INVALID and every verdict degraded to UNKNOWN (issue 198)."
         }
       }
     },

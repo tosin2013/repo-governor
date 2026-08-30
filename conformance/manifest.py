@@ -60,6 +60,11 @@ CASES = [
     ("profile not in enum",            lambda d: d["condition"].__setitem__("profile", "GOVERNOR_TURBO"), "SCHEMA"),
     ("binding without adapter",        lambda d: d["providers"]["repository"].pop("adapter"), "SCHEMA"),
     ("bad transport kind",             lambda d: d["providers"]["repository"].__setitem__("transport", {"kind": "carrier-pigeon"}), "SCHEMA"),
+    # Issue 198. The hook compares `mode == "blocking"`, so a typo would fall
+    # through to advisory and give a repository weaker governance than it
+    # declared, silently -- 189's defect one layer up. An enum makes it an
+    # error instead of a downgrade.
+    ("enforcement not in enum",        lambda d: d["repo_governor"].__setitem__("enforcement", "blockign"), "SCHEMA"),
     ("contract_version zero",          lambda d: d["providers"]["repository"].__setitem__("contract_version", 0), "SCHEMA"),
 ]
 
@@ -272,8 +277,49 @@ def main():
     print(f"  [{'PASS' if ok4 else 'FAIL'}] the engine names no adapter's configuration (ADR-003)"
           + ("" if ok4 else "\n         adapter-specific knowledge must stay in the adapter"))
 
+    # ISSUE 198. docs/installation.md documented `enforcement` while the schema's
+    # additionalProperties refused it, so a reader following the instructions
+    # produced MANIFEST_INVALID and every verdict degraded to UNKNOWN. Following
+    # the documentation turned a governed repository into an ungoverned one.
+    #
+    # Read FROM the document, never restated here: a copy of the example would
+    # agree with itself while both drifted from the schema, which is the shape
+    # issue 178 recorded when README.md and ENGINE_VERSION agreed perfectly and
+    # were both wrong.
+    import re as _re
+    _schema = json.loads((ROOT / "schemas" / "manifest-v1.json").read_text(encoding="utf-8"))
+    _allowed = set(_schema["properties"]["repo_governor"]["properties"])
+    _docs = [d for d in ("README.md", "docs/installation.md", "AGENTS.md",
+                         "CONTRIBUTING.md") if (ROOT / d).is_file()]
+    _frags, _bad = 0, []
+    for _d in _docs:
+        for _b in _re.findall(r"```json\s*\n(.*?)\n```",
+                              (ROOT / _d).read_text(encoding="utf-8"), _re.S):
+            try:
+                _obj = json.loads(_b)
+            except ValueError:
+                continue
+            _rg = _obj.get("repo_governor")
+            if not isinstance(_rg, dict):
+                continue
+            _frags += 1
+            _bad += [f"{_d}: {k!r}" for k in _rg if k not in _allowed]
+    # Floor control: a pattern that matches nothing passes the claim below
+    # having read no documentation at all.
+    okf = _frags > 0
+    extra += not okf
+    print(f"  [{'PASS' if okf else 'FAIL'}] the install docs state a manifest fragment to check ({_frags})"
+          + ("" if okf else "\n         found none -- either the example was removed or the "
+                            "scan stopped matching it; both need a human"))
+    oke = not _bad
+    extra += not oke
+    print(f"  [{'PASS' if oke else 'FAIL'}] every documented repo_governor key is one the schema permits"
+          + ("" if oke else f"\n         refused by the schema: {_bad} -- following the "
+                            "documentation would produce MANIFEST_INVALID and degrade "
+                            "every verdict to UNKNOWN"))
+
     fails += extra
-    total = len(CASES) + len(PERM_CASES) + 7
+    total = len(CASES) + len(PERM_CASES) + 9
     print(f"\n{total - fails}/{total} checks passed")
     print("MANIFEST LOADER: " + ("CONFORMANT" if not fails else f"NON-CONFORMANT ({fails})"))
     return 0 if not fails else 1
