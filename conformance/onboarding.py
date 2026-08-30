@@ -109,6 +109,24 @@ def run_fixture(name, fx, tmp, rep):
     rep.add(name, "detection states it used no credentials",
             any("No credentials" in n for n in res["notes"]), "")
 
+    # ISSUE 201. Detection may name an adapter only if that adapter can read the
+    # evidence that triggered the detection. Two candidates broke it while
+    # stating it in a comment three lines above -- a `.beads/` SQLite store
+    # offered `adapters/execution-file`, a Renovate config offered
+    # `adapters/change-signals-file`. Both carried an honest not_evidence line,
+    # and a reader scanning the candidate row still got the wrong answer,
+    # because the row is the part that looks authoritative.
+    _named = [c for cs in res["candidates"].values() for c in cs if c.get("adapter")]
+    _unnamed = [c for cs in res["candidates"].values() for c in cs if not c.get("adapter")]
+    _ghost = [c["adapter"] for c in _named if not (ROOT / c["adapter"]).is_file()]
+    rep.add(name, "every named adapter exists on disk", not _ghost, f"missing: {_ghost}")
+    # A null adapter must never be silent. "Found, and nothing here reads it" is
+    # useful; "found" with no adapter and no reason is a candidate a human
+    # cannot act on either way.
+    _mute = [c["type"] for c in _unnamed if not c.get("not_evidence")]
+    rep.add(name, "a candidate naming no adapter says why", not _mute,
+            f"silent: {_mute} -- naming no adapter is honest only when the reason is stated")
+
     return repo, res
 
 
@@ -688,6 +706,55 @@ def main():
                         f"missing {_missing} -- the adapter "
                         "cannot import engine/onboard.py, so this assertion is the only "
                         "thing holding the two lists together")
+
+                # ISSUE 201, the general property rather than the instance. A
+                # candidate that NAMES an adapter is claiming that adapter can
+                # serve it. Checked by spawning it against the repository that
+                # triggered the detection -- not by grepping onboard.py, which
+                # would pass on a table that exists and is never read.
+                _fx = tempfile.mkdtemp()
+                (Path(_fx) / ".beads").mkdir()
+                (Path(_fx) / "docs" / "adr").mkdir(parents=True)
+                (Path(_fx) / "docs" / "adr" / "001-t.md").write_text(
+                    "# 1. T\n\n**Status**: Accepted\n", encoding="utf-8")
+                (Path(_fx) / "renovate.json").write_text("{}", encoding="utf-8")
+                _sub.run(["git", "init", "-q", "."], cwd=_fx, capture_output=True)
+                _cands = O.detect(Path(_fx))
+                _flat = [c for cs in _cands.values() for c in cs]
+                rep.add("proposal-e2e", f"the over-promise fixture produced candidates ({len(_flat)})",
+                        len(_flat) >= 3,
+                        "a fixture that detects nothing makes every claim below vacuous")
+                _bad = []
+                for _c in _flat:
+                    if not _c.get("adapter"):
+                        continue
+                    _env = {**_os_.environ, "REPO_GOVERNOR_TARGET": _fx}
+                    _env.pop("REPO_GOVERNOR_BINDING", None)
+                    if _c.get("path"):
+                        _env["REPO_GOVERNOR_BINDING"] = json.dumps({"path": _c["path"]})
+                    _rr = _sub.run([sys.executable, str(ROOT / _c["adapter"]), "describe"],
+                                   capture_output=True, text=True, cwd=_fx, env=_env)
+                    _tt = (json.loads(_rr.stdout or "{}").get("transport") or {})
+                    if _tt.get("reachable") is not True:
+                        _bad.append(f"{_c['type']}->{_c['adapter']}")
+                rep.add("proposal-e2e", "every named adapter can read what its evidence cites",
+                        not _bad,
+                        f"unreachable against the repository that triggered them: {_bad} -- "
+                        "detection may name an adapter only if that adapter can read the "
+                        "evidence that triggered the detection")
+                # The two instances, by name, because both were shipped and both
+                # stated the rule they broke in a comment directly above.
+                _ex = [c for c in _cands.get("execution", []) if c.get("type") == "beads"]
+                rep.add("proposal-e2e", "a .beads store is detected and names no adapter",
+                        bool(_ex) and not _ex[0].get("adapter"),
+                        "adapters/execution-file reads .repo-governor/execution.json and "
+                        "cannot open a SQLite store")
+                _cs = _cands.get("change_signals", [])
+                rep.add("proposal-e2e", "a renovate config is detected and names no adapter",
+                        bool(_cs) and not any(c.get("adapter") for c in _cs),
+                        "adapters/change-signals-file reads a local signals file, not a "
+                        "Renovate config")
+                shutil.rmtree(_fx, ignore_errors=True)
 
                 _allowed = set(_spec) | {"repository", "roadmap_authority"}
                 rep.add("proposal-e2e", "and nothing outside the table is proposed",

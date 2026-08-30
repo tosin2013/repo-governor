@@ -271,7 +271,7 @@ def _entry(cand, spec):
     if cand is None:
         return {"type": spec["type"], "adapter": spec["adapter"], "contract_version": 1}
     out = {"type": cand.get("type", spec["type"]),
-           "adapter": cand.get("adapter", spec["adapter"]),
+           "adapter": cand.get("adapter") or spec["adapter"],
            "contract_version": 1}
     for k in CARRIED:
         if k not in out and cand.get(k) is not None:

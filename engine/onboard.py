@@ -285,6 +285,23 @@ def detect(repo: Path):
     cands = {}
 
     def add(role, type_, adapter, disposition, evidence, not_evidence=None, **extra):
+        """One candidate. `adapter=None` means: found, and nothing here reads it.
+
+        DETECTION MAY NAME AN ADAPTER ONLY IF THAT ADAPTER CAN READ THE EVIDENCE
+        THAT TRIGGERED THE DETECTION (#27, #201). Two candidates broke it while
+        stating it in a comment three lines above: a `.beads/` SQLite store was
+        offered `adapters/execution-file`, which reads a JSON file, and a
+        Renovate config was offered `adapters/change-signals-file`, which reads
+        a local signals file. Both were marked UNCONFIRMED with an explicit
+        not_evidence line, so nothing was concealed -- but the mitigation is a
+        sentence and the field is a machine-readable claim, and a reader
+        scanning the candidate row gets the wrong answer from the part that
+        looks authoritative. An external reporter did exactly that.
+
+        A null adapter keeps the detection, which is useful -- the role IS
+        present -- and drops the pointer that cannot be honoured. It must be
+        accompanied by a not_evidence line saying so; conformance asserts it.
+        """
         cands.setdefault(role, []).append({
             "role": role, "type": type_, "adapter": adapter,
             "disposition": disposition, "evidence": evidence,
@@ -382,7 +399,7 @@ def detect(repo: Path):
             # `change-signals-file` reads a local signals file, not a Renovate or
             # Dependabot config -- proposing it here is detection naming an
             # adapter that cannot serve the provider it detected (#27).
-            add("change_signals", t, "adapters/change-signals-file", "PROVIDER_UNCONFIRMED",
+            add("change_signals", t, None, "PROVIDER_UNCONFIRMED",
                 [_cite(repo, f, "configuration present")],
                 [_cite(repo, f, f"no adapter here reads {t}; change-signals-file reads a local "
                                 "signals file, so this binding needs a real adapter or a human "
@@ -395,7 +412,7 @@ def detect(repo: Path):
         # instance of the same over-promise as the ADR status count and the
         # dependabot config (#27): detection may name an adapter only if that
         # adapter can read the evidence that triggered the detection.
-        add("execution", "beads", "adapters/execution-file", "PROVIDER_UNCONFIRMED",
+        add("execution", "beads", None, "PROVIDER_UNCONFIRMED",
             [_cite(repo, ".beads/", "beads database directory present")],
             [_cite(repo, ".beads/", "no adapter here reads a beads database; execution-file reads "
                                     "a JSON file, so this needs a real adapter or `bd export` "
