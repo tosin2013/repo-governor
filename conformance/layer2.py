@@ -250,6 +250,21 @@ def main():
     if live.returncode != 0:
         return 1
 
+    # The readiness tool answers the PREREQUISITE to the live run -- which of
+    # these five states each provider can express, and which it actually holds.
+    # It imports SCENARIOS from live-equivalence rather than restating them, so
+    # its self-test is also the check that the two have not drifted apart. Same
+    # gate, same reason: it needs no network, and a tool that silently stopped
+    # distinguishing "no such status" from "status with nothing in it" would
+    # report a fix nobody can act on.
+    sys.stdout.flush()
+    ready = subprocess.run(
+        [sys.executable, str(ROOT / "tools" / "provider-readiness.py"), "--self-test"],
+        cwd=ROOT,
+    )
+    if ready.returncode != 0:
+        return 1
+
     covered = diverged = mismatched = 0
     findings = []
     print("Layer 2 — cross-provider equivalence\n")
