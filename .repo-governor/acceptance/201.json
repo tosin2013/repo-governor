@@ -1,0 +1,49 @@
+{
+  "$comment": "Acceptance criteria for issue 201. Detection named an adapter that cannot read the evidence that triggered it, TWICE, while stating the rule it was breaking in a comment three lines above each call: a .beads/ SQLite store was offered adapters/execution-file (which reads .repo-governor/execution.json) and a Renovate config was offered adapters/change-signals-file (which reads a local signals file). Both were marked PROVIDER_UNCONFIRMED with an explicit not_evidence line, so nothing was concealed -- and an external reporter still read the candidate row as 'we found your beads DB, bind it', because the mitigation is a sentence and the adapter field is a machine-readable claim. WHY A NULL ADAPTER RATHER THAN A DIFFERENT LABEL: the detection is worth keeping -- the role IS present, and a user should know their beads store was seen. What cannot stand is the pointer. THE VACUITY THIS BAR IS BUILT AGAINST is pinning to .beads/. The comment in onboard.py already counts three instances of this class, so a check naming the third one passes the day a fourth appears. C1 is the general property and is checked by SPAWNING each named adapter against the repository that triggered the detection, not by grepping onboard.py -- imports.py refuses greps for this reason: a table that exists and is never read passes a source-text check. C4 and C5 name the two instances because both were shipped. CALIBRATION THAT CHANGED THE DESIGN: reachability alone is not the property. adapters/execution-file reports reachable=True on a repository that happens to carry .repo-governor/execution.json, so on one real governed repository the over-promise would have passed a naive reachability check. That is why the fixture in C1 is purpose-built and why the null adapter, not a reachability gate, is the fix.",
+  "authority_id": "201",
+  "criteria": [
+    {
+      "$comment": "C1 THE GENERAL PROPERTY. Every candidate that names an adapter names one reachable against the repository that triggered it. Fixture carries .beads/, renovate.json and docs/adr at once.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -q \"\\[PASS\\] every named adapter can read what its evidence cites\"'"
+    },
+    {
+      "$comment": "C2 FLOOR CONTROL for C1. A fixture detecting nothing makes the loop above run zero times and pass having established nothing.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -qE \"\\[PASS\\] the over-promise fixture produced candidates \\([3-9]\"'"
+    },
+    {
+      "$comment": "C3 A NULL ADAPTER IS NEVER SILENT. 'Found, and nothing here reads it' is useful; 'found', with no adapter and no reason, is a candidate a human cannot act on either way.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -q \"\\[PASS\\] a candidate naming no adapter says why\"'"
+    },
+    {
+      "$comment": "C4 INSTANCE ONE, by name, because it shipped.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -q \"\\[PASS\\] a .beads store is detected and names no adapter\"'"
+    },
+    {
+      "$comment": "C5 INSTANCE TWO, by name, because it shipped too and nobody had reported it.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -q \"\\[PASS\\] a renovate config is detected and names no adapter\"'"
+    },
+    {
+      "$comment": "C6 CONTROL -- the detection SURVIVES. Nulling the adapter must not delete the candidate; a user whose beads store went unmentioned is worse off than one told nothing reads it.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -q \"\\[PASS\\] every candidate cites evidence\"'"
+    },
+    {
+      "$comment": "C7 no candidate names an adapter that is not on disk.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -q \"\\[PASS\\] every named adapter exists on disk\"'"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh onboarding"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh --hermetic"
+    }
+  ]
+}

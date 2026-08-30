@@ -322,6 +322,26 @@ def _probe():
     return ADR_DIR.exists() and ADR_DIR.is_dir()
 
 
+def _transport_detail():
+    """Why there is nothing here, in the adapter's own words (issue 199).
+
+    Without it `--validate` reports "advertises no capabilities; transport is
+    not configured" -- which is what a BROKEN ADAPTER looks like. The adapter is
+    fine; it was pointed at a directory that does not exist, and the operator
+    has no way to learn that from the refusal. A reporter reading this message
+    concluded the ADR provider did not work, when the manifest was missing a
+    `path` (the other half of 199).
+    """
+    if not ADR_DIR.exists():
+        return (f"no ADR directory at {str(ADR_DIR)!r} (relative to the governed "
+                f"repository). Declare providers.architecture[].path if your ADRs "
+                f"live elsewhere -- onboarding conventions are docs/adr, docs/adrs, "
+                f"docs/decisions, doc/adr, adrs.")
+    if not ADR_DIR.is_dir():
+        return f"{str(ADR_DIR)!r} exists but is not a directory"
+    return None
+
+
 FUNCTIONS = {
     "get_active_decisions": get_active_decisions,
     "get_superseded_decisions": get_superseded_decisions,
@@ -346,4 +366,5 @@ CAPABILITIES = {
 if __name__ == "__main__":
     sys.exit(main(ROLE, CAPABILITIES, FUNCTIONS,
                   {"name": "adr", "permissions": {"read": True, "write": False}},
-                  properties=PROPERTIES, probe=_probe))
+                  properties=PROPERTIES, probe=_probe,
+                  transport_detail=_transport_detail))

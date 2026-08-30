@@ -109,6 +109,24 @@ def run_fixture(name, fx, tmp, rep):
     rep.add(name, "detection states it used no credentials",
             any("No credentials" in n for n in res["notes"]), "")
 
+    # ISSUE 201. Detection may name an adapter only if that adapter can read the
+    # evidence that triggered the detection. Two candidates broke it while
+    # stating it in a comment three lines above -- a `.beads/` SQLite store
+    # offered `adapters/execution-file`, a Renovate config offered
+    # `adapters/change-signals-file`. Both carried an honest not_evidence line,
+    # and a reader scanning the candidate row still got the wrong answer,
+    # because the row is the part that looks authoritative.
+    _named = [c for cs in res["candidates"].values() for c in cs if c.get("adapter")]
+    _unnamed = [c for cs in res["candidates"].values() for c in cs if not c.get("adapter")]
+    _ghost = [c["adapter"] for c in _named if not (ROOT / c["adapter"]).is_file()]
+    rep.add(name, "every named adapter exists on disk", not _ghost, f"missing: {_ghost}")
+    # A null adapter must never be silent. "Found, and nothing here reads it" is
+    # useful; "found" with no adapter and no reason is a candidate a human
+    # cannot act on either way.
+    _mute = [c["type"] for c in _unnamed if not c.get("not_evidence")]
+    rep.add(name, "a candidate naming no adapter says why", not _mute,
+            f"silent: {_mute} -- naming no adapter is honest only when the reason is stated")
+
     return repo, res
 
 
@@ -587,6 +605,156 @@ def main():
                         "architecture" not in _und,
                         "proposing a role nothing detected is detection inventing "
                         "evidence, which is the opposite defect (ADR-010)")
+
+                # ISSUE 199. Detection computed `docs/adr`, the evidence
+                # document recorded it, and build_providers read the candidate
+                # only as a boolean -- so the manifest bound adapters/adr with
+                # no path, the adapter defaulted to `docs/adrs`, found nothing,
+                # and reported TRANSPORT_UNREACHABLE. That is what a BROKEN
+                # ADAPTER looks like, which is why the reporter read a correct
+                # adapter as a defective one.
+                _p = _oi.build_providers(
+                    "github-projects", "adapters/github-projects", "o/r", None, None,
+                    {"architecture": [{"type": "adr", "adapter": "adapters/adr",
+                                       "path": "docs/adr",
+                                       "disposition": "PROVIDER_DETECTED"}]})
+                rep.add("proposal-e2e", "the detected path reaches the manifest",
+                        (_p.get("architecture") or [{}])[0].get("path") == "docs/adr",
+                        "a repository whose ADRs are not in docs/adrs binds an adapter "
+                        "that finds nothing, and says so in the vocabulary of a broken "
+                        "transport")
+                # Control. Absence must stay absence: inventing a path would
+                # bind every repository to a directory nobody detected.
+                rep.add("proposal-e2e", "control: no detected path, no path key",
+                        "path" not in (_det.get("architecture") or [{}])[0],
+                        "a default written into the manifest is a claim detection "
+                        "never made")
+                # The table says adr. A repository carrying only openspec/ was
+                # proposed adapters/adr because the entry was built from the
+                # constant while the candidate that triggered it sat unread.
+                _o = _oi.build_providers(
+                    "github-projects", "adapters/github-projects", "o/r", None, None,
+                    {"architecture": [{"type": "openspec", "adapter": "adapters/openspec",
+                                       "disposition": "PROVIDER_DETECTED"}]})
+                _oe = (_o.get("architecture") or [{}])[0]
+                rep.add("proposal-e2e", "the adapter comes from the candidate, not the table",
+                        _oe.get("adapter") == "adapters/openspec" and _oe.get("type") == "openspec",
+                        f"got {_oe.get('type')}/{_oe.get('adapter')} -- ZERO_INSTALL names "
+                        "one adapter per role, which is right only for roles nothing detects")
+                # Control. UNCONFIRMED is detection saying "something might be
+                # here" -- docs/decisions holding zero readable files is the
+                # ordinary case. Binding it yields a provider that answers
+                # nothing, which is the defect above wearing a different hat.
+                _u = _oi.build_providers(
+                    "github-projects", "adapters/github-projects", "o/r", None, None,
+                    {"architecture": [{"type": "adr", "adapter": "adapters/adr",
+                                       "path": "docs/decisions",
+                                       "disposition": "PROVIDER_UNCONFIRMED"}]})
+                rep.add("proposal-e2e", "control: an UNCONFIRMED candidate is not bound",
+                        "architecture" not in _u,
+                        "detection distinguishes DETECTED from UNCONFIRMED; the manifest "
+                        "writer is the first place that distinction is honoured")
+                # The partition is exhaustive against what detection REALLY
+                # emits, derived by running it rather than by listing fields
+                # here -- a hardcoded list is the second source of truth that
+                # let `path` go missing with nothing to notice.
+                _keys = set()
+                for _cl in O.detect(ROOT_).values():
+                    for _c in _cl:
+                        _keys |= set(_c)
+                _known = set(getattr(_oi, "CARRIED", ())) | set(getattr(_oi, "NOT_CARRIED", ()))
+                rep.add("proposal-e2e", f"detection emitted fields to classify ({len(_keys)})",
+                        bool(_keys),
+                        "a detection run that yields no candidate fields makes the "
+                        "partition check below vacuous")
+                rep.add("proposal-e2e", "every field detection emits is carried or named",
+                        _keys <= _known,
+                        f"unclassified: {sorted(_keys - _known)} -- a field must be "
+                        "carried into the manifest or listed as detection's own "
+                        "bookkeeping, so the next one cannot go missing silently")
+
+                # ISSUE 199, the half that cost the reporter the most time. With
+                # no `path` the adapter defaults to docs/adrs, finds nothing, and
+                # `--validate` said "advertises no capabilities; transport is not
+                # configured" -- the vocabulary of a BROKEN ADAPTER for an adapter
+                # that was working and pointed somewhere empty.
+                import os as _os_, re as _re_, subprocess as _sub
+                _tmp = tempfile.mkdtemp()
+                _r = _sub.run([sys.executable, str(ROOT_ / "adapters" / "adr"), "describe"],
+                              capture_output=True, text=True, cwd=_tmp,
+                              env={**_os_.environ, "REPO_GOVERNOR_TARGET": _tmp})
+                _d = json.loads(_r.stdout or "{}")
+                _msg = ((_d.get("transport") or {}).get("detail") or "")
+                shutil.rmtree(_tmp, ignore_errors=True)
+                rep.add("proposal-e2e", "an unreachable ADR provider names the directory it tried",
+                        "docs/adrs" in _msg,
+                        f"got {_msg!r} -- a refusal that does not name the path it looked "
+                        "in reads as a broken adapter, and was read that way")
+                # The message lists the conventions. That list is O.ADR_DIRS and
+                # must not become a second copy of it -- the defect this
+                # repository has fixed in imports.py, SUPERSEDED_RE, the census
+                # and the reference counts.
+                # TOKENS, not substrings. `docs/adr` is a substring of
+                # `docs/adrs`, so a containment test passes with the SINGULAR
+                # form -- the one this whole issue is about -- deleted from the
+                # message. Found by mutation; the first version of this check
+                # was vacuous in exactly the case it exists for.
+                _missing = [c for c in O.ADR_DIRS
+                            if not _re_.search(rf"(?<![\w/]){_re_.escape(c)}(?![\w/])", _msg)]
+                rep.add("proposal-e2e", "...and its convention list matches ADR_DIRS",
+                        not _missing,
+                        f"missing {_missing} -- the adapter "
+                        "cannot import engine/onboard.py, so this assertion is the only "
+                        "thing holding the two lists together")
+
+                # ISSUE 201, the general property rather than the instance. A
+                # candidate that NAMES an adapter is claiming that adapter can
+                # serve it. Checked by spawning it against the repository that
+                # triggered the detection -- not by grepping onboard.py, which
+                # would pass on a table that exists and is never read.
+                _fx = tempfile.mkdtemp()
+                (Path(_fx) / ".beads").mkdir()
+                (Path(_fx) / "docs" / "adr").mkdir(parents=True)
+                (Path(_fx) / "docs" / "adr" / "001-t.md").write_text(
+                    "# 1. T\n\n**Status**: Accepted\n", encoding="utf-8")
+                (Path(_fx) / "renovate.json").write_text("{}", encoding="utf-8")
+                _sub.run(["git", "init", "-q", "."], cwd=_fx, capture_output=True)
+                _cands = O.detect(Path(_fx))
+                _flat = [c for cs in _cands.values() for c in cs]
+                rep.add("proposal-e2e", f"the over-promise fixture produced candidates ({len(_flat)})",
+                        len(_flat) >= 3,
+                        "a fixture that detects nothing makes every claim below vacuous")
+                _bad = []
+                for _c in _flat:
+                    if not _c.get("adapter"):
+                        continue
+                    _env = {**_os_.environ, "REPO_GOVERNOR_TARGET": _fx}
+                    _env.pop("REPO_GOVERNOR_BINDING", None)
+                    if _c.get("path"):
+                        _env["REPO_GOVERNOR_BINDING"] = json.dumps({"path": _c["path"]})
+                    _rr = _sub.run([sys.executable, str(ROOT / _c["adapter"]), "describe"],
+                                   capture_output=True, text=True, cwd=_fx, env=_env)
+                    _tt = (json.loads(_rr.stdout or "{}").get("transport") or {})
+                    if _tt.get("reachable") is not True:
+                        _bad.append(f"{_c['type']}->{_c['adapter']}")
+                rep.add("proposal-e2e", "every named adapter can read what its evidence cites",
+                        not _bad,
+                        f"unreachable against the repository that triggered them: {_bad} -- "
+                        "detection may name an adapter only if that adapter can read the "
+                        "evidence that triggered the detection")
+                # The two instances, by name, because both were shipped and both
+                # stated the rule they broke in a comment directly above.
+                _ex = [c for c in _cands.get("execution", []) if c.get("type") == "beads"]
+                rep.add("proposal-e2e", "a .beads store is detected and names no adapter",
+                        bool(_ex) and not _ex[0].get("adapter"),
+                        "adapters/execution-file reads .repo-governor/execution.json and "
+                        "cannot open a SQLite store")
+                _cs = _cands.get("change_signals", [])
+                rep.add("proposal-e2e", "a renovate config is detected and names no adapter",
+                        bool(_cs) and not any(c.get("adapter") for c in _cs),
+                        "adapters/change-signals-file reads a local signals file, not a "
+                        "Renovate config")
+                shutil.rmtree(_fx, ignore_errors=True)
 
                 _allowed = set(_spec) | {"repository", "roadmap_authority"}
                 rep.add("proposal-e2e", "and nothing outside the table is proposed",
