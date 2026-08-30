@@ -26,6 +26,13 @@ with nothing in it are different facts with different fixes:
 Collapsing them into "missing" is the absence-vs-unknown failure ADR-003 rule 6
 forbids of every adapter, and issue 200 records the engine committing it.
 
+WHO CAN FIX IT is reported separately from WHAT IS MISSING, and is the more
+useful axis. `absent` needs a workflow state created -- a team setting with no
+API surface here, so a human does it. `declared` needs an issue put into a
+state that already exists, which is an ordinary write. Printing both as
+"missing" leaves the reader to find out which they can automate one failed
+script later.
+
 TRUNCATION IS REPORTED, NOT HIDDEN. The GitHub side reads a bounded page. A
 bucket absent from that page is reported as `not in the newest N`, never as
 absent: `.github/project-config.json` already records this exact trap --
@@ -106,6 +113,18 @@ def linear_states(payload):
     return counts, declared
 
 
+# Who can close each gap. ONE function, used by the report and by the self-test:
+# a control that re-implements the routing tests nothing about the routing
+# (issue 187, where exactly that left a broken comparator green).
+FIXER = {"populated": None, "declared": "scripted",
+         "absent": "human", "absent-or-declared": "unknown"}
+
+
+def who_fixes(state):
+    """"human" when only a team setting closes it, "scripted" when a write does."""
+    return FIXER[state]
+
+
 def classify(ltype, counts, declared):
     if counts.get(ltype):
         return "populated", counts[ltype]
@@ -132,24 +151,46 @@ def report(lcounts, ldeclared, gcounts, gseen, github_only):
     total = len(SCENARIOS)
     print(f"\n  runnable: {runnable} of {total}")
     if runnable < total:
-        print("\n  To make the bar runnable:")
+        # WHO CAN FIX IT is a separate axis from WHAT IS MISSING, and the more
+        # useful one. Creating a workflow state is a team setting with no API
+        # surface here; putting an issue INTO a state that already exists is an
+        # ordinary write. Printing both as "missing" leaves the reader to
+        # discover which of the two they can automate, one failed script later.
+        human, scripted, unknown = [], [], []
         for meaning, ltype, _e, gh_state in SCENARIOS:
             gn = (gcounts or {}).get(gh_state, 0)
             if not gn:
-                print(f"    github: no issue is {gh_state!r} within the newest {gseen} "
-                      f"-- create one, or search deeper")
+                scripted.append(f"github: no issue is {gh_state!r} within the newest "
+                                f"{gseen} -- create one, or search deeper")
             if github_only:
                 continue
             state, _n = classify(ltype, lcounts, ldeclared)
-            if state == "declared":
-                print(f"    linear: status type {ltype!r} exists and holds nothing "
-                      f"-- put one issue in it")
-            elif state == "absent":
-                print(f"    linear: no status of type {ltype!r} in this team "
-                      f"-- create one (Triage may need enabling)")
-            elif state == "absent-or-declared":
-                print(f"    linear: nothing of type {ltype!r} present; include "
-                      f"list_issue_statuses output to tell 'absent' from 'declared'")
+            fixer = who_fixes(state)
+            if fixer == "scripted":
+                scripted.append(f"linear: status type {ltype!r} exists and holds "
+                                f"nothing -- create an issue and set it to that state")
+            elif fixer == "human":
+                human.append(f"linear: this team has no status of type {ltype!r}. "
+                             f"Add one in Team settings -> Workflow"
+                             + (" (Triage is a team feature, enable it there)"
+                                if ltype == "triage" else ""))
+            elif fixer == "unknown":
+                unknown.append(f"linear: nothing of type {ltype!r} present -- include "
+                               f"list_issue_statuses output to tell 'absent' from "
+                               f"'declared', which decides who can fix it")
+        if human:
+            print("\n  A HUMAN MUST DO THESE -- no API here reaches a team's workflow "
+                  "settings:")
+            for line in human:
+                print(f"    {line}")
+        if scripted:
+            print("\n  These can be scripted:")
+            for line in scripted:
+                print(f"    {line}")
+        if unknown:
+            print("\n  Cannot tell who fixes these without the status vocabulary:")
+            for line in unknown:
+                print(f"    {line}")
     return 0 if runnable == len(SCENARIOS) else 1
 
 
@@ -179,6 +220,16 @@ def self_test():
     # Absence of evidence is not evidence of absence (ADR-003 rule 6).
     check("a populated type is populated whether or not it was declared",
           classify("started", {"started": 1}, None) == ("populated", 1))
+    # WHO fixes it, routed through the same function the report uses.
+    check("a missing status is a human's job, not a script's",
+          who_fixes("absent") == "human",
+          "creating a workflow state is a team setting with no API surface here")
+    check("an empty-but-declared status is scriptable",
+          who_fixes("declared") == "scripted",
+          "putting an issue into a state that exists is an ordinary write")
+    check("who-fixes-it covers every classify() answer",
+          set(FIXER) == {"populated", "declared", "absent", "absent-or-declared"},
+          "a state with no fixer would be printed as nothing at all")
     print(f"\nPROVIDER-READINESS SELF-TEST: {'PASS' if not fails else f'FAIL ({fails})'}")
     return 1 if fails else 0
 
