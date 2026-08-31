@@ -1,6 +1,7 @@
 # 24. The ScopeEnvelope Is Compiled, Not Authored
 
-**Status**: Accepted — ratified 2026-08-31 ([RATIFICATION-v0.5.0.md](RATIFICATION-v0.5.0.md)). All four acceptance conditions below are met; the last of them, issue 2, was answered by measurement across six repositories on 2026-08-18.
+**Status**: Accepted — ratified 2026-08-31 under RATIFICATION-v0.5.0.md. All four acceptance conditions below are met; the last, issue 2, was answered by measurement across six repositories on 2026-08-18.
+**Ratification**: [RATIFICATION-v0.5.0.md](RATIFICATION-v0.5.0.md) — the link lives here and not on the Status line, because `adapters/adr` treats a `[` in a status value as an unfilled template (`PLACEHOLDER`), and a markdown link there made this project's own adapter read this project's own ratification as a template.
 **Held at ratification**: 2026-08-17. Not accepted for v0.1.0 — see [RATIFICATION-v0.1.0.md](RATIFICATION-v0.1.0.md) finding F2. This describes architecture that **does not exist yet**.
 **Date**: 2026-08-17
 **Domain**: Policy engine / core domain model
