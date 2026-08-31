@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """ExecutionStateProvider backed by a local JSON file (spec §13, §62).
 
-Synthetic reference implementation. Beads is the intended real backend;
-per ADR-016 that adapter should use the `bd` CLI (stable JSON) rather than
-the Beads MCP server (built for agents to converse with).
+Synthetic reference implementation. `adapters/beads` is now the real backend
+and reads the `bd export` JSONL rather than the `bd` CLI this docstring used
+to point at -- ADR-016 prefers the CLI over the Beads MCP server and still
+does, but it is silent on live-versus-committed, and ADR-033 is not: a
+repo-local provider answers about the checked-out revision. See that
+adapter's docstring for the argument.
 
 INV-002 is the point of this role's separation: nothing here confers
 roadmap authority. A task marked READY says the execution graph is ready,

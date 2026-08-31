@@ -11,7 +11,7 @@ conformance minimums: [`docs/reference/provider-roles.md`](../docs/reference/pro
 |---|---|---|
 | `roadmap_authority` | Is this admitted and still authorized? | `file-roadmap`, `linear`, `github-projects` |
 | `architecture` | What constrains how it must be built? | `adr` |
-| `execution` | What is the state beneath the authority? | `execution-file` |
+| `execution` | What is the state beneath the authority? | `execution-file`, `beads` |
 | `repository` | What is actually here? | `git` |
 | `change_signals` | What changed outside? | `change-signals-file` |
 | `retirement` | What obligations block removal? | `retirement-analysis` |
