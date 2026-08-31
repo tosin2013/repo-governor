@@ -78,8 +78,9 @@ This ADR stays `Proposed` until all four are met. None is met today.
    reads it must be able to act on it immediately. If not, it is decoration,
    and decoration in a governance surface is worse than silence.
 4. **Measured on repositories this project does not own.** The same bar
-   [ADR-024](024-scope-envelope-compiler.md) is held to, for the same reason:
-   a property observed only here is a property of this repository.
+   [ADR-024](024-scope-envelope-compiler.md) was held to, and met on
+   2026-08-31, for the same reason: a property observed only here is a property
+   of this repository.
 
 ## Consequences
 

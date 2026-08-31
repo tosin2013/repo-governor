@@ -1,6 +1,24 @@
 # Architecture Ratification Review — v0.5.0
 
-**Prepared** 2026-08-31 · **Ratification: not yet recorded.**
+**Prepared** 2026-08-31 · **Ratified 2026-08-31 by Tosin Akinosho (§68).**
+
+> **Decision.**
+>
+> **ADR-024 is `Accepted`.** Its four acceptance conditions are met, each verified
+> against the file rather than asserted — see F1 below.
+>
+> **ADR-031 and ADR-033 remain `Proposed`, and they are runtime dependencies.**
+> v0.5.0 therefore ships as a **recorded departure** from the release condition
+> stated in `RATIFICATION-v0.1.0.md`. Neither can be accepted until measurements
+> on repositories and hosts this project does not control are complete; holding
+> the release on them indefinitely is the worse option. That is a judgement, made
+> here rather than left implicit, which is the whole difference between this
+> release and the four before it.
+>
+> **The F3 conflict stays open.** None of the three readings is adopted. A
+> departure recorded once is an exception; recorded every release, it is the
+> condition being repealed by habit, and the next reviewer should treat a second
+> one as a signal to settle F3 rather than to repeat this line.
 
 > **This document is the evidence half only.** An agent produced it. The
 > acceptance decision belongs to the maintainer (§68) and is deliberately absent

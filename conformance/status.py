@@ -286,9 +286,10 @@ def main():
 
     # NOT A SCORE. The refusal is in status.py's own docstring -- "a number
     # invites optimising the number" -- and it bites hardest here: a Proposed
-    # ADR is not worse than an Accepted one. ADR-024 is correctly Proposed
-    # pending a measurement on repositories this project does not own, and a
-    # percentage would read that as debt.
+    # ADR is not worse than an Accepted one. ADR-031 is correctly Proposed
+    # pending a measurement on a host this project does not own, and a
+    # percentage would read that as debt. (ADR-024 was the example until it was
+    # accepted on 2026-08-31.)
     import re as _re
     fails += check("no ratio or percentage is printed for the ledger",
                    not _re.search(r"architecture[\s\S]{0,220}?(\d+\s*%|\d+\s*/\s*\d+\s+(?:Accepted|ADRs))", out3),

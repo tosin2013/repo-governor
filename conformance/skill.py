@@ -675,6 +675,23 @@ def main():
     fails += check(f"proposed ADRs were actually found ({len(proposed)})", bool(proposed),
                    "a status regex that matches nothing reads as an all-Accepted repository")
 
+    # THE SAME FALSE SENTENCE LIVED IN TWO FILES. The guard below reads
+    # docs/adrs/README.md, and the top-level README carried its own copy of
+    # "none referenced by the runtime" -- which stayed green because nothing
+    # read that file for this claim. A guard scoped to one of two places that
+    # must agree is the defect it was written against, one level up.
+    #
+    # So: no document may assert the runtime depends on none of them while the
+    # derived set is non-empty. A blunt check, on purpose.
+    NO_DEP = re.compile(r"none[^.\n]{0,40}referenced by the runtime", re.I)
+    liars = [d for d in ("README.md", "AGENTS.md", "SKILL.md", "docs/adrs/README.md",
+                         "docs/installation.md", "CONTRIBUTING.md")
+             if (ROOT / d).is_file() and NO_DEP.search((ROOT / d).read_text(encoding="utf-8"))]
+    fails += check("no document claims the runtime depends on no proposed ADR",
+                   not (dependent and liars),
+                   f"{liars} say none is referenced by the runtime, while "
+                   f"{sorted(dependent)} are")
+
     idx = (ROOT / "docs" / "adrs" / "README.md").read_text(encoding="utf-8")
     m_dep = re.search(r"Runtime-dependent and still `Proposed`:\s*([^*]+)", idx)
     fails += check("the ADR index states which proposed ADRs the runtime depends on",
