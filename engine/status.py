@@ -61,8 +61,11 @@ def _architecture_detail(role, described):
 
     NOT A SCORE. `engine/status.py` refuses those, and the reason applies with
     unusual force here: a Proposed ADR is not worse than an Accepted one.
-    ADR-024 is correctly Proposed pending a measurement on repositories this
-    project does not own. A number would read that as debt and create pressure
+    ADR-031 is correctly Proposed pending a measurement on a host this
+    project does not own. (This named ADR-024 until 2026-08-31, when 024 was
+    accepted -- the argument is unchanged and needed a live example, because an
+    example that has since been accepted quietly makes the point read as
+    historical.) A number would read that as debt and create pressure
     to accept decisions to raise it -- admission without authority, applied to
     an architecture ledger. Counts and named states carry the same information
     and cannot be optimised.

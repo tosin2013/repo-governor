@@ -32,7 +32,7 @@ python3 engine/completion.py <work-id>     # govern
 | | |
 | --- | --- |
 | Roadmap authority | GitHub issues, admission by milestone ([ADR-018](docs/adrs/018-admission-signal-is-declared-not-assumed.md), [ADR-022](docs/adrs/022-repo-governor-does-not-own-roadmap-state.md)) |
-| Decisions | 31 ADRs — **23 Accepted** (2026-08-17), 7 `Proposed` ([020](docs/adrs/020-agent-supplied-transport-with-adapter-as-normalizer.md), [024](docs/adrs/024-scope-envelope-compiler.md), [029](docs/adrs/029-hooks-as-deterministic-delivery-surface.md), [030](docs/adrs/030-backend-recommendation-from-declared-capability.md), [031](docs/adrs/031-authority-source-missing-obliges-disclosure-not-refusal.md), [032](docs/adrs/032-a-decision-declares-how-it-will-be-confirmed.md), [033](docs/adrs/033-repo-local-providers-answer-about-the-checked-out-revision.md)) — none referenced by the runtime — and 1 `Superseded` ([014](docs/adrs/014-scope-envelope-as-bounded-execution-contract.md), split) |
+| Decisions | 31 ADRs — **24 Accepted** (23 on 2026-08-17, [024](docs/adrs/024-scope-envelope-compiler.md) on 2026-08-31), 6 `Proposed` ([020](docs/adrs/020-agent-supplied-transport-with-adapter-as-normalizer.md), [029](docs/adrs/029-hooks-as-deterministic-delivery-surface.md), [030](docs/adrs/030-backend-recommendation-from-declared-capability.md), [031](docs/adrs/031-authority-source-missing-obliges-disclosure-not-refusal.md), [032](docs/adrs/032-a-decision-declares-how-it-will-be-confirmed.md), [033](docs/adrs/033-repo-local-providers-answer-about-the-checked-out-revision.md)) — **two of which, 031 and 033, the runtime depends on**, recorded as a departure in [RATIFICATION-v0.5.0.md](docs/adrs/RATIFICATION-v0.5.0.md) — and 1 `Superseded` ([014](docs/adrs/014-scope-envelope-as-bounded-execution-contract.md), split) |
 | Open thesis risks | [#1](https://github.com/tosin2013/repo-governor/issues/1) normalization (fixtures only), [#2](https://github.com/tosin2013/repo-governor/issues/2) envelope thinness (measured: *always* thin on real trackers), [#5](https://github.com/tosin2013/repo-governor/issues/5) skill activation (unmeasured) |
 
 ---
@@ -74,14 +74,14 @@ A deterministic engine reconciles their state and returns one bounded dispositio
 
 **Since v0.1.0 the engine emits eleven of the twelve.** `engine/completion.py` answers *is this finished?* and *is authority absent or withdrawn?*; `engine/envelope.py` compiles the ScopeEnvelope and rules on discoveries, adding `CAPTURE_ONLY`, the four review lanes, and `EXECUTE` for work substantiated as necessary to the authorized outcome. Only `CONFLICT` remains unreachable — it needs two peer providers actually disagreeing.
 
-The v0.1.0 tag itself emits five; that limitation is recorded in the [ratification review](docs/adrs/RATIFICATION-v0.1.0.md). [ADR-024](docs/adrs/024-scope-envelope-compiler.md) is still `Proposed`: three of its four acceptance conditions are met, and the fourth — measuring envelope thinness on repositories this project does not own — is [#2](https://github.com/tosin2013/repo-governor/issues/2).
+The v0.1.0 tag itself emits five; that limitation is recorded in the [ratification review](docs/adrs/RATIFICATION-v0.1.0.md). [ADR-024](docs/adrs/024-scope-envelope-compiler.md) is `Accepted` as of 2026-08-31: the fourth condition — measuring envelope thinness on repositories this project does not own — was answered by [#2](https://github.com/tosin2013/repo-governor/issues/2) across six repositories, five of them foreign.
 
 Governance depth scales with repository condition (L0 greenfield → L4 mature/high-assurance), so a two-file repository needs Git, a ten-line manifest, and four invariants — nothing more.
 
 ## Install
 
 ```bash
-git clone --branch v0.4.1 https://github.com/tosin2013/repo-governor /tmp/rg
+git clone --branch v0.5.0 https://github.com/tosin2013/repo-governor /tmp/rg
 /tmp/rg/tools/install-skill.sh /path/to/your/repo .claude/skills
 ```
 
@@ -117,7 +117,7 @@ engine/        deterministic policy engine, Python stdlib only
 conformance/   19 suites — the evidence behind every gate claim
 schemas/       manifest v1 JSON Schema
 docs/
-  adrs/        31 architectural decisions (23 Accepted) + index + ratification review
+  adrs/        31 architectural decisions (24 Accepted) + index + two ratification reviews
   reference/   normative specification, §1–§70, INV-001…INV-014
   research/    external landscape sweep + transport/capability research
 ```

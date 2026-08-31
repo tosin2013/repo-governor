@@ -127,7 +127,7 @@ python3 "$RG/engine/envelope.py" <work-id> --discovery <TYPE>[:target] [--record
 
 It compiles the ScopeEnvelope from provider state and rules on the discovery. `--record` persists the capture through the decision-history provider, idempotently.
 
-**Two limits worth knowing.** Necessity is a claim you make (`--necessary`) and the engine *substantiates against declared scope* — an unsupported claim fails closed to `CAPTURE_ONLY`, so it is not a password that unlocks work. And once acceptance conditions are satisfied, **nothing** converts to execution: not a bug, not a necessary change, not a three-line fix (§40). ADR-024 remains `Proposed` — its last acceptance condition is a measurement on repositories this project does not own.
+**Two limits worth knowing.** Necessity is a claim you make (`--necessary`) and the engine *substantiates against declared scope* — an unsupported claim fails closed to `CAPTURE_ONLY`, so it is not a password that unlocks work. And once acceptance conditions are satisfied, **nothing** converts to execution: not a bug, not a necessary change, not a three-line fix (§40). ADR-024 is `Accepted` — its last acceptance condition, a measurement on repositories this project does not own, was answered across six of them.
 
 ## Before deleting anything
 

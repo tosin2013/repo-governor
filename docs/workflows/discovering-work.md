@@ -20,7 +20,7 @@ For a genuine open question rather than a buildable thing:
 
 ## What the engine will say
 
-`CAPTURE_ONLY` is the *correct, complete* outcome for a discovery — not a deferral, not a consolation prize. The engine now rules on discoveries directly (`engine/envelope.py --discovery`), so ask it rather than deciding yourself. ADR-024 remains `Proposed` — its last acceptance condition is a measurement on repositories this project does not own — but INV-001 is now enforced rather than merely followed: an unsubstantiated necessity claim fails closed, and once acceptance conditions are satisfied nothing converts to execution at all. A clean `completion.py` run on issue N still says nothing about the thing discovered along the way; that is a separate question with a separate answer.
+`CAPTURE_ONLY` is the *correct, complete* outcome for a discovery — not a deferral, not a consolation prize. The engine now rules on discoveries directly (`engine/envelope.py --discovery`), so ask it rather than deciding yourself. ADR-024 is `Accepted` — its last acceptance condition, a measurement on repositories this project does not own, was answered across six of them — and INV-001 is now enforced rather than merely followed: an unsubstantiated necessity claim fails closed, and once acceptance conditions are satisfied nothing converts to execution at all. A clean `completion.py` run on issue N still says nothing about the thing discovered along the way; that is a separate question with a separate answer.
 
 ## The forbidden shortcut
 
