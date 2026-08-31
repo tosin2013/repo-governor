@@ -34,6 +34,12 @@ DIR = Path(os.environ.get("REPO_GOVERNOR_ACCEPTANCE_DIR", ".repo-governor/accept
 # growth path ends at an expression language nobody planned.
 CHECKS = ("tests_pass", "file_exists", "command_exit")
 
+# A criterion is closed too, and for the same reason: a key that is not read
+# but looks like it is (issue 213) makes the bar say something it does not
+# check. Mirrored by $defs.criterion in schemas/acceptance-v1.json, and
+# conformance/acceptance.py asserts the two agree.
+CRITERION_KEYS = ("check", "target", "$comment")
+
 SAFE_ID = re.compile(r"^[A-Za-z0-9._-]+$")
 
 
@@ -138,6 +144,35 @@ def get_criteria(kw):
         return fail(ROLE, "get_criteria", "MALFORMED_SOURCE",
                     f"{p} contains {len(bad)} criterion/criteria outside the closed "
                     f"vocabulary {list(CHECKS)}: {bad[:2]}")
+    # A criterion is (check, target). `target` is what the repository provider
+    # measures -- a path for file_exists, a command string for the other two
+    # (adapters/git evaluate_check). Serving a criterion without it hands the
+    # engine something it cannot evaluate, and the engine crashed on the
+    # KeyError rather than reaching any disposition (issue 213). That is the
+    # same class as an unrecognised check -- a bar that states nothing
+    # measurable -- so it gets the same refusal ADR-017 rule 4 already
+    # prescribes. A malformed bar must produce a verdict, never a traceback.
+    untargeted = [c for c in data["criteria"]
+                  if not isinstance(c.get("target"), str) or not c["target"].strip()]
+    if untargeted:
+        return fail(ROLE, "get_criteria", "MALFORMED_SOURCE",
+                    f"{p} contains {len(untargeted)} criterion/criteria with no usable "
+                    f"'target': {untargeted[:2]}. Every criterion is {{check, target}} -- "
+                    "target is the path for file_exists and the command string for "
+                    "tests_pass and command_exit. Keys such as 'command' or "
+                    "'description' are not read; see schemas/acceptance-v1.json.")
+    # The other half of the same defect. A criterion carrying `command` NEXT TO
+    # a valid `target` is worse than one carrying it instead: it reads as though
+    # two things are checked and only one is. Silently ignoring a key that looks
+    # load-bearing is how a bar comes to check something other than what its
+    # author believes. So the criterion object is closed, exactly as the check
+    # vocabulary is.
+    extra = sorted({k for c in data["criteria"] for k in c} - set(CRITERION_KEYS))
+    if extra:
+        return fail(ROLE, "get_criteria", "MALFORMED_SOURCE",
+                    f"{p}: criteria carry key(s) {extra} that are never read. A criterion "
+                    f"is {set(CRITERION_KEYS)}. Put the command in 'target' and any prose "
+                    "in '$comment'; see schemas/acceptance-v1.json.")
     return ok(ROLE, "get_criteria",
               {"authority_id": kw["id"],
                "criteria": data["criteria"],

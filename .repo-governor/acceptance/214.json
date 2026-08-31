@@ -1,0 +1,26 @@
+{
+  "$comment": "The criterion contract must be readable from the surfaces an author actually reads, and the two enforcers of it must agree.",
+  "authority_id": "214",
+  "criteria": [
+    {
+      "check": "file_exists",
+      "target": "schemas/acceptance-v1.json",
+      "$comment": "The contract is published, alongside the manifest schema it was missing next to."
+    },
+    {
+      "check": "command_exit",
+      "target": "grep -q 'schemas/acceptance-v1.json' SKILL.md && grep -q 'check, target' SKILL.md",
+      "$comment": "On the surface an agent loads, not only in an ADR body."
+    },
+    {
+      "check": "command_exit",
+      "target": "grep -q 'acceptance.py' tools/onboard-interactive.py && python3 -c \"import ast;ast.parse(open('tools/onboard-interactive.py').read())\"",
+      "$comment": "Onboarding pointed at mkdir and stopped. It now points at the scaffold that has shown the correct shape all along."
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/acceptance.py",
+      "$comment": "Includes the anti-drift checks: schema and adapter compared literal-to-literal, every bar on disk validated, and the shipped scaffold validated against the shipped contract."
+    }
+  ]
+}

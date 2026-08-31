@@ -1,0 +1,26 @@
+{
+  "$comment": "A malformed bar must produce a verdict, never a traceback. Each criterion below fails on main before this work: the adapter served a criterion with no 'target' and completion.py died on the KeyError.",
+  "authority_id": "213",
+  "criteria": [
+    {
+      "check": "command_exit",
+      "target": "d=$(mktemp -d); printf '%s' '{\"authority_id\":\"G-1\",\"criteria\":[{\"check\":\"tests_pass\"}]}' > $d/G-1.json; REPO_GOVERNOR_ACCEPTANCE_DIR=$d python3 adapters/acceptance-file query acceptance_criteria get_criteria id=G-1 | grep -q MALFORMED_SOURCE",
+      "$comment": "The reported shape, isolated: a missing target and nothing else wrong. Refused, not served."
+    },
+    {
+      "check": "command_exit",
+      "target": "d=$(mktemp -d); printf '%s' '{\"authority_id\":\"G-2\",\"criteria\":[{\"check\":\"command_exit\",\"target\":\"true\",\"command\":\"make lint\"}]}' > $d/G-2.json; REPO_GOVERNOR_ACCEPTANCE_DIR=$d python3 adapters/acceptance-file query acceptance_criteria get_criteria id=G-2 | grep -q MALFORMED_SOURCE",
+      "$comment": "The worse half: a key that is never read sitting NEXT TO a valid target reads as though two things are checked and only one is."
+    },
+    {
+      "check": "command_exit",
+      "target": "d=$(mktemp -d); printf '%s' '{\"authority_id\":\"G-3\",\"criteria\":[{\"check\":\"file_exists\",\"target\":\"README.md\",\"$comment\":\"why\"}]}' > $d/G-3.json; REPO_GOVERNOR_ACCEPTANCE_DIR=$d python3 adapters/acceptance-file query acceptance_criteria get_criteria id=G-3 | grep -q '\"ok\": true'",
+      "$comment": "Positive control. Without it the two above are satisfied by an adapter that refuses everything."
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/acceptance.py",
+      "$comment": "The guard is asserted where it will still be asserted after this issue closes. A check that lives only in a bar goes unguarded the moment the issue does."
+    }
+  ]
+}

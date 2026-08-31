@@ -66,6 +66,24 @@ Returns JSON with a `decision`. Obey it:
 
 Every `unknown` carries `reason`, `dimension`, `blocking`, and a human-readable `resolution`. Report the resolution rather than working around it.
 
+### Declaring a completion bar
+
+`STOP_COMPLETE` is only reachable when the work item has a bar — one file at `.repo-governor/acceptance/<id>.json`. Scaffold it; do not hand-write the first one:
+
+```bash
+python3 "$RG/engine/acceptance.py" <id> --template
+```
+
+A criterion is exactly **`{check, target}`**. `check` is one of `tests_pass`, `file_exists`, `command_exit`; `target` is the path for `file_exists` and the command string for the other two. Any other key — `command`, `description` — is refused as `MALFORMED_SOURCE`, because a key that is never read makes the bar claim something it does not check. Prose goes in `$comment`.
+
+```json
+{ "authority_id": "42",
+  "criteria": [ { "check": "file_exists", "target": "adapters/foo" },
+                { "check": "command_exit", "target": "python3 conformance/foo.py" } ] }
+```
+
+The full contract, including `covers` for a bar that deliberately leaves part of the item out, is `schemas/acceptance-v1.json`. **Never write a criterion you have not seen fail** — an empty or unfalsifiable bar reads `NO_CRITERIA_DECLARED`, never satisfied (§40).
+
 ## Linear with MCP transport
 
 When the manifest declares `roadmap_authority` as Linear with `"transport": {"kind": "mcp"}`, the engine cannot reach Linear on its own — the engine never calls MCP (ADR-016). The **agent** bridges the gap by fetching from Linear MCP and supplying the data to the engine through the environment.
