@@ -486,6 +486,124 @@ def main():
                    "and no child evaluated past it")
 
 
+    print("\nThe criterion contract is published, and the two enforcers agree (issues 213, 214)\n")
+
+    # A criterion is (check, target). Before this, `target` was required by the
+    # CONSUMER (adapters/git evaluate_check) and asserted by NO producer: the
+    # adapter served a criterion without it, advertising machine_checkable=true,
+    # and completion.py:282 died on the KeyError before reaching any
+    # disposition. A governance engine's entire product is a verdict; handed a
+    # malformed bar it must still produce one.
+    #
+    # The shape also lived in exactly one place -- the body of ADR-017 -- which
+    # is why a governed repository authored `command` and `description` keys
+    # that were never read. schemas/acceptance-v1.json publishes it.
+    #
+    # TWO enforcers now state the same contract, which is the setup for the
+    # other defect this repository keeps finding: two places that must agree
+    # with nothing asserting it. So the fixtures below are driven through BOTH,
+    # and the vocabularies are compared literal-to-literal.
+    schema_path = ROOT / "schemas" / "acceptance-v1.json"
+    fails += check("the criterion contract is published as a schema",
+                   schema_path.exists(), f"{schema_path} is missing")
+    SCH = json.loads(schema_path.read_text(encoding="utf-8"))
+    import jsonschema_mini as JS  # noqa: E402 -- engine/ is on sys.path above
+
+    MALFORMED = [
+        ("no target at all -- the shape actually reported",
+         [{"check": "tests_pass", "description": "suite green"},
+          {"check": "command_exit", "command": "true", "description": "builds"}]),
+        # ISOLATED. The fixture above carries `description` and `command`, so
+        # the unknown-key guard refuses it too -- removing the target guard
+        # left that check green, and it would have vouched for a guard that
+        # was gone. This one has NOTHING but a missing target, so only the
+        # target guard can catch it.
+        ("a missing target and nothing else wrong", [{"check": "tests_pass"}]),
+        ("target present but whitespace", [{"check": "file_exists", "target": "   "}]),
+        ("target of the wrong type", [{"check": "file_exists", "target": ["x"]}]),
+        ("a key that is never read, NEXT TO a valid target",
+         [{"check": "command_exit", "target": "true", "command": "make lint"}]),
+        ("a check outside the closed vocabulary", [{"check": "lgtm", "target": "x"}]),
+    ]
+    with tempfile.TemporaryDirectory() as td:
+        d = Path(td) / ".repo-governor" / "acceptance"
+        d.mkdir(parents=True)
+        for i, (label, crit) in enumerate(MALFORMED):
+            wid = f"M-{i}"
+            doc = {"authority_id": wid, "criteria": crit}
+            (d / f"{wid}.json").write_text(json.dumps(doc))
+            r = adapter(wid, td)
+            refused = (r.get("ok") is False
+                       and r.get("error", {}).get("type") == "MALFORMED_SOURCE")
+            fails += check(f"the adapter refuses: {label}", refused,
+                           f"served instead: {json.dumps(r)[:200]}")
+            fails += check(f"the schema refuses: {label}", bool(JS.validate(doc, SCH)),
+                           "the published contract accepts what the adapter rejects")
+
+        # POSITIVE CONTROL. Without it every check above passes on an adapter
+        # that refuses everything and a schema that accepts nothing.
+        good = {"authority_id": "M-ok", "$comment": "why",
+                "criteria": [{"check": "file_exists", "target": "README.md",
+                              "$comment": "prose belongs here"}]}
+        (d / "M-ok.json").write_text(json.dumps(good))
+        rg = adapter("M-ok", td)
+        fails += check("positive control: the adapter serves a well-formed bar",
+                       rg.get("ok") is True and rg["value"]["count"] == 1,
+                       json.dumps(rg)[:200])
+        fails += check("positive control: the schema accepts a well-formed bar",
+                       not JS.validate(good, SCH), str(JS.validate(good, SCH)))
+
+    # The published contract must describe the bars that actually exist. A
+    # schema nothing on disk is measured against is documentation, not a
+    # contract -- and this repository's 400-plus criteria are the only corpus
+    # that can show the shape was written from reality rather than from memory.
+    bars = sorted((ROOT / ".repo-governor" / "acceptance").glob("*.json"))
+    rejected = [(b.name, JS.validate(json.loads(b.read_text(encoding="utf-8")), SCH))
+                for b in bars]
+    rejected = [(n, e) for n, e in rejected if e]
+    # OUR OWN SCAFFOLD MUST VALIDATE. The first version of this schema rejected
+    # the file `engine/acceptance.py --template` writes, over the two keys the
+    # template adds to show the shape. A contract that refuses the artifact its
+    # own tooling produces is the two-places-disagree defect, shipped.
+    import importlib.util as _ilu  # noqa: E402
+    _sp = _ilu.spec_from_file_location("_acc_tool", TOOL)
+    _m = _ilu.module_from_spec(_sp); _sp.loader.exec_module(_m)
+    _terrs = JS.validate(_m.template("T-1"), SCH)
+    fails += check("the scaffold this project ships validates against the schema "
+                   "this project publishes", not _terrs, str(_terrs))
+    fails += check("and the scaffold is still not a bar: it declares no criteria",
+                   _m.template("T-1")["criteria"] == [],
+                   "a template that validated AND declared criteria would be a bar "
+                   "nobody wrote")
+
+    fails += check(f"every bar on disk validates against the published schema "
+                   f"({len(bars)} bars)",
+                   not rejected and len(bars) > 0,
+                   f"{len(rejected)} rejected, e.g. {rejected[:2]}")
+
+    # ANTI-DRIFT, mechanical. Read the adapter's literals out of its source --
+    # importing an extensionless adapter is what conformance/imports.py polices,
+    # and ast needs no import at all.
+    import ast  # noqa: E402
+    tree = ast.parse(ACC.read_text(encoding="utf-8"))
+    lits = {t.id: ast.literal_eval(n.value)
+            for n in tree.body if isinstance(n, ast.Assign)
+            for t in n.targets if isinstance(t, ast.Name)
+            and isinstance(n.value, (ast.Tuple, ast.List, ast.Constant))}
+    crit_def = SCH["$defs"]["criterion"]
+    fails += check("adapter CHECKS and the schema's check enum are the same set",
+                   set(lits.get("CHECKS", ())) == set(crit_def["properties"]["check"]["enum"])
+                   and bool(lits.get("CHECKS")),
+                   f"adapter={lits.get('CHECKS')} schema={crit_def['properties']['check']['enum']}")
+    fails += check("adapter CRITERION_KEYS and the schema's criterion properties agree",
+                   set(lits.get("CRITERION_KEYS", ())) == set(crit_def["properties"])
+                   and bool(lits.get("CRITERION_KEYS")),
+                   f"adapter={lits.get('CRITERION_KEYS')} schema={sorted(crit_def['properties'])}")
+    fails += check("the schema marks target required, as the consumer needs",
+                   "target" in crit_def.get("required", []) and "check" in crit_def["required"],
+                   f"required={crit_def.get('required')}")
+
+
     print(f"\n{'ACCEPTANCE: CONFORMANT' if not fails else f'ACCEPTANCE: NON-CONFORMANT ({fails})'}")
     return 0 if not fails else 1
 

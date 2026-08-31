@@ -517,6 +517,15 @@ def main(argv):
     # generated manifest.
     print(f"  mkdir -p {repo / '.repo-governor' / 'decisions'}   # the decision store")
     print(f"  mkdir -p {repo / '.repo-governor' / 'acceptance'}  # where completion bars live")
+    # And say how to write one. This printed the mkdir and stopped, which told
+    # an author where bars live and nothing about what goes in them -- a
+    # governed repository then authored criteria with 'command' and
+    # 'description' keys that are never read, and the engine crashed on the
+    # missing 'target' instead of returning a disposition (issues 213, 214).
+    # The scaffold has shown the correct shape all along; nothing pointed at it.
+    print(f"\n  # A bar is {{check, target}} per criterion -- schemas/acceptance-v1.json.")
+    print(f"  # Do not hand-write the first one; scaffold it and edit:")
+    print(f"  python3 {SKILL / 'engine' / 'acceptance.py'} <id> --template")
     print(f"  cd {repo} && mv {PROPOSAL} .repo-governor.json")
     print(f"  python3 {SKILL / 'engine' / 'manifest.py'} --validate")
     print("\nIf validation fails, rename it back. Nothing governs until it passes.")
