@@ -156,6 +156,29 @@ SUITE = {
         "unknown_fn": ("get_execution_history", {"id": "AUTHORIZED-1"}),
         "absence_fn": ("get_tasks", {"id": "NO-SUCH"}),
     },
+    "adapters/beads": {
+        # The malformed case is a status Beads does not emit today. The adapter
+        # maps a CLOSED set and refuses anything else, because forwarding an
+        # unrecognised status produces a task that is neither active nor
+        # complete with nothing saying so -- an empty answer where an error
+        # belongs.
+        "malformed": ("REPO_GOVERNOR_BEADS",
+                      '{"_type":"issue","id":"x","status":"snoozed","external_ref":"AUTHORIZED-1"}'),
+        "role": "execution",
+        "probe": {"id": "AUTHORIZED-1"},
+        "capability_fn": {
+            "execution_root": ("find_execution_root", {"id": "AUTHORIZED-1"}),
+            "tasks": ("get_tasks", {"id": "AUTHORIZED-1"}),
+            "dependencies": ("get_dependencies", {"id": "AUTHORIZED-1"}),
+            "completed_work": ("get_completed_work", {"id": "AUTHORIZED-1"}),
+            "discoveries": ("get_discoveries", {"id": "AUTHORIZED-1"}),
+            "provenance": ("get_provenance", {}),
+        },
+        "env": {"REPO_GOVERNOR_BEADS": "conformance/fixtures/beads-issues.jsonl"},
+        "break_env": {"REPO_GOVERNOR_BEADS": "/nonexistent-path-xyz.jsonl"},
+        "unknown_fn": ("get_execution_history", {"id": "AUTHORIZED-1"}),
+        "absence_fn": ("get_tasks", {"id": "NO-SUCH"}),
+    },
     "adapters/change-signals-file": {
         "malformed": ("REPO_GOVERNOR_SIGNALS", '{"signals":"not-a-list"}'),
         "role": "change_signals",

@@ -99,26 +99,57 @@ Both are runnable before you open anything: `./tools/run-conformance.sh`.
 |---|---|---|
 | **filesystem** | any | The default. Zero dependencies, always available, weakest guarantees — and honest about them. `file-roadmap`, `execution-file`, `acceptance-file`, `change-signals-file`, `decision-history-file`. |
 | **Dolt** | `decision_history` | The reference implementation. Supplies history natively (`dolt_log`, `dolt_history_decisions`), so it does not hand-roll a chain and says so. Recommended where the evidence chain must hold against an adversary rather than against a mistake. |
-| **Beads** | `execution` | **A candidate, not admitted.** The contract below is what it would have to satisfy; documenting that is not the same as deciding to build it. |
+| **Beads** | `execution` | Reads the `bd export` JSONL, not the `.beads/` store. Joins to roadmap authority on Beads' own `external_ref`. Built after the necessity argument was made and re-decided (#196). |
 
-### Why Beads is documented but not built
+### Beads: the export, not the store
 
-The `execution` role is required at `GOVERNOR_FULL` and above, and
-`execution-file` fills it today. Whether a real execution tracker is *necessary*
-is an open experiment, and the standing rule is deliberate:
+`adapters/beads` reads `.beads/issues.jsonl` — the file `bd export` produces
+and Beads itself uses to synchronise through git — and not the `.beads/`
+directory.
+
+That is not a convenience. A `.beads/` store is an embedded Dolt database,
+machine-local and routinely gitignored, so two checkouts of one commit hold
+different execution state and a CI runner holds none.
+ADR-033 — still `Proposed`, and load-bearing here — settles which of those a
+repo-local provider is allowed to answer about: **the checked-out revision**
+([the decision](../docs/adrs/033-repo-local-providers-answer-about-the-checked-out-revision.md)). The export is tracked, so it moves with the
+branch, needs no `bd` on `PATH`, and cites a path a reader can open at that
+revision.
+
+The cost is stated rather than hidden: the export is only as current as the
+last `bd export`. `get_provenance` names the file so a reader can check it.
+
+**The join is `external_ref`.** Beads maintains it — `bd create --external-ref`,
+and `bd linear pull` accepts one as a positional argument — so an authority id
+is read from a field rather than parsed out of prose. Beads with no
+`external_ref` are counted and reported by `get_provenance`, never silently
+dropped: they are real work no authority id can reach, and a reader should be
+able to see how much of the store that is.
+
+**What it does not claim.** `failures` and `handoff_state` are advertised
+`false` and are not implemented. Beads models neither, and answering "no
+failures" from a store that cannot record one is evidence of absence dressed
+as absence of evidence ([ADR-003](../docs/adrs/003-seven-provider-roles-with-normalized-contracts.md)
+rule 6). `UNSUPPORTED_FUNCTION` is the honest reply. `execution_history` is
+`false` for the same reason with a different cause — Beads keeps history in
+Dolt, which the export does not carry.
+
+The status map is closed. An unrecognised Beads status is `MALFORMED_SOURCE`,
+not a passed-through string, because a forwarded unknown status yields a task
+that is neither active nor complete with nothing saying so — an empty answer
+where an error belongs.
+
+### The necessity rule this was built under
+
+The rule that governed it for months, and that a no-go would have satisfied:
 
 > Do not admit building the Beads adapter merely because this test would be
 > interesting. First define the experiment and show that Beads is necessary to
 > answer the execution-state question.
 
 A **no-go is a successful outcome**. A role may be required; a product may not
-be recommended on the strength of anyone having enjoyed using it.
-
-An execution integration would answer `find_execution_root`, `get_active_work`,
-`get_completed_work`, `get_dependencies`, `get_discoveries`,
-`get_execution_history`, `get_failures`, `get_handoff_state`, `get_tasks` — and
-would be bound by the rule at the top of this page harder than any other role,
-because execution trackers are where "ready" lives.
+be recommended on the strength of anyone having enjoyed using it. That rule is
+unchanged and applies to the next tracker as written.
 
 ## Practical notes
 

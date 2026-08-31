@@ -43,7 +43,22 @@ def check(label, ok, detail=""):
     return 0 if ok else 1
 
 
-def bound_manifest(with_execution=True):
+# Two structurally different execution providers over the same scenario. One
+# reads a hand-authored JSON map; the other reads a `bd export` JSONL and joins
+# on Beads' own external_ref. INV-002 is a property of the ROLE, so a suite that
+# only ever exercised one provider could not tell the property from that
+# provider's behaviour.
+PROVIDERS = {
+    "execution-file": {
+        "type": "execution-file", "adapter": "adapters/execution-file", "contract_version": 1,
+        "env": {"REPO_GOVERNOR_EXECUTION": "conformance/fixtures/execution.json"}},
+    "beads": {
+        "type": "beads", "adapter": "adapters/beads", "contract_version": 1,
+        "env": {"REPO_GOVERNOR_BEADS": "conformance/fixtures/beads-issues.jsonl"}},
+}
+
+
+def bound_manifest(with_execution=True, provider="execution-file"):
     """A manifest binding the file providers, so execution has something to read."""
     d = copy.deepcopy(BASE)
     d["providers"]["roadmap_authority"] = {
@@ -52,9 +67,7 @@ def bound_manifest(with_execution=True):
     d["providers"]["acceptance_criteria"]["env"] = {
         "REPO_GOVERNOR_ACCEPTANCE_DIR": "conformance/fixtures/acceptance"}
     if with_execution:
-        d["providers"]["execution"] = {
-            "type": "execution-file", "adapter": "adapters/execution-file", "contract_version": 1,
-            "env": {"REPO_GOVERNOR_EXECUTION": "conformance/fixtures/execution.json"}}
+        d["providers"]["execution"] = PROVIDERS[provider]
         d["permissions"]["execution"] = {"read": True}
     f = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
     json.dump(d, f)
@@ -109,6 +122,46 @@ def main():
                    r["decision"] == "STOP_COMPLETE", r["decision"])
     fails += check("no discoveries are claimed when nothing was read", not r.get("captured"))
 
+    print("\nThe same subordination, through Beads (#196)\n")
+
+    # #33 recorded a no-go on this adapter, and one of its load-bearing reasons
+    # was that no engine module consulted the role -- so the scenario could
+    # neither pass nor fail. #34 made the role consulted; this makes the
+    # scenario run through a real tracker's own export rather than a file
+    # written to make it pass.
+    mb = bound_manifest(provider="beads")
+
+    rb = C.evaluate("CANCELLED-1", manifest=mb)
+    exb = rb.get("execution") or {}
+    fails += check("cancelled item with Beads subtasks running is AUTHORITY_WITHDRAWN",
+                   rb["decision"] == "AUTHORITY_WITHDRAWN", rb["decision"])
+    fails += check("and the running subtask is VISIBLE, not merely overridden",
+                   len(exb.get("active") or []) >= 1,
+                   f"active={exb.get('active')} -- overriding evidence nobody read is "
+                   "not the same as overriding evidence")
+
+    ra = C.evaluate("AUTHORIZED-1", manifest=mb)
+    exa = ra.get("execution") or {}
+    fails += check("an authorized item reads its Beads root",
+                   exa.get("state") == "READ" and len(exa.get("completed") or []) >= 1,
+                   str(exa)[:200])
+    fails += check("a discovered-from edge arrives as a CAPTURE_ONLY discovery",
+                   any(x.get("default_disposition") == "CAPTURE_ONLY"
+                       for x in (exa.get("discoveries") or [])),
+                   f"discoveries={exa.get('discoveries')} -- \u00a732 and INV-001 mean a "
+                   "discovery never arrives executable")
+
+    # THE CONTROL, and the reason this section is worth its runtime. Both
+    # providers must reach the SAME disposition from structurally different
+    # sources. If they diverge, one of them is contributing authority, which is
+    # exactly what INV-002 forbids and what a single-provider suite cannot see.
+    mf = bound_manifest(provider="execution-file")
+    for wid in ("CANCELLED-1", "AUTHORIZED-1"):
+        a = C.evaluate(wid, manifest=mf)["decision"]
+        b = C.evaluate(wid, manifest=mb)["decision"]
+        fails += check(f"{wid}: both execution providers reach the same disposition ({a})",
+                       a == b, f"execution-file={a} beads={b} -- an execution provider that "
+                               "changes the disposition is a second roadmap")
     print("\nExecution evidence cites its source (#217)\n")
 
     # execution_evidence read `value` and dropped `provenance`, so a verdict

@@ -373,9 +373,19 @@ def main():
                        "contract nobody outside this repository can meet")
         fails += check("it describes all three integration tiers",
                        all(k in text for k in ("filesystem", "Dolt", "Beads")))
-        fails += check("it marks Beads as NOT admitted",
-                       "not admitted" in text.lower(),
-                       "documenting a contract must not read as deciding to build it")
+        # This asserted "not admitted" until #196 was decided GO and the
+        # adapter shipped. A suite that encodes a VERDICT goes wrong the moment
+        # the verdict changes, and it went wrong here in the safe direction --
+        # it failed rather than vouching for a claim that had become false.
+        #
+        # What survives is the RULE, which is not about Beads: a documented
+        # contract must never read as a decision to build it, and a no-go must
+        # stay a successful outcome for the next tracker. Assert that instead
+        # of the verdict, so this check does not need revisiting per adapter.
+        fails += check("it states the necessity rule that governs a new tracker",
+                       "no-go" in text.lower() and "necessary" in text.lower(),
+                       "documenting a contract must not read as deciding to build it, and "
+                       "the rule has to outlive whichever way any one decision went")
         fails += check("providers.md points at it",
                        "integrations.md" in (ROOT / "references" / "providers.md").read_text(encoding="utf-8"),
                        "the roles table must not be the only thing an implementer finds")
@@ -678,6 +688,30 @@ def main():
                        "RATIFICATION-v0.1.0.md: every architecture decision the runtime "
                        "depends on is Accepted. A new name here is a ratification "
                        "question, not a documentation edit.")
+    # The adapter COUNT was guarded; the contract-check count beside it was
+    # not, and had been stale through two suite growths (149 claimed, 184 then
+    # 199 actual) with every run green. A number nothing recomputes is a
+    # number that drifts silently -- the same shape as the adapter claim two
+    # lines down, which is why it gets the same treatment rather than a
+    # comment asking the next person to remember.
+    L1_CLAIM = re.compile(r"(\d+)\s+contract checks\b", re.I)
+    l1_claims = []
+    for doc in ("README.md", "AGENTS.md", "docs/installation.md"):
+        f = ROOT / doc
+        if f.is_file():
+            l1_claims += [(doc, int(m.group(1))) for m in L1_CLAIM.finditer(
+                f.read_text(encoding="utf-8"))]
+    if l1_claims:
+        p1 = subprocess.run([sys.executable, str(ROOT / "conformance" / "layer1.py")],
+                            capture_output=True, text=True, cwd=str(ROOT), timeout=300)
+        m1 = re.search(r"executed=(\d+)", p1.stdout)
+        fails += check("layer1's own check count was actually read",
+                       bool(m1), f"no CONFORMANCE-COUNT in layer1 output: {p1.stdout[-160:]!r}")
+        if m1:
+            real = int(m1.group(1))
+            for doc, n in l1_claims:
+                fails += check(f"{doc}: '{n} contract checks' matches the {real} layer1 runs",
+                               n == real, f"layer1 runs {real}")
 
     ADAPTER_CLAIM = re.compile(r"(\d+)\s+(?:provider\s+)?adapters?\b", re.I)
     adapter_claims = 0

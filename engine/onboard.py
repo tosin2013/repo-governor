@@ -405,18 +405,27 @@ def detect(repo: Path):
                                 "signals file, so this binding needs a real adapter or a human "
                                 "exporting signals into that file")])
 
-    # execution — Beads
-    if (repo / ".beads").is_dir():
-        # UNCONFIRMED. A .beads directory is a SQLite-backed store;
-        # adapters/execution-file reads a JSON file and cannot open it. Third
-        # instance of the same over-promise as the ADR status count and the
-        # dependabot config (#27): detection may name an adapter only if that
-        # adapter can read the evidence that triggered the detection.
+    # execution — Beads. TWO candidates, because two different facts.
+    #
+    # The rule above is why they are separate. `adapters/beads` reads the JSONL
+    # export, not the store; naming it for a bare `.beads/` directory would be
+    # the same over-promise this rule was written against, just with a
+    # different adapter in the field.
+    if (repo / ".beads" / "issues.jsonl").exists():
+        add("execution", "beads", "adapters/beads", "PROVIDER_DETECTED",
+            [_cite(repo, ".beads/issues.jsonl", "beads JSONL export present; adapters/beads "
+                                                "reads exactly this file")])
+    elif (repo / ".beads").is_dir():
+        # The store is there and nothing here can open it. An embedded Dolt
+        # database is also not revision-scoped (ADR-033) and is routinely
+        # gitignored, so binding it would answer about the machine rather than
+        # the checked-out revision even if an adapter could read it.
         add("execution", "beads", None, "PROVIDER_UNCONFIRMED",
             [_cite(repo, ".beads/", "beads database directory present")],
-            [_cite(repo, ".beads/", "no adapter here reads a beads database; execution-file reads "
-                                    "a JSON file, so this needs a real adapter or `bd export` "
-                                    "written into that file")])
+            [_cite(repo, ".beads/", "no adapter here reads a beads database. `adapters/beads` "
+                                    "reads .beads/issues.jsonl, which is absent: run "
+                                    "`bd export --all > .beads/issues.jsonl` and track it, or "
+                                    "leave this role unbound")])
 
     # roadmap_authority — Linear
     for f in (".linear.json", ".linear.yml", "linear.json"):
