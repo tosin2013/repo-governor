@@ -109,7 +109,8 @@ def execution_evidence(authority_id, manifest=None):
                 "detail": "no execution provider is bound; nothing is known about work "
                           "beneath this item, which is not the same as knowing there is none"}
 
-    out = {"state": "READ", "active": [], "completed": [], "discoveries": [], "unknowns": []}
+    out = {"state": "READ", "active": [], "completed": [], "discoveries": [],
+           "unknowns": [], "provenance": []}
     for fn, key in (("get_active_work", "active"), ("get_completed_work", "completed"),
                     ("get_discoveries", "discoveries")):
         r = B.call("execution", fn, {"id": authority_id}, manifest=m)
@@ -124,6 +125,22 @@ def execution_evidence(authority_id, manifest=None):
             continue
         v = r.get("value") or {}
         out[key] = v.get(key) or v.get("discoveries") or []
+        # The citations the provider already returned. This loop read `value`
+        # and dropped the rest, so a verdict reporting work in flight cited
+        # nothing for it -- while every other dimension in this module
+        # accumulates (:206 authority, :243 criteria, :294 each check). #217.
+        #
+        # They ride HERE and not in the top-level chain on purpose. That chain
+        # supports the disposition, and INV-002 is that execution state never
+        # contributes to one. Merging them would put non-authoritative evidence
+        # in the run of citations a reader takes as authority's.
+        #
+        # Execution evidence is also the least checkable dimension by nature:
+        # every other one cites something inside the repository the reader is
+        # standing in, while this comes from a tracker, or an export of one,
+        # whose currency the verdict cannot state. The citation is the only
+        # thing naming which source said so.
+        out["provenance"] += r.get("provenance") or []
     if not any(out[k] for k in ("active", "completed", "discoveries")) and not out["unknowns"]:
         out["state"] = "NO_EXECUTION_ROOT"
     return out
