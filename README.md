@@ -124,7 +124,7 @@ docs/
 
 | Suite | Asserts |
 | --- | --- |
-| `layer1.py` | 199 contract checks across 16 adapters |
+| `layer1.py` | 199 contract checks across 16 adapters, with every adapter dependency installed |
 | `layer2.py` | cross-provider equivalence — **the thesis test** |
 | `transport.py` | agent-as-transport produces byte-identical results (70 comparisons) |
 | `bindings.py` | the engine holds no adapter knowledge, and the permission gate is a gate |

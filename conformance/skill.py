@@ -31,6 +31,7 @@ import sys
 import tempfile
 from pathlib import Path
 
+import _preflight  # noqa: E402 -- names an absent adapter dependency
 import _count as _CNT  # noqa: E402 -- alias avoids `C`, already bound to
 # `completion` in two suites, where the collision silently rebound it (issue 67).
 _CNT.watch("skill")
@@ -709,9 +710,31 @@ def main():
                        bool(m1), f"no CONFORMANCE-COUNT in layer1 output: {p1.stdout[-160:]!r}")
         if m1:
             real = int(m1.group(1))
+            # THE COUNT IS NOT ENVIRONMENT-INDEPENDENT, and the first version of
+            # this guard assumed it was. Without `dolt` on PATH the dolt
+            # adapter's probe fails, five capability checks do not run, and
+            # layer1 reports 194 rather than 199 -- so CI's `static` job, which
+            # exists precisely because it "needs no adapter dependency at all",
+            # failed on a claim that is true on a developer machine.
+            #
+            # The honest repair is not to weaken the check. It is to say in the
+            # README which environment the number describes, and to compare
+            # exactly THERE. Where a dependency is absent the number is a
+            # ceiling the environment cannot reach, and that is still a real
+            # assertion: a claim smaller than what actually ran is wrong in
+            # either environment.
+            absent = _preflight.missing()
             for doc, n in l1_claims:
-                fails += check(f"{doc}: '{n} contract checks' matches the {real} layer1 runs",
-                               n == real, f"layer1 runs {real}")
+                if absent:
+                    fails += check(
+                        f"{doc}: '{n} contract checks' is a ceiling this environment "
+                        f"({real} ran, {', '.join(sorted(absent))} absent) does not exceed",
+                        real <= n,
+                        f"layer1 ran {real} with {sorted(absent)} missing, which is MORE "
+                        f"than the {n} claimed for a complete environment")
+                else:
+                    fails += check(f"{doc}: '{n} contract checks' matches the {real} "
+                                   "layer1 runs", n == real, f"layer1 runs {real}")
 
     ADAPTER_CLAIM = re.compile(r"(\d+)\s+(?:provider\s+)?adapters?\b", re.I)
     adapter_claims = 0

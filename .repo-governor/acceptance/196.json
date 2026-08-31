@@ -36,6 +36,11 @@
       "check": "command_exit",
       "target": "grep -q 'external_ref' references/integrations.md && grep -q '`beads`' references/providers.md",
       "$comment": "The join key is documented where an integrator reads, not only in the adapter docstring."
+    },
+    {
+      "check": "command_exit",
+      "target": "D=$(mktemp -d); for b in git python3 python bash sh grep sed awk env dirname basename uname mktemp rm ln; do p=$(command -v $b 2>/dev/null) && ln -sf \"$p\" $D/$b; done; PATH=\"$D\" python3 conformance/skill.py >/dev/null 2>&1",
+      "$comment": "The agent surface must still answer with an adapter dependency absent. CI's `static` job exists because it needs none, and the first version of the contract-check guard broke that by asserting a count that is 199 with dolt and 194 without."
     }
   ]
 }
