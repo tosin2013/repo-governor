@@ -306,42 +306,143 @@ def main():
     # ADR-033 decision 3, the tripwire. A repo-local provider answers about the
     # CHECKED-OUT REVISION. adapters/speckit reads specs/<feature>/, which Spec
     # Kit populates per feature branch, so it can answer differently on two
-    # checkouts of one repository -- and its branch-varying methods, get_specs
-    # and get_provenance, are called by nothing in the engine. That is what
-    # makes the problem not live, and it is an accident of what the engine
-    # happens to call rather than a designed property.
+    # checkouts of one repository. The obligation is: the day the engine reads a
+    # branch-varying method, the recorded provenance has to name the revision,
+    # and this is what makes that day visible. The check cannot say what the
+    # right answer is when it fires -- only that ADR-033 is now due for a second
+    # reading.
     #
-    # So this is not "the engine calls three methods" restated as a test. It is:
-    # the day a fourth is added, the recorded provenance has to name the
-    # revision, and this is what makes that day visible. The check cannot say
-    # what the right answer is when it fires -- only that ADR-033 is now due for
-    # a second reading.
-    print("\nThe engine reads no branch-varying architecture method (ADR-033)\n")
+    # IT USED TO SCAN FOR THE LITERAL PAIR `"architecture", "get_..."`, WHICH
+    # HAD TWO HOLES.
+    #
+    # First, it read one role. Decision 3 is written about "a branch-varying
+    # provider method", not an architecture one, so six roles were unguarded by
+    # a check whose ADR calls it structural.
+    #
+    # Second, and worse, a text scan for adjacent literals cannot see dispatch
+    # through a variable. `engine/completion.py` calls the execution role in a
+    # loop -- `B.call("execution", fn, ...)` with `fn` bound per iteration -- so
+    # the pair never appears adjacent and three engine calls were invisible to
+    # a check that reported PASS. A scanner that silently skips what it cannot
+    # parse is the failure this repository keeps finding: the method could not
+    # have produced the answer it gave.
+    #
+    # So: AST, every role, and an unresolvable call site is REPORTED rather than
+    # skipped.
+    print("\nThe engine reads no unreviewed provider method, in any role (ADR-033)\n")
 
-    import re as _re
-    REVISION_STABLE = {"get_constraints", "get_active_decisions", "get_superseded_decisions"}
-    called, sites = set(), {}
+    import ast as _ast
+
+    ROLES = {"roadmap_authority", "architecture", "execution", "repository",
+             "change_signals", "retirement", "decision_history", "acceptance_criteria"}
+
+    # What the engine reads today. SEEDING IS NOT REVIEW -- it is a baseline, so
+    # that the NEXT method added is the thing that shows up. That was true of
+    # the architecture set this replaces, and it is stated here rather than
+    # implied.
+    REVIEWED = {
+        "roadmap_authority":   {"get_authority", "get_scope", "get_non_goals"},
+        "architecture":        {"get_constraints", "get_active_decisions",
+                                "get_superseded_decisions"},
+        "acceptance_criteria": {"get_criteria"},
+        "repository":          {"evaluate_check"},
+        "decision_history":    {"get_decisions", "record_decision"},
+        "retirement":          {"obligation_check"},
+        "execution":           {"get_active_work", "get_completed_work", "get_discoveries"},
+    }
+
+    # Call sites whose method is not a literal. Each must be declared with the
+    # methods reachable there, and those are checked against REVIEWED like any
+    # other. A new dynamic site fails rather than passing unseen.
+    DYNAMIC = {
+        ("completion.py", "execution"): {"get_active_work", "get_completed_work",
+                                         "get_discoveries"},
+    }
+
+    # Wrappers that take the role itself as an argument. Their own call sites
+    # carry the literals and are matched above; the wrapper body is not a
+    # distinct read.
+    PASSTHROUGH = {"envelope.py:56"}
+
+    resolved, sites, dynamic_seen, passthrough = {}, {}, set(), set()
     for f in sorted((ROOT / "engine").glob("*.py")):
-        for m in _re.finditer(r'"architecture",\s*"(?P<fn>get_\w+)"', f.read_text(encoding="utf-8")):
-            fn = m.group("fn")
-            called.add(fn)
-            sites.setdefault(fn, []).append(f.name)
+        tree = _ast.parse(f.read_text(encoding="utf-8"))
+        for node in _ast.walk(tree):
+            if not isinstance(node, _ast.Call) or len(node.args) < 2:
+                continue
+            # Only actual provider invocations. `engine/onboard.py` calls
+            # add("execution", "beads", ...) -- role first, PROVIDER TYPE
+            # second -- which a role-name filter alone reads as a method call
+            # and reports as an unreviewed method. Being wrong in that
+            # direction is loud rather than silent, but it is still wrong.
+            callee = node.func
+            name = (callee.attr if isinstance(callee, _ast.Attribute)
+                    else callee.id if isinstance(callee, _ast.Name) else "")
+            if not (name == "call" or name.startswith("_ask")):
+                continue
+            a0 = node.args[0]
+            if not (isinstance(a0, _ast.Constant) and a0.value in ROLES):
+                # The ROLE itself is not a literal. `engine/envelope.py`'s
+                # `_ask` wrapper is this: B.call(role, fn, ...) with both bound
+                # by its caller. Harmless there because its call sites pass
+                # literals and are matched above -- but a site like it outside a
+                # wrapper would reach any role with any method, invisibly. Same
+                # rule as unresolved methods: declared, or reported.
+                if not isinstance(a0, _ast.Constant):
+                    passthrough.add(f"{f.name}:{node.lineno}")
+                continue
+            role, a1 = a0.value, node.args[1]
+            if isinstance(a1, _ast.Constant) and isinstance(a1.value, str):
+                resolved.setdefault(role, set()).add(a1.value)
+                sites.setdefault((role, a1.value), []).append(f"{f.name}:{node.lineno}")
+            else:
+                dynamic_seen.add((f.name, role))
 
-    # Floor control. A regex that matches nothing makes every claim below
-    # vacuous, and "the engine calls no branch-varying method" would be the
-    # loudest possible false pass.
-    fails += check(f"the engine's architecture calls were actually found ({len(called)})",
-                   bool(called),
-                   "the scan matched nothing -- a broken pattern reads as an engine "
+    # FLOOR CONTROL. A walk that matches nothing makes every claim below
+    # vacuous, and "the engine reads no unreviewed method" would be the loudest
+    # possible false pass. Two floors, because the old check had one and still
+    # missed a whole role: assert the resolved scan found calls, AND assert the
+    # dynamic scan is working by requiring the known dynamic site to be seen.
+    fails += check(f"the engine's provider calls were actually found "
+                   f"({sum(len(v) for v in resolved.values())} across {len(resolved)} roles)",
+                   len(resolved) >= 4,
+                   "the walk matched almost nothing -- a broken scan reads as an engine "
                    "that consults no provider at all")
+    fails += check("the scan sees dispatch through a variable, not only literals",
+                   bool(dynamic_seen),
+                   "the previous text scan could not, and three execution calls were "
+                   "invisible to it while it reported PASS")
 
-    fails += check("engine architecture calls are all revision-stable",
-                   called <= REVISION_STABLE,
-                   f"branch-varying or unreviewed: "
-                   f"{ {k: sites[k] for k in sorted(called - REVISION_STABLE)} }. "
-                   "A repo-local provider answers about the checked-out revision; "
-                   "ADR-033 decision 3 requires the recorded provenance to name it "
-                   "before the engine may read such a method.")
+    unreviewed = {f"{role}.{fn}": sites[(role, fn)]
+                  for role, fns in sorted(resolved.items())
+                  for fn in sorted(fns - REVIEWED.get(role, set()))}
+    fails += check("every engine provider call is a reviewed method",
+                   not unreviewed,
+                   f"unreviewed: {unreviewed}. A repo-local provider answers about the "
+                   "checked-out revision; ADR-033 decision 3 requires the recorded "
+                   "provenance to name it before the engine may read such a method. "
+                   "Adding the method to REVIEWED is a decision, not a fix.")
+
+    undeclared = sorted(dynamic_seen - set(DYNAMIC))
+    fails += check("every dynamic call site is declared with the methods it reaches",
+                   not undeclared,
+                   f"undeclared dynamic dispatch: {undeclared}. The scanner cannot resolve "
+                   "these, so they must be declared or they pass unseen.")
+    undeclared_pt = sorted(passthrough - PASSTHROUGH)
+    fails += check("every role-agnostic call site is a declared wrapper",
+                   not undeclared_pt,
+                   f"undeclared pass-through: {undeclared_pt}. A call whose ROLE is a "
+                   "variable can reach any provider; it is a wrapper whose callers are "
+                   "checked, or it is a hole.")
+    fails += check("and the declared wrappers still exist",
+                   passthrough >= PASSTHROUGH,
+                   f"declared but not found: {sorted(PASSTHROUGH - passthrough)} -- a "
+                   "declaration for a site that moved excuses nothing and hides the next one")
+
+    for (fname, role), fns in sorted(DYNAMIC.items()):
+        extra = sorted(fns - REVIEWED.get(role, set()))
+        fails += check(f"{fname}'s dynamic {role} calls are reviewed methods",
+                       not extra, f"unreviewed: {extra}")
 
     print(f"\n{'BINDINGS: CONFORMANT' if not fails else f'BINDINGS: NON-CONFORMANT ({fails})'}")
     if fails:

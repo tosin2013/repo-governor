@@ -109,6 +109,41 @@ def main():
                    r["decision"] == "STOP_COMPLETE", r["decision"])
     fails += check("no discoveries are claimed when nothing was read", not r.get("captured"))
 
+    print("\nExecution evidence cites its source (#217)\n")
+
+    # execution_evidence read `value` and dropped `provenance`, so a verdict
+    # reporting work in flight cited nothing for it -- while every other
+    # dimension in completion.py accumulates. Execution is the dimension where
+    # that costs most: every other one cites something inside the repository
+    # the reader is standing in, and this comes from a tracker whose currency
+    # the verdict cannot state.
+    #
+    # TWO INPUTS, TWO OUTPUTS. A fix that unconditionally appends a citation
+    # passes any check written only on the populated case, so the empty case is
+    # asserted beside it. That is the same requirement #200 makes of the state
+    # collapse, and for the same reason.
+    mprov = bound_manifest()
+    rp = C.evaluate("CANCELLED-1", manifest=mprov)
+    ep = rp.get("execution") or {}
+    cites = ep.get("provenance") or []
+    fails += check("a populated execution block cites its source",
+                   bool(cites) and all(c.get("source") and c.get("ref") for c in cites),
+                   f"provenance={cites}")
+    fails += check("and the citation names the provider that answered",
+                   {c.get("source") for c in cites} == {"execution-file"},
+                   f"sources={ {c.get('source') for c in cites} }")
+
+    rn = C.evaluate("THIN-1", manifest=mprov)
+    en = rn.get("execution") or {}
+    fails += check("an item with no execution root cites nothing",
+                   not (en.get("provenance") or []),
+                   f"{en.get('provenance')} -- a fix that always appends would pass the "
+                   "check above while citing evidence it never read")
+    fails += check("control: the two cases really are different states",
+                   ep.get("state") == "READ" and en.get("state") == "NO_EXECUTION_ROOT",
+                   f"{ep.get('state')} vs {en.get('state')} -- if both were the same "
+                   "state the pair above would prove nothing")
+
     print(f"\n{'EXECUTION SUBORDINATION: CONFORMANT' if not fails else f'EXECUTION SUBORDINATION: NON-CONFORMANT ({fails})'}")
     if fails:
         _preflight.attribute(absent)

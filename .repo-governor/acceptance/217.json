@@ -1,0 +1,31 @@
+{
+  "$comment": "Two gaps with one symptom. This bar covers the one filed: provenance the engine already receives and discards. It does NOT cover ADR-033's condition 3, which is about the get_provenance METHOD having no engine consumer -- a separate decision the maintainer owns.",
+  "authority_id": "217",
+  "criteria": [
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/execution.py",
+      "$comment": "Asserts BOTH inputs: a populated execution block cites its source, and an item with no root cites nothing. A fix that unconditionally appends would pass the first and fail the second."
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/bindings.py",
+      "$comment": "ADR-033's tripwire, generalized from one role to every role and from a text scan to an AST walk. A call site it cannot resolve is now reported rather than skipped."
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/skill.py",
+      "$comment": "The ADR index's runtime-dependency claim is now derived from engine/ and the bound adapters, by the method RATIFICATION-v0.1.0.md itself prescribes."
+    },
+    {
+      "check": "command_exit",
+      "target": "grep -q 'out\\[\"provenance\"\\] += r.get(\"provenance\")' engine/completion.py",
+      "$comment": "The line itself. Weak alone -- a comment would match -- which is why the suite above is the real criterion and this only pins where the change lives."
+    },
+    {
+      "check": "command_exit",
+      "target": "grep -q 'Runtime-dependent and still' docs/adrs/README.md && ! grep -q 'none is referenced by the runtime' docs/adrs/README.md",
+      "$comment": "Both halves: the true claim is present AND the false one is gone. Asserting only the first would pass with both sentences in the file."
+    }
+  ]
+}

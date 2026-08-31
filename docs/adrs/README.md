@@ -2,7 +2,9 @@
 
 Generated 2026-08-17 from PRD v0.2 (provider-oriented draft) using the MCP ADR Analysis Server's PRD-to-ADR protocol, informed by the external landscape research in [`../research/2026-08-17-external-landscape.md`](../research/2026-08-17-external-landscape.md).
 
-**23 of 31 ADRs are Accepted** as of 2026-08-17, ratified under [RATIFICATION-v0.1.0.md](RATIFICATION-v0.1.0.md). ADR-020, ADR-024, ADR-029, ADR-030, ADR-031, ADR-032 and ADR-033 are held `Proposed` — none is referenced by the runtime; ADR-014 is `Superseded` by the 023/024 split. Per §61, the project cannot reach `IMPLEMENTATION_READY` until the `RG-SIM-ONBOARDING-v0.1` simulation passes.
+**23 of 31 ADRs are Accepted** as of 2026-08-17, ratified under [RATIFICATION-v0.1.0.md](RATIFICATION-v0.1.0.md). ADR-020, ADR-024, ADR-029, ADR-030, ADR-031, ADR-032 and ADR-033 are held `Proposed`; ADR-014 is `Superseded` by the 023/024 split.
+
+> **Runtime-dependent and still `Proposed`: ADR-024, ADR-031.** This line used to assert that no held ADR was cited by the engine or a bound adapter — the release condition [RATIFICATION-v0.1.0.md](RATIFICATION-v0.1.0.md) states — *every architecture decision the runtime depends on is Accepted* — asserted as though it still held. It stopped holding when #153 and #183 gave ADR-024 and ADR-031 engine citations, and four releases shipped without anyone recomputing it. `conformance/skill.py` now derives this list from `engine/` and the adapters this repository binds, using the method that record itself prescribes, so it cannot go stale again. Per §61, the project cannot reach `IMPLEMENTATION_READY` until the `RG-SIM-ONBOARDING-v0.1` simulation passes.
 
 > **`PRD.md` no longer exists.** Its normative content was extracted into [`../reference/`](../reference/) on 2026-08-17, with original § numbering preserved so every citation below still resolves. Start at the [section map](../reference/README.md#section-map).
 

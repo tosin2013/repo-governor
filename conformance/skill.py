@@ -24,6 +24,7 @@ Usage:  python3 conformance/skill.py
 
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 import sys
@@ -622,6 +623,61 @@ def main():
     fails += check(f"the adapter set was actually derived ({len(adapters)} found)",
                    len(adapters) >= 8 and "git" in adapters,
                    f"{sorted(adapters)} -- a broken glob reads as a clean repository")
+
+    # RATIFICATION-v0.1.0.md states the release condition:
+    #
+    #   Every architecture decision the runtime depends on is Accepted, and no
+    #   Proposed ADR is silently treated as normative by that release.
+    #
+    # docs/adrs/README.md asserted the first half -- "none is referenced by the
+    # runtime" -- and it had been false since #153 and #183, through four
+    # releases, with every conformance run green. The condition is checkable
+    # and nothing was checking it; that is the same shape as the adapter count
+    # below and the contract-check count above.
+    #
+    # Derived by the record's OWN method: cited by engine/, or by an adapter
+    # THIS repository binds. Unbound adapters ship but govern nothing here.
+    bound = set()
+    for _k, _v in (json.loads((ROOT / ".repo-governor.json").read_text(encoding="utf-8"))
+                   .get("providers") or {}).items():
+        if _k.startswith("$"):
+            continue
+        for _b in (_v if isinstance(_v, list) else [_v]):
+            bound.add(_b["adapter"])
+    fails += check(f"the bound-adapter set was derived ({len(bound)})", len(bound) >= 3,
+                   "an empty set makes every ADR read as runtime-independent")
+
+    proposed, dependent = [], []
+    for adr in sorted((ROOT / "docs" / "adrs").glob("[0-9]*.md")):
+        body = adr.read_text(encoding="utf-8")
+        st = re.search(r"^\*\*Status\*\*:\s*(\S+)", body, re.M)
+        if not (st and st.group(1).strip("*").startswith("Proposed")):
+            continue
+        num = re.match(r"(\d+)", adr.name).group(1)
+        proposed.append(num)
+        cited = any(f"ADR-{num}" in f.read_text(encoding="utf-8")
+                    for f in (ROOT / "engine").glob("*.py"))
+        cited = cited or any(f"ADR-{num}" in (ROOT / a).read_text(encoding="utf-8")
+                             for a in bound)
+        if cited:
+            dependent.append(num)
+    fails += check(f"proposed ADRs were actually found ({len(proposed)})", bool(proposed),
+                   "a status regex that matches nothing reads as an all-Accepted repository")
+
+    idx = (ROOT / "docs" / "adrs" / "README.md").read_text(encoding="utf-8")
+    m_dep = re.search(r"Runtime-dependent and still `Proposed`:\s*([^*]+)", idx)
+    fails += check("the ADR index states which proposed ADRs the runtime depends on",
+                   bool(m_dep),
+                   "the release condition is about exactly this set; a reader cannot "
+                   "check a claim the index does not make")
+    if m_dep:
+        claimed = sorted(set(re.findall(r"ADR-(\d+)", m_dep.group(1))))
+        fails += check(f"and that list matches the code ({', '.join(dependent) or 'none'})",
+                       claimed == sorted(dependent),
+                       f"index says {claimed}, code says {sorted(dependent)} -- "
+                       "RATIFICATION-v0.1.0.md: every architecture decision the runtime "
+                       "depends on is Accepted. A new name here is a ratification "
+                       "question, not a documentation edit.")
 
     ADAPTER_CLAIM = re.compile(r"(\d+)\s+(?:provider\s+)?adapters?\b", re.I)
     adapter_claims = 0
