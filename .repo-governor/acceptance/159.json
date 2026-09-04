@@ -1,0 +1,34 @@
+{
+  "$comment": "Acceptance criteria for issue 159. Measured on docs/adrs/: 6 Proposed ADRs, 4 carrying '## Acceptance conditions', 2 carrying none -- ADR-020 (agent-supplied transport) and ADR-029 (hooks as a deterministic delivery surface). A Proposed ADR with conditions is a decision waiting on a stated test; one without is a decision waiting on nothing in particular, and the ledger cannot tell you which you are reading. THE VACUITY THIS BAR IS BUILT AGAINST is a check that passes because it examined nothing: 'every Proposed ADR names what would settle it' is trivially true of an empty set, and it would go green the day someone flips the last Proposed ADR to Accepted for unrelated reasons. C2 makes the examined set visible so the assertion cannot pass vacuously. SCOPE, from the issue and section 8: this repository's own ledger only -- a check that fired on someone else's ADRs would make Repo Governor an ADR system, which section 8 excludes. STRUCTURAL, NOT SUBSTANTIVE (ADR-032's own taxonomy): a check sees that the section exists; whether its conditions are the right ones is a reader's judgement and always will be. WHAT THIS BAR CANNOT CHECK: whether ADR-020 and ADR-029 gain good conditions. Authoring is a human act; the check makes the gap visible and a person closes it or changes the status. NOT A GATE -- nothing blocks a merge or a release on this, per section 54's standing warning about mechanisms that block routine reversible work.",
+  "authority_id": "159",
+  "criteria": [
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/skill.py | grep -q \"\\[PASS\\].*every Proposed ADR names what would settle it\"'",
+      "$comment": "C1 THE DEFECT. Red today: ADR-020 and ADR-029 carry no such section. Green means both the assertion exists and the ledger satisfies it."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/skill.py | grep -q \"\\[PASS\\].*the Proposed set examined is not empty\"'",
+      "$comment": "C2 THE ANTI-VACUITY CONTROL. C1 is trivially true of an empty set. The suite must report how many Proposed ADRs it examined and assert it is non-zero, or C1 vouches for a check that ran over nothing."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/skill.py | grep -q \"\\[PASS\\].*an Accepted ADR without the section is not reported\"'",
+      "$comment": "C3 SCOPE CONTROL. Proposed only. An implementation demanding the section of every ADR passes C1 and C2 while inventing a requirement ADR-032 never made of settled decisions."
+    },
+    {
+      "$comment": "C4 THIS REPOSITORY'S LEDGER ONLY (section 8). The check must read the ADR directories the project already declares rather than accept a caller-supplied path, or it becomes a general-purpose ADR linter for repositories this project does not own.",
+      "check": "command_exit",
+      "target": "bash -c 'grep -q \"ADR_DIRS\\|docs/adrs\" conformance/skill.py'"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh skill"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh --hermetic"
+    }
+  ]
+}
