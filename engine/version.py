@@ -16,4 +16,4 @@ that can read that manifest -- and is deliberately not derived from this.
 
 from __future__ import annotations
 
-ENGINE_VERSION = "0.5.0"
+ENGINE_VERSION = "0.6.0"
