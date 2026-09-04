@@ -1,0 +1,39 @@
+{
+  "$comment": "Acceptance criteria for issue 197. Two installs on one machine reported version=0.4.1 and differed by four merges; the stale one was missing conformance/roadmap.py, the split_to pointers and ADR-033. engine/version.py moves on a release and installs are made whenever, so the version string cannot distinguish two installs and it is the only version-shaped thing an install carries. The two install paths make different promises: the documented one clones --branch <tag>; tools/install-skill.sh clones the installing machine's checkout at whatever HEAD it is on, so an install made from a feature branch carries unmerged code and reports the released version number. INSTALLED.md is written precisely to explain the install to whoever finds it -- it lists every pruned path -- and records no commit and no date. THE VACUITY THIS BAR IS BUILT AGAINST is asserting against a hand-written fixture: only a DRIVEN install proves the script writes the provenance. CORRECTION TO THE ISSUE: it says 'the suite already drives the installer into temp repositories, so the seam exists' -- conformance/install.py does NOT (grep for install-skill returns nothing there; it asks the REMOTE whether the documented tag exists, per issue 178). The installer is driven by conformance/skill.py, hooks.py, benchmark.py and onboarding.py, so the pattern exists to copy but the seam must be built here. A check that reads a committed sample INSTALLED.md passes forever without the installer changing. C4 is the second direction: an implementation that hardcodes 'not a tag' satisfies C3 and lies whenever the source IS on a tag. WHAT THIS BAR DOES NOT DECIDE: whether the script should refuse, or merely warn, when the source checkout is dirty or on a feature branch. The issue names that as a separate judgement and does not assume it; recording provenance is closeable without settling it.",
+  "authority_id": "197",
+  "criteria": [
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/install.py | grep -q \"\\[PASS\\].*a driven install records the source commit\"'",
+      "$comment": "C1 THE DEFECT. The installer is RUN and the INSTALLED.md it produces names the commit it came from. Red today."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/install.py | grep -q \"\\[PASS\\].*and the branch and the install date\"'",
+      "$comment": "C2 The other two facts a reader needs to tell two installs apart. A commit alone does not say whether it was ever merged."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/install.py | grep -q \"\\[PASS\\].*an install from an untagged source says so\"'",
+      "$comment": "C3 The case where the version string is least trustworthy is named plainly, rather than left for a reader to infer from a hash."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/install.py | grep -q \"\\[PASS\\].*an install from a tag names the tag\"'",
+      "$comment": "C4 THE SECOND DIRECTION. Without it, hardcoding the untagged warning satisfies C3 while telling every tagged install something false."
+    },
+    {
+      "$comment": "C5 DRIVEN, NOT READ. The assertion must run the installer rather than inspect a checked-in sample, or it vouches for provenance the script never wrote. Red today and correctly so: install.py drives nothing. Four other suites already drive install-skill.sh into temp repositories -- copy one.",
+      "check": "command_exit",
+      "target": "bash -c 'grep -q \"install-skill.sh\" conformance/install.py'"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh install"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh --hermetic"
+    }
+  ]
+}

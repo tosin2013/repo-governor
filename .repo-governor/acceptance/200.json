@@ -1,0 +1,34 @@
+{
+  "$comment": "Acceptance criteria for issue 200. A root deliberately seeded with an OPEN task reads NO_EXECUTION_ROOT -- byte-identical to having no root at all. The adapter is correct and distinguishes the cases cleanly: a seeded root answers ok with empty lists, a missing root answers NOT_FOUND. engine/completion.py:100-101 discards that, because NOT_FOUND is skipped as honest absence without recording anything, so both paths arrive with three empty lists and no unknowns. This is absence reported as unknown -- the inverse of the distinction ADR-003 rule 6 makes for providers and references/providers.md requires of every adapter. execution_evidence's own docstring sets the standard it misses: an unbound role 'must read as absence of evidence, never as evidence of absence'. A root that exists with nothing in flight is evidence -- of a root, and of nothing running. THE VACUITY THIS BAR IS BUILT AGAINST, named by the issue itself: a check that exercises only one of the two cases passes against today's code, because the failure is that two inputs produce ONE output. So C1 asserts the two results DIFFER rather than asserting either value. THIS BAR DELIBERATELY DOES NOT NAME THE NEW STATE. The issue says a distinguishing state 'costs a boolean' and that NO_EXECUTION_ROOT keeps its current meaning; which identifier carries the other case is an implementation choice, and pinning it here would settle by acceptance bar a decision the implementer should make. If it becomes a new closed-vocabulary reason that is an engine/vocabulary.py edit and needs recording there.",
+  "authority_id": "200",
+  "criteria": [
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/execution.py | grep -q \"\\[PASS\\].*a seeded root and a missing root do not produce the same state\"'",
+      "$comment": "C1 THE DEFECT, asserted as a DIFFERENCE. Two inputs, one output is the bug; a check reading either value alone cannot see it. Red today."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/execution.py | grep -q \"\\[PASS\\].*a missing root still reports NO_EXECUTION_ROOT\"'",
+      "$comment": "C2 CONTROL. NO_EXECUTION_ROOT keeps its current meaning rather than acquiring a second one. Without this, renaming the state for both cases satisfies C1 and breaks every existing reader."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/execution.py | grep -q \"\\[PASS\\].*a root with active work is unaffected\"'",
+      "$comment": "C3 CONTROL. The ordinary path must not move. An implementation that reports a distinct state for every root passes C1 and C2."
+    },
+    {
+      "$comment": "C4 THE ADAPTER WAS NEVER THE FAULT. adapters/execution-file already answers NOT_FOUND for a missing root and ok for a seeded one; the fix belongs in the engine. This guards against closing the issue by changing the adapter's filters, which the external report proposed and which would break the correct meaning of active and completed. The fixture is bound explicitly because this repository leaves `execution` UNBOUND on purpose (ADR-022 rule 4); without it the adapter answers PROVIDER_UNAVAILABLE for a missing store, which is a different fact and would make this control vouch for nothing.",
+      "check": "command_exit",
+      "target": "bash -c 'REPO_GOVERNOR_EXECUTION=conformance/fixtures/execution.json python3 adapters/execution-file query execution get_active_work id=NOSUCH 2>&1 | grep -q NOT_FOUND'"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh execution"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh --hermetic"
+    }
+  ]
+}

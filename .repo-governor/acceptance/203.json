@@ -1,0 +1,34 @@
+{
+  "$comment": "Acceptance criteria for issue 203. Onboarding prints 'THEN ASK IT A REAL QUESTION -- validation does not catch a wrong signal' and trusts the operator to do it. The comment above that print records what happens when they do not: three separate onboarding attempts declared project_status on a repository with no Project, every id then read NOT_ON_BOARD, and validation stayed green throughout -- three times, by the person who wrote the tool, with the instruction on screen. Issue 51 closed the other half: a binding advertising nothing now reports TRANSPORT_UNREACHABLE. What remains uncaught is the binding that answers AND ANSWERS WRONGLY -- a declared admission signal the tracker does not implement. Capability probing cannot see it, because the capability is genuinely there. THE VACUITY THIS BAR IS BUILT AGAINST, in the issue's own words: 'Verify by breaking it -- a check that only exercises a correct signal passes against today's code, which is how this survived three times.' So C1 drives a WRONG signal and C2 is the control that a correct one completes quietly. TIMING IS THE SUBSTANCE, NOT A DETAIL. The tool writes a proposal, not a manifest, and deliberately does not create the stores, because 'a store nobody asked for is still a change to the repository' (ADR-005). Validating a proposal whose stores do not exist yet reports TRANSPORT_UNREACHABLE and WRITE_GRANTED_BUT_TRANSPORT_READONLY -- both correct and both confusing. So the question must be asked after the manifest is bound; C3 asserts that rather than leaving it to be rediscovered. WHAT THIS BAR CANNOT CHECK: the live instance that prompted the issue is in a repository this project does not own and is private (section 51). Numbers and shapes only; the fixture stands in for it.",
+  "authority_id": "203",
+  "criteria": [
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -q \"\\[PASS\\].*a wrong admission signal is surfaced before onboarding completes\"'",
+      "$comment": "C1 THE DEFECT. Drive the flow against a fixture whose declared signal the tracker does not implement, and fail if it completes silently. Red today."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -q \"\\[PASS\\].*a correct admission signal completes without the warning\"'",
+      "$comment": "C2 VERIFY BY BREAKING IT, the other direction. Without this, warning on every onboarding satisfies C1 and makes the warning noise."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -q \"\\[PASS\\].*the question is asked after the manifest is bound\"'",
+      "$comment": "C3 TIMING. Asked at proposal time it reports store-absence findings that are correct and confusing, which is why the advice was left to a human in the first place. This is the substance of the issue."
+    },
+    {
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/onboarding.py | grep -q \"\\[PASS\\].*UNKNOWN for every id reads as a probable wrong signal\"'",
+      "$comment": "C4 THE INTERPRETATION, which today is written for a person to perform. A real verdict means the binding works; UNKNOWN with the same reason for every id means the signal is probably wrong. Reporting the raw UNKNOWNs without saying what they mean leaves the operator exactly where they were."
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh onboarding"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh --hermetic"
+    }
+  ]
+}
