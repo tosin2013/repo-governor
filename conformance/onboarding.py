@@ -485,6 +485,26 @@ def main():
                     "UNAVAILABLE" in src_t2 and "Pick another" in src_t2,
                     "removing it renumbers the list, and the same keystroke then "
                     "selects a DIFFERENT signal -- observed on the very next run")
+            # The survey WITHHOLDS a zero-count signal and `ask` refuses it if
+            # chosen, so a wrong count does not mislead -- it refuses a correct
+            # answer. GitHub's milestones endpoint defaults to state=open, so a
+            # repository whose milestones are all closed counted zero and the
+            # operator was refused milestone admission on a repository where it
+            # works: the engine reads `milestone` without consulting its state
+            # (issue 221). Measured on this repository: 4 open, 6 closed.
+            #
+            # Structural, because the behavioural version needs `gh` and a
+            # repository with only closed milestones, and the hermetic suite has
+            # neither. It asserts the query, which is where the defect was.
+            rep.add("proposal-e2e", "the milestone survey is not blind to closed milestones",
+                    "milestones?state=all" in src_t2,
+                    "the endpoint defaults to state=open; a repository whose "
+                    "milestones are all closed then counts zero and milestone "
+                    "admission is REFUSED, not merely unadvertised")
+            rep.add("proposal-e2e", "and it shows the open/closed split rather than a bare total",
+                    'm.get("s") == "open"' in src_t2,
+                    "'10 milestones' hides that none is open, which is the one "
+                    "case where what works today and what ADR-018 says diverge")
             rep.add("proposal-e2e", "the option list is never rebuilt from counts",
                     "for v, d in GH_SIGNALS]" in src_t2,
                     "options must keep their positions whatever the counts are")
