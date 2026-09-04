@@ -132,5 +132,17 @@ Four things this document deliberately does not do:
 
 ## Maintainer's acceptance
 
-*Unsigned. §68: ratification is a human act, and an agent that signs this has
-ratified nothing.*
+**Ratified 2026-09-04 by Tosin Akinosho (§68).** The departure from the release
+condition is accepted for v0.6.0. ADR-031 and ADR-033 remain `Proposed` and
+runtime-depended-on; the set has not grown since v0.5.0, and the disclosure
+obligation in the condition's second half is met.
+
+Accepted on the understanding that **#223 settles what the condition means before
+v0.7.0**. A third consecutive departure would not be a third exception — it is the
+condition being repealed by habit, which is the outcome the v0.5.0 review named
+and this one was written to prevent. G3 is why that boundary is stated rather
+than assumed: ADR-033's condition 3 moved in the wrong direction this release, so
+"unchanged" is already not quite true.
+
+*Recorded by the agent at the maintainer's explicit instruction in session, not
+authored by it. §68 makes the judgement human; the transcription is not the act.*
