@@ -137,9 +137,17 @@ def _survey(rid):
             not in ("y", "yes"):
         return None
     try:
+        # state=all, NOT the default. GitHub's milestones endpoint defaults to
+        # state=open, and this survey WITHHOLDS an option whose count is zero --
+        # `ask` refuses it if chosen. So a repository whose milestones are all
+        # closed reported "none" and the operator was refused milestone
+        # admission on a repository where it demonstrably works: the engine
+        # reads `milestone` without consulting its state, so a closed milestone
+        # confers admission today (issue 221). Measured on this repository while
+        # writing this: 4 open, 6 closed, 10 total.
         ms = json.loads(subprocess.run(
-            ["gh", "api", f"repos/{rid}/milestones", "--jq",
-             "[.[] | {t:.title, o:.open_issues, c:.closed_issues}]"],
+            ["gh", "api", f"repos/{rid}/milestones?state=all", "--jq",
+             "[.[] | {t:.title, o:.open_issues, c:.closed_issues, s:.state}]"],
             capture_output=True, text=True, timeout=25).stdout or "[]")
         pj = json.loads(subprocess.run(
             ["gh", "api", "graphql", "-f", "query=query{repository(owner:\"%s\","
@@ -157,7 +165,16 @@ def _survey(rid):
     if ms:
         names = ", ".join(m["t"] for m in ms[:4])
         live = sum(m["o"] for m in ms)
-        print(f"  milestones : {len(ms)} ({names}) -- {live} open issues carry one")
+        opened = sum(1 for m in ms if m.get("s") == "open")
+        print(f"  milestones : {len(ms)} ({opened} open, {len(ms) - opened} closed)"
+              f" ({names}) -- {live} open issues carry one")
+        if not opened:
+            # Not withheld: admission does not consult milestone state today, so
+            # this choice works. Said out loud because it is the one case where
+            # what works now and what ADR-018 says are being reconciled (221).
+            print("               every milestone is CLOSED. This still reads as"
+                  " admitted today, because the signal does not check"
+                  " state -- see issue 221.")
     else:
         print("  milestones : none  <-- option 1 cannot work here")
     print(f"  Projects   : {pj}" + ("" if pj else "  <-- option 2 cannot work here"))
