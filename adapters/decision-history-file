@@ -367,6 +367,11 @@ FUNCTIONS = {
 
 PROPERTIES = {
     "persistence": True,
+    # Survives a change of host. The store is a text file at a path git tracks,
+    # so `git clone` carries the chain. This is the property that decides
+    # whether a decommissioned machine takes the decision history with it --
+    # see the sibling field on decision-history-dolt.
+    "portable": True,
     # Values are READ from fields that mean what they say, so provenance is
     # exact -- unlike decision-history-github, which infers a disposition from
     # a closure reason.

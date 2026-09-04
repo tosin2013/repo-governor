@@ -271,6 +271,10 @@ FUNCTIONS = {
 
 PROPERTIES = {
     "persistence": True,
+    # Portable: the records live in GitHub, not on this disk, so any host that
+    # can reach the API reads the same history. What it cannot supply is
+    # reversal_condition and revision_history -- see CAPABILITIES.
+    "portable": True,
     # Weaker than Dolt: a disposition is INFERRED from a closure reason rather
     # than read from a field that means "decision".
     "provenance_quality": "inferred",

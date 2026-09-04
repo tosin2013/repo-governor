@@ -80,6 +80,12 @@
         "env": {
           "REPO_GOVERNOR_GH_REPO": "tosin2013/repo-governor"
         }
+      },
+      {
+        "type": "decision-history-file",
+        "adapter": "adapters/decision-history-file",
+        "contract_version": 1,
+        "$comment": "Third backend, bound for PORTABILITY. The Dolt store is gitignored on the reasoning that Dolt has its own remotes; no remote was ever configured, so it was distributed by nothing and a decommissioned host took the chain with it. This adapter writes .repo-governor/decisions/decisions.jsonl -- text, tracked, and it supplies reversal_condition and revision_history, the two capabilities decision-history-github cannot. ADR-019 rule 2 anticipated exactly this pairing: a second backend bound alongside is how portability gets tested rather than asserted. Its chain is hand-rolled sha256 links and it says so in `properties`, per ADR-019 rule 3."
       }
     ],
     "$comment": "Six roles bound. `execution` and `change_signals` are deliberately UNBOUND: this repository has no execution tracker and no dependency-signal source, and the file providers previously bound to them read synthetic fixtures under .repo-governor/. Binding a role to a fixture makes the fixture the repository's state -- which is how the roadmap became a shadow roadmap (ADR-022). An unbound role yields a typed disposition, which is the honest answer; a fixture-backed one yields a confident wrong answer."

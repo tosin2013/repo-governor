@@ -23,7 +23,8 @@
     "roadmap_authority",
     "execution",
     "retirement",
-    "acceptance_criteria"
+    "acceptance_criteria",
+    "decision_history"
   ],
   "escalate_to_blocking": [
     "NON_GOALS_UNSTATED",
