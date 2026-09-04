@@ -20,7 +20,8 @@
   "required_roles": [
     "repository",
     "roadmap_authority",
-    "execution"
+    "execution",
+    "decision_history"
   ],
   "escalate_to_blocking": [
     "NO_CRITERIA_DECLARED"

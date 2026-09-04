@@ -235,6 +235,112 @@ def main():
           + ("" if oka else f"\n         validate rc={rc_gap}, status rc={st.returncode} "
                             "-- an operator has to decide which to believe"))
 
+    # --- governance that lives on one machine is not governance --------------
+    #
+    # A repository was governed for months on a host that was then deleted. Its
+    # manifest had never been committed, so the replacement host read it as
+    # un-onboarded while the old one had been reporting READY_FOR_GOVERNANCE
+    # throughout. Onboarding says "rename and commit" in a $comment and a
+    # docstring, and neither is a check -- a rule declared in one place and read
+    # in none.
+    #
+    # Both directions, because a trackedness check passes trivially in the
+    # repository that develops it: everything here is committed already.
+    print("\nA manifest no other host can see is not unqualified governance\n")
+
+    def _validate_tracked(commit, ignore=False):
+        """Validate a manifest that is, or is not, in git's index."""
+        with _tf.TemporaryDirectory() as td:
+            r = pathlib.Path(td) / "repo"
+            r.mkdir()
+            _sp.run(["git", "init", "-q", str(r)], capture_output=True)
+            (r / ".repo-governor.json").write_text(json.dumps(kept))
+            if ignore:
+                (r / ".gitignore").write_text(".repo-governor.json\n")
+            if commit:
+                _sp.run(["git", "-C", str(r), "add", "-f", ".repo-governor.json"],
+                        capture_output=True)
+            env = dict(_os.environ); env["REPO_GOVERNOR_TARGET"] = str(r)
+            pr = _sp.run([sys.executable, str(ROOT / "engine" / "manifest.py"), "--validate"],
+                         capture_output=True, text=True, cwd=str(r), env=env, timeout=120)
+            return pr.stdout, pr.returncode
+
+    out_un, rc_un = _validate_tracked(commit=False)
+    oku = "MANIFEST_UNTRACKED" in out_un and "ON THIS HOST ONLY" in out_un
+    extra += not oku
+    print(f"  [{'PASS' if oku else 'FAIL'}] an uncommitted manifest is reported and the green is qualified"
+          + ("" if oku else f"\n         {out_un.strip()[-200:]}"))
+
+    # Reported, not refused. ADR-031: a configuration gap is disclosed, never
+    # blocked -- and the operator runs this BEFORE committing, by design.
+    okn = rc_un == 0
+    extra += not okn
+    print(f"  [{'PASS' if okn else 'FAIL'}] and it does not refuse: disclosure, not refusal (ADR-031)"
+          + ("" if okn else f"\n         rc={rc_un} -- validating before the commit is the documented flow"))
+
+    # THE CONTROL. Without it the check above passes for a guard that fires on
+    # every repository, which would make the qualifier meaningless noise.
+    out_tr, _ = _validate_tracked(commit=True)
+    okt = "MANIFEST_UNTRACKED" not in out_tr and "ON THIS HOST ONLY" not in out_tr
+    extra += not okt
+    print(f"  [{'PASS' if okt else 'FAIL'}] control: once tracked, the qualifier is gone"
+          + ("" if okt else f"\n         {out_tr.strip()[-200:]}"))
+
+    # An actively-ignored artifact is the worse case: `git add` alone does not
+    # fix it, and saying only "not tracked" would send the reader to a repair
+    # that silently does nothing.
+    out_ig, _ = _validate_tracked(commit=False, ignore=True)
+    oki = "EXCLUDES" in out_ig
+    extra += not oki
+    print(f"  [{'PASS' if oki else 'FAIL'}] a gitignored manifest is named as excluded, not merely untracked"
+          + ("" if oki else f"\n         {out_ig.strip()[-200:]}"))
+
+    # --- a history that cannot leave this machine ---------------------------
+    #
+    # The check is deliberately not "is Dolt bound": section 54 forbids
+    # requiring a named third-party tool, so the property is one each backend
+    # answers for itself. Both directions, because an advisory that fires for
+    # every repository says nothing.
+    print("\nA decision history that cannot survive a clone is reported\n")
+
+    def _validate_dh(backends):
+        base_dh = _copy.deepcopy(kept)
+        base_dh["providers"]["decision_history"] = backends
+        base_dh["permissions"]["decision_history"] = {"read": True, "write": True}
+        with _tf.TemporaryDirectory() as td:
+            r = pathlib.Path(td) / "repo"
+            r.mkdir()
+            _sp.run(["git", "init", "-q", str(r)], capture_output=True)
+            (r / ".repo-governor.json").write_text(json.dumps(base_dh))
+            _sp.run(["git", "-C", str(r), "add", ".repo-governor.json"], capture_output=True)
+            (r / ".repo-governor" / "decisions").mkdir(parents=True, exist_ok=True)
+            env = dict(_os.environ); env["REPO_GOVERNOR_TARGET"] = str(r)
+            return _sp.run([sys.executable, str(ROOT / "engine" / "manifest.py"), "--validate"],
+                           capture_output=True, text=True, cwd=str(r), env=env,
+                           timeout=120).stdout
+
+    _dolt_only = [{"type": "decision-history-dolt",
+                   "adapter": "adapters/decision-history-dolt", "contract_version": 1,
+                   "env": {"REPO_GOVERNOR_DECISIONS_DB":
+                           str((ROOT / ".repo-governor" / "decisions-db").resolve())}}]
+    _with_file = _dolt_only + [{"type": "decision-history-file",
+                                "adapter": "adapters/decision-history-file",
+                                "contract_version": 1}]
+
+    out_np = _validate_dh(_dolt_only)
+    okp = "HISTORY_NOT_PORTABLE" in out_np
+    extra += not okp
+    print(f"  [{'PASS' if okp else 'FAIL'}] a history bound only to a non-portable store is reported"
+          + ("" if okp else f"\n         {out_np.strip()[-200:]}"))
+
+    # THE CONTROL. ADR-019 rule 2 expects a portable backend bound ALONGSIDE a
+    # local one; flagging that arrangement would punish the recommended fix.
+    out_p = _validate_dh(_with_file)
+    okp2 = "HISTORY_NOT_PORTABLE" not in out_p
+    extra += not okp2
+    print(f"  [{'PASS' if okp2 else 'FAIL'}] control: one portable backend alongside is enough"
+          + ("" if okp2 else f"\n         {out_p.strip()[-200:]}"))
+
     # A DECLARED transport is not a reached one (issue 130). Declaring
     # transport.kind=mcp made the adapter report reachable and writable, which
     # silenced WRITE_GRANTED_BUT_TRANSPORT_READONLY for a transport that has no

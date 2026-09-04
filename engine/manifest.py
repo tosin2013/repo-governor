@@ -109,7 +109,25 @@ ARRAY_ROLES = ("architecture", "change_signals", "retirement", "decision_history
 # Closed set, deliberately: `--validate` treats any other kind as blocking, so
 # forgetting to list one costs a false refusal and never a false green
 # (issue 180).
-ADVISORY_FINDINGS = ("REQUIRED_ROLE_UNBOUND",)
+ADVISORY_FINDINGS = ("REQUIRED_ROLE_UNBOUND", "ARTIFACT_UNTRACKED",
+                     "TRACKEDNESS_UNKNOWN", "MANIFEST_UNTRACKED",
+                     "HISTORY_NOT_PORTABLE", "PORTABILITY_UNDECLARED")
+
+# MANIFEST_UNTRACKED is advisory, and the banner is qualified instead.
+#
+# It was blocking first, which broke onboarding: a manifest is legitimately
+# uncommitted between the moment the operator promotes the onboarding
+# proposal to a manifest and the moment they commit it, and
+# --validate is what the operator runs IN that window. Refusing there would
+# make the tool fail at the one moment it is meant to help.
+#
+# The repo's own taxonomy decides it. An uncommitted manifest is a
+# CONFIGURATION GAP, not a broken binding -- every binding answers, on this one
+# machine -- and ADR-031 fixes the posture for gaps: "Report the fact, state the
+# consequence, block nothing." So it reports and does not refuse. What it must
+# never do is print READY_FOR_GOVERNANCE unqualified, because that is the false
+# green that let a repository lose its authority to a decommissioned host; see
+# the banner below.
 
 VERBS = ("read", "write", "create", "update", "archive", "comment", "transition")
 RESERVED_VERBS = ("execute",)
@@ -305,6 +323,134 @@ def check_adapters(manifest):
     return findings
 
 
+def _git_out(args, cwd):
+    """Run git plumbing. Returns (rc, stdout); rc is None when git is unavailable."""
+    import subprocess  # noqa: PLC0415 -- only needed on this path
+    try:
+        r = subprocess.run(["git", "-C", str(cwd), *args],
+                           capture_output=True, text=True, timeout=20)
+        return r.returncode, r.stdout
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        return None, ""
+
+
+def _artifact_classes(manifest, root, mp):
+    """(label, kind, paths, why) for each class of artifact that carries governance.
+
+    A class rather than a file, so a repository with 88 acceptance bars produces
+    one finding naming a count instead of 88 findings nobody reads.
+    """
+    out = [("the manifest", "MANIFEST_UNTRACKED", [mp] if mp.exists() else [],
+            "the manifest IS the authority (ADR-004): bindings, permissions, "
+            "profile and the declared admission signal (ADR-018)")]
+
+    bars = sorted((root / ".repo-governor" / "acceptance").glob("*.json"))
+    out.append(("acceptance bars", "ARTIFACT_UNTRACKED", bars,
+                "completion bars are repo-local by ADR-017; an untracked bar "
+                "cannot be evaluated on any other checkout"))
+
+    # Only when a file-backed decision store is actually bound. A store nobody
+    # binds is not a governance artifact, and demanding it would be inventing a
+    # requirement the manifest never made (INV-013).
+    dh = (manifest.get("providers") or {}).get("decision_history") or []
+    if any((b or {}).get("type") == "decision-history-file"
+           for b in (dh if isinstance(dh, list) else [dh]) if isinstance(b, dict)):
+        d = Path(os.environ.get("REPO_GOVERNOR_DECISIONS_DIR",
+                                root / ".repo-governor" / "decisions"))
+        f = Path(d) / "decisions.jsonl"
+        out.append(("the decision log", "ARTIFACT_UNTRACKED", [f] if f.exists() else [],
+                    "a decision history bound to a file backend is portable only "
+                    "if the file is committed (ADR-019 rule 2)"))
+    return out
+
+
+def check_tracked(manifest, path=None):
+    """Findings for governance artifacts git would not carry to another host.
+
+    Present-on-one-machine is not governance. A manifest nobody committed is
+    invisible to every other host -- that host reports AUTHORITY_SOURCE_MISSING
+    and reads the repository as un-onboarded, while this surface reports
+    READY_FOR_GOVERNANCE. Onboarding says "rename and commit" in a $comment and
+    a docstring; neither is a check.
+
+    Severity is deliberately uneven. An untracked MANIFEST blocks: a repository
+    claiming READY_FOR_GOVERNANCE on a file no other host can see asserts
+    something false, and the tempting repair -- re-onboarding -- is not recovery
+    but re-founding, silently redeciding bindings, profile and admission.
+    Untracked bars or decisions are advisory: still governed, just answering
+    less on the next clone.
+    """
+    root = target()
+    mp = Path(path) if path else (root / ".repo-governor.json")
+
+    rc, _ = _git_out(["rev-parse", "--is-inside-work-tree"], root)
+    if rc != 0:
+        return [("(governance artifacts)", str(root), "TRACKEDNESS_UNKNOWN",
+                 "not a git worktree, or git is unavailable, so whether these "
+                 "artifacts reach another host cannot be determined. Unknown is "
+                 "not tracked (ADR-003 rule 6).")]
+
+    findings = []
+    for label, kind, paths, why in _artifact_classes(manifest, root, mp):
+        if not paths:
+            continue
+        rels = [os.path.relpath(p, root) for p in paths]
+        _, listed = _git_out(["ls-files", "--", *rels], root)
+        tracked = {ln for ln in listed.splitlines() if ln}
+        missing = [r for r in rels if r not in tracked]
+        if not missing:
+            continue
+        # An actively-ignored artifact is the worse case and gets said so: it is
+        # not an oversight a `git add` fixes.
+        irc, _ = _git_out(["check-ignore", "-q", "--", missing[0]], root)
+        excluded = " A .gitignore rule EXCLUDES it, so `git add` alone will not fix this." if irc == 0 else ""
+        shown = ", ".join(missing[:3]) + (f" (+{len(missing) - 3} more)" if len(missing) > 3 else "")
+        findings.append(("(governance artifact)", label, kind,
+                         f"{len(missing)} of {len(rels)} not tracked: {shown}. {why}. "
+                         f"`git clone` does not carry it.{excluded}"))
+    return findings
+
+
+def check_portability(manifest):
+    """Advisory when a repository's decision history cannot survive a clone.
+
+    The question is deliberately not "is Dolt bound". Section 54 forbids
+    requiring a specific third-party tool and ADR-019 rule 2 says the backend is
+    pluggable, not prescribed, so the checkable property is one every backend
+    answers for itself: does the history reach another host? Adapters advertise
+    it in `properties.portable`; the engine reads roles and never adapter names
+    (engine/bindings.py).
+
+    Fires only when EVERY bound backend says no. One portable backend alongside
+    a fast local one is the arrangement ADR-019 rule 2 recommends, not a defect.
+    """
+    dh = (manifest.get("providers") or {}).get("decision_history")
+    if not dh:
+        return []  # unbound: INV-013, not this check's business
+    import bindings as B  # noqa: PLC0415 -- bindings imports this module
+
+    verdicts = []
+    for b in (dh if isinstance(dh, list) else [dh]):
+        if not isinstance(b, dict):
+            continue
+        d = B.describe(b, use_cache=False) or {}
+        verdicts.append(((d.get("properties") or {}).get("portable"), b.get("adapter")))
+    if not verdicts or any(v is True for v, _ in verdicts):
+        return []
+    # `None` is not `False`: a backend that never declared the property has not
+    # said it is unportable, and reporting it as such would be inventing an
+    # answer (ADR-003 rule 6).
+    if all(v is None for v, _ in verdicts):
+        return [("decision_history", "(all backends)", "PORTABILITY_UNDECLARED",
+                 "no bound backend declares `properties.portable`, so whether this "
+                 "repository's decision history survives a clone is unknown.")]
+    return [("decision_history", "(all backends)", "HISTORY_NOT_PORTABLE",
+             "every bound backend declares portable=false, so the decision history "
+             "lives only on this machine and a clone starts empty. Bind a portable "
+             "backend alongside -- the role is multi-valued (ADR-013) and ADR-019 "
+             "rule 2 expects exactly that pairing.")]
+
+
 def main(argv):
     if argv and argv[0] == "--validate":
         m, errs = load()
@@ -331,6 +477,11 @@ def main(argv):
                              f"{m['condition']['profile']} requires this role; it is not "
                              "usable here. Bind it, or reassess the condition -- the level "
                              "is a human's to change (ADR-006 rule 1)."))
+        # Governance that lives on one machine is not governance. Checked here
+        # because --validate is what a person runs to find out whether they
+        # onboarded correctly, and "did it reach the repository" is half of that.
+        findings += check_tracked(m)
+        findings += check_portability(m)
         for role, adapter, kind, detail in findings:
             print(f"  [{kind}] {role} -> {adapter}: {detail}")
 
@@ -354,6 +505,11 @@ def main(argv):
         blocking = [f for f in findings if f[2] not in ADVISORY_FINDINGS]
         n = len([r for r in (m.get("providers") or {}) if not r.startswith("$")])
         state = "PROVIDER_UNAVAILABLE" if blocking else "READY_FOR_GOVERNANCE"
+        # Qualify the green. A reader who sees READY_FOR_GOVERNANCE and stops
+        # reading has been told the repository is governed; if the manifest is
+        # uncommitted, that is true only of the machine they are sitting at.
+        if any(f[2] == "MANIFEST_UNTRACKED" for f in advisory) and not blocking:
+            state = "READY_FOR_GOVERNANCE ON THIS HOST ONLY"
         counts = f"{n} bindings, {len(blocking)} finding(s)"
         if advisory:
             counts += f", {len(advisory)} advisory"

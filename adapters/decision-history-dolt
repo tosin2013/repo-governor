@@ -306,6 +306,13 @@ FUNCTIONS = {
 
 PROPERTIES = {
     "persistence": True,
+    # NOT portable, and the distinction is not academic. The store is a binary
+    # database git is told to ignore, on the reasoning that Dolt distributes it
+    # through remotes of its own. That is only true once a remote exists;
+    # without one the store is distributed by nothing, and a repository whose
+    # host is decommissioned loses the chain with no way to notice. Persistence
+    # is about surviving a process; this is about surviving a machine.
+    "portable": False,
     "provenance_quality": "exact",
     "chain_supplied_by_store": True,   # see ADR-019 rule 3
     "vocabulary": list(DISPOSITIONS),
