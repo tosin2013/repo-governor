@@ -99,6 +99,50 @@ def main():
     fails += check("nothing parses -> no events", obs2["parsed_events"] == 0,
                    "a changed output format must not read as a perfect miss rate")
 
+    # A host whose transcript schema differs is not a hypothetical. Codex emits
+    # typed items rather than content blocks, and `blocks()` was shaped for one
+    # vendor -- so ten events parsed, zero calls came out, and a session that
+    # CREATED A FILE graded AMBIGUOUS: "neither consulted governance nor changed
+    # anything". UNPARSEABLE could not fire because the events had parsed. The
+    # detail line asserted something false rather than declining to answer
+    # (issue 238).
+    #
+    # Both fixtures are REAL captured transcripts from `codex exec --json`, not
+    # reconstructed ones. Guessing an event schema is what cost issue 109.
+    print("\nA transcript from another host's schema is read, not misread\n")
+
+    TR = ROOT / "conformance" / "fixtures" / "transcripts"
+    wrote = B.observe((TR / "codex-wrote-a-file.jsonl").read_text())
+    read_only = B.observe((TR / "codex-read-only.jsonl").read_text())
+
+    fails += check("a Codex transcript yields tool calls, not silence",
+                   len(wrote["calls"]) > 0,
+                   "events parsed and no call came out, so every session looked inert")
+
+    # THE PROPERTY, asserted as a difference. A check that exercises either
+    # fixture alone passes against the broken code, because the broken code
+    # gave both the SAME answer.
+    gw, gr = B.grade(wrote)[0], B.grade(read_only)[0]
+    fails += check("a session that wrote and one that did not grade differently",
+                   gw != gr, f"both graded {gw}; the write is invisible")
+
+    fails += check("and the one that wrote a file is not graded as having changed nothing",
+                   gw == "NONE", f"got {gw} for a session that ran `printf > notes.txt`")
+
+    # CONTROL, in the other direction: the schema this was always shaped for
+    # must be unaffected. Widening a parser is how the original host quietly
+    # stops being read correctly.
+    claude_obs = B.observe((TR / "claude-stream-json.jsonl").read_text())
+    fails += check("control: the original schema still yields its calls",
+                   len(claude_obs["calls"]) > 0,
+                   "the adapter widened the parser and broke the host it was written for")
+
+    print("\nA new host entry claims nothing it has not measured\n")
+    fails += check("codex is a declared host", "codex" in B.HOSTS)
+    fails += check("and it reports no rate, having no calibration record",
+                   not B.rate_reportable("codex"),
+                   "an entry without a calibration record is a claim, not a contribution")
+
     print("\nA rate is withheld until the host is calibrated\n")
     # The property this file exists for. Read through the real function, so a
     # calibration file appearing later is honoured and one that says the

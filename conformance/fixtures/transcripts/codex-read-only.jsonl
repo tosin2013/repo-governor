@@ -1,0 +1,6 @@
+{"type":"thread.started","thread_id":"01a0891a-1113-7d71-961f-f797b1ddfe2f"}
+{"type":"turn.started"}
+{"type":"item.started","item":{"id":"item_0","type":"command_execution","command":"ls","aggregated_output":"","status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_0","type":"command_execution","command":"ls","aggregated_output":"a.txt\nerr.txt\nout.jsonl\n","exit_code":0,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_1","type":"agent_message","text":"The directory contains three files:\n\n- `a.txt`\n- `err.txt`\n- `out.jsonl`\n\nThat's it — no subdirectories or other items visible."}}
+{"type":"turn.completed","usage":{"input_tokens":0,"cached_input_tokens":0,"output_tokens":0}}

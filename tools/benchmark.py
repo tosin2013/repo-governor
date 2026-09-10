@@ -166,6 +166,36 @@ HOSTS = {
         "skills_dir": ".agents/skills",
         "installer_host": "cursor",
     },
+    # Read from `codex --help` and `codex exec --help` on a real machine and
+    # exercised against a live model, not from documentation -- the Codex hook
+    # template was written from a doc summary and was wrong.
+    #
+    # NO CALIBRATION RECORD EXISTS FOR THIS HOST. `rate_reportable()` therefore
+    # refuses a rate here and grades come back UNCALIBRATED, which is the
+    # intended state: references/harnesses.md says an entry without its own
+    # calibration record is a claim, not a contribution. The entry is here so
+    # the calibration can be RUN; it does not assert the run happened.
+    "codex": {
+        "cmd": "codex",
+        # `exec` is the non-interactive subcommand; `--json` emits JSONL events.
+        # `--skip-git-repo-check` is needed because prepare() hands the host a
+        # throwaway copy that is not a git repository.
+        #
+        # `mcp_servers={}` is not tidiness. A configured MCP server that fails
+        # to authenticate injects error events into the transcript the grade is
+        # computed from -- observed live with a Notion server mid-run. An
+        # uncontrolled variable in a calibration run is what makes it not a
+        # calibration.
+        "argv": ["exec", "{prompt}", "--json", "--skip-git-repo-check",
+                 "-c", "mcp_servers={}"],
+        "unrestricted_argv": ["--dangerously-bypass-approvals-and-sandbox"],
+        "model_flag": "-m",
+        # Codex reads .agents/skills, .codex/skills and ~/.codex/skills. The
+        # cross-vendor path is chosen so this measures the same install layout
+        # the installer defaults to.
+        "skills_dir": ".agents/skills",
+        "installer_host": "codex",
+    },
 }
 
 # A tool call that consults governance. Reading SKILL.md is deliberately NOT
@@ -277,12 +307,44 @@ def blocks(e):
     two places, and the duplication is why only one of them was ever noticed.
     """
     msg = e.get("message")
-    if not isinstance(msg, dict):
-        return []
-    content = msg.get("content")
-    if not isinstance(content, list):
-        return []
-    return [b for b in content if isinstance(b, dict)]
+    if isinstance(msg, dict) and isinstance(msg.get("content"), list):
+        return [b for b in msg["content"] if isinstance(b, dict)]
+
+    # Codex speaks a different schema, and this function used to assume there
+    # was only one. `codex exec --json` emits typed items rather than content
+    # blocks -- no `message`, no `content`, no `tool_use`:
+    #
+    #   item.completed  item.type=command_execution  {command, exit_code, ...}
+    #   item.completed  item.type=agent_message      {text}
+    #
+    # So every event counted as PARSED and none yielded a call, and a session
+    # that created a file graded AMBIGUOUS -- "neither consulted governance nor
+    # changed anything". UNPARSEABLE could not fire, because ten events had
+    # parsed. The detail line was stating something false rather than declining
+    # to answer, which is worse (issue 238).
+    #
+    # `item.started` is deliberately ignored: it and `item.completed` describe
+    # ONE command, and counting both doubles every tool call in the ordering
+    # the grade is computed from.
+    #
+    # Unknown item types yield nothing rather than a guess. Codex may also
+    # report edits as a patch item; none was observed, and inventing a schema
+    # for it is what cost issue 109 a reconstructed fixture.
+    if e.get("type") == "item.completed":
+        item = e.get("item")
+        if isinstance(item, dict):
+            kind = item.get("type")
+            if kind == "command_execution":
+                # Normalised to `Bash` on purpose. Mutation detection is gated
+                # on `name == "Bash"`, so a shell tool under any other name
+                # bypasses both WRITE_SHELL and _redirects_to_a_file. Renaming
+                # here keeps that coupling in one place instead of spreading a
+                # second vendor's vocabulary through the grader.
+                return [{"type": "tool_use", "name": "Bash",
+                         "input": {"command": item.get("command") or ""}}]
+            if kind == "agent_message":
+                return [{"type": "text", "text": item.get("text") or ""}]
+    return []
 
 
 def observe(raw):
