@@ -84,6 +84,55 @@ def main():
     fails += check("SKILL.md explains how to locate the skill directory",
                    "RG=" in skill and "base directory" in skill.lower())
 
+    # ADR-034 decision 3. Discovery under the Agent Skills standard carries only
+    # name, description and metadata, so a host without the runtime does not find
+    # out until AFTER activation -- where a missing binary reads as the skill
+    # declining rather than as an unmet requirement. What the skill needs belongs
+    # in frontmatter.
+    #
+    # Derived, not restated. docs/installation.md's dependency table marks the
+    # load-bearing tools with "nothing works"; this asserts the frontmatter names
+    # each of them, so the two cannot drift. Two places that must agree with
+    # nothing asserting it is this repository's most repeated defect.
+    print("\nWhat the skill requires is declared where discovery can see it (ADR-034)\n")
+
+    fm = skill.split("---")[1] if skill.startswith("---") else ""
+    compat = re.search(r"^compatibility:\s*(.+)$", fm, re.M)
+    fails += check("SKILL.md declares `compatibility`", bool(compat),
+                   "a skill with environment requirements that states none fails after "
+                   "activation, which reads as a refusal rather than a missing binary")
+
+    install_md = (ROOT / "docs" / "installation.md").read_text(encoding="utf-8")
+    load_bearing = sorted({t for t in re.findall(r"\|\s*`([a-z0-9]+)`[^|]*\|[^|]*\|\s*nothing works",
+                                                 install_md)})
+    fails += check(f"the load-bearing tools were derived from the install docs ({len(load_bearing)})",
+                   len(load_bearing) >= 2,
+                   "an empty set makes the check below pass for any compatibility string")
+
+    if compat:
+        text = compat.group(1)
+        unnamed = [t for t in load_bearing if t not in text]
+        fails += check("and it names every tool the install docs call load-bearing",
+                       not unnamed,
+                       f"{unnamed} are documented as 'nothing works' without them and are "
+                       "absent from the frontmatter a host reads at discovery")
+
+    # ADR-034 decision 1: the published artifact is this tree, not a copy of it.
+    # A second SKILL.md is section 54's oldest failure condition -- two sources of
+    # record -- arriving through the distribution door rather than the roadmap one.
+    # Scoped to THIS skill by its declared name, not to the filename. The first
+    # draft asserted a single tracked SKILL.md anywhere and went red on
+    # `.claude/skills/github-project-release-manager/SKILL.md` -- a different
+    # skill, correctly present. A repository may hold many skills; what rule 1
+    # forbids is a second copy of this one.
+    tracked = subprocess.run(["git", "-C", str(ROOT), "ls-files", "*SKILL.md"],
+                             capture_output=True, text=True).stdout.split()
+    mine = [f for f in tracked
+            if re.search(r"^name:\s*repo-governor\s*$",
+                         (ROOT / f).read_text(encoding="utf-8"), re.M)]
+    fails += check("exactly one copy of THIS skill is tracked; publication adds pointers",
+                   mine == ["SKILL.md"], f"declaring name: repo-governor -> {mine}")
+
     print("\nEvery entry point the surface names exists and runs\n")
 
     named = sorted(set(ENTRY_RE.findall(skill + agents)))
