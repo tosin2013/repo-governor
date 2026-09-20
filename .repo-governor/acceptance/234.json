@@ -1,0 +1,8 @@
+{
+  "$comment": "Reading 1 of issue 234 was chosen: carry a Claude Code marketplace entry in-tree, bounded (ADR-034 decision 1). This bar verifies that reading's artifacts. It deliberately would NOT pass under reading 2 (carry none) or reading 3 (out-of-tree); the issue's 'a bar must pass under all three' caution applied to a bar written BEFORE the decision, to avoid prejudging it. The decision is now made, so the bar is reading-specific. file_exists catches deletion of the entry; conformance/skill.py carries ADR-034 decision 1 (exactly one SKILL.md, no second copy) and decision 2 (the entry pins a released tag), so a broken pin or a leaked copy turns this red.",
+  "authority_id": "234",
+  "criteria": [
+    { "check": "file_exists", "target": ".claude-plugin/marketplace.json" },
+    { "check": "command_exit", "target": "python3 conformance/skill.py" }
+  ]
+}

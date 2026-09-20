@@ -58,6 +58,10 @@ rm -f  "$DEST/.repo-governor.json"   # binds tosin2013/repo-governor -- not the 
 rm -rf "$DEST/.repo-governor"        # its acceptance criteria and decision store
 rm -rf "$DEST/docs/research"         # this project's working notes; nothing reads them
 rm -f  "$DEST/CONTRIBUTING.md"       # Repo Governor's contribution rules, not yours
+rm -rf "$DEST/.claude-plugin"        # Claude Code marketplace entry (ADR-034): it
+                                     # publishes THIS repository by tag, so in a copy
+                                     # it points at the wrong tree -- ADR-034 rule 1's
+                                     # "no second copy" arriving via the install door
 
 # Leave a note, because a pruned clone is otherwise a mystery to whoever finds
 # it, and because `git status` inside it will now show deletions.
@@ -65,7 +69,7 @@ cat > "$DEST/INSTALLED.md" <<'NOTE'
 # Installed as a skill
 
 This is a clone of [Repo Governor](https://github.com/tosin2013/repo-governor)
-with three paths removed by `tools/install-skill.sh`:
+with the paths below removed by `tools/install-skill.sh`:
 
 | Removed | Why |
 |---|---|
@@ -75,6 +79,7 @@ with three paths removed by `tools/install-skill.sh`:
 | `.repo-governor.json`, `.repo-governor/` | bind and configure governance for *Repo Governor's own repository*. Left in place, an agent standing in this directory resolves the install as the repository under governance and answers questions about the wrong project. |
 | `CONTRIBUTING.md` | Repo Governor's contribution rules — its conformance suites, its branch policy, its PR template. True of Repo Governor, false of the repository you installed it into, and grepping for contribution rules would otherwise turn up two files describing different projects. To contribute an adapter, see https://github.com/tosin2013/repo-governor/blob/main/CONTRIBUTING.md |
 | `docs/research/` | this project's working notes. `SKILL.md` reads `docs/workflows/` and `docs/reference/` and never these. One of them is the protocol for measuring whether this skill activates — shipping it means an agent being measured can read the experiment it is part of. |
+| `.claude-plugin/` | the Claude Code marketplace entry (ADR-034). It publishes *this* repository as a plugin pinned to a tag; inside a copy it names the wrong tree, which is ADR-034 rule 1's "no second copy" arriving through the install door. |
 
 `git status` here shows them as deletions. That is expected. To update:
 
@@ -88,10 +93,10 @@ NOTE
 
 echo "installed: $DEST"
 [ -f "$DEST/SKILL.md" ] && echo "  SKILL.md present" || { echo "  SKILL.md MISSING" >&2; exit 1; }
-for f in AGENTS.md CLAUDE.md .claude .repo-governor.json .repo-governor docs/research CONTRIBUTING.md; do
+for f in AGENTS.md CLAUDE.md .claude .claude-plugin .repo-governor.json .repo-governor docs/research CONTRIBUTING.md; do
   [ -e "$DEST/$f" ] && { echo "  PRUNE FAILED: $f still present" >&2; exit 1; }
 done
-echo "  pruned: AGENTS.md, CLAUDE.md, .claude/, .repo-governor.json, .repo-governor/, docs/research/, CONTRIBUTING.md"
+echo "  pruned: AGENTS.md, CLAUDE.md, .claude/, .claude-plugin/, .repo-governor.json, .repo-governor/, docs/research/, CONTRIBUTING.md"
 
 # LICENSE and NOTICE must SURVIVE. Apache-2.0 section 4(a) requires recipients
 # get a copy of the License and 4(d) requires the NOTICE travel with it, so the
