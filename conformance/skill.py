@@ -143,42 +143,50 @@ def main():
     # bumped when a tag is cut -- or this suite goes red at release time.
     channels = sorted(ROOT.glob(".claude-plugin/marketplace.json"))
     if channels:
-        print("\nEvery published channel entry pins a released tag (ADR-034 decision 2)\n")
-        released = {t for t in subprocess.run(
-            ["git", "-C", str(ROOT), "tag"], capture_output=True, text=True
-        ).stdout.split() if re.fullmatch(r"v\d+\.\d+\.\d+", t)}
-        fails += check(f"released tags are visible to the check ({len(released)})",
-                       bool(released),
-                       "no vX.Y.Z tags in this checkout; a pin cannot be verified "
-                       "against nothing -- fetch tags (CI uses fetch-depth: 0)")
-        # Only rule on individual pins when there is a tag list to rule against.
-        # Without one the failure above is the single, accurate signal; asserting
-        # each pin here too would read as "your pin is wrong" when the truth is
-        # "this checkout cannot tell", which is the confusion ADR-007 forbids.
-        for mkt in (channels if released else []):
+        print("\nEvery channel entry ships the pruned build, pinned to this version (ADR-034 decisions 1-2)\n")
+        vsrc = (ROOT / "engine" / "version.py").read_text(encoding="utf-8")
+        vm = re.search(r'ENGINE_VERSION\s*=\s*"([^"]+)"', vsrc)
+        fails += check("engine/version.py declares a version the channel check can read",
+                       bool(vm), "without it the pin checks below pass vacuously")
+        ver = vm.group(1) if vm else None
+        for mkt in channels:
             for e in json.loads(mkt.read_text(encoding="utf-8")).get("plugins", []):
+                name = e.get("name")
                 src = e.get("source")
-                # A relative source IS the marketplace tree and carries no
-                # independent pin; only a remote source can drift from a release.
-                if not isinstance(src, dict):
-                    continue
-                ref = src.get("ref") or e.get("version")
-                fails += check(
-                    f"{mkt.name}: entry {e.get('name')!r} pins a released tag",
-                    ref in released,
-                    f"ref/version {ref!r} is not a released tag; an unpinned or "
-                    "unreleased entry publishes HEAD, not a release (ADR-034 rule 2)")
-
-        # ADR-034 rule 1 at the install door. A channel manifest publishes THIS
-        # repository by tag; carried into a copy by install-skill.sh it names the
-        # wrong tree -- rule 1's "no second copy" arriving through distribution.
-        # Assert the installer both prunes it and would catch a regression, so the
-        # prune cannot be dropped from one place while looking present in another.
+                kind = src.get("source") if isinstance(src, dict) else "relative"
+                # ADR-034 decision 1: ship the PRUNED artifact, not the repo tree.
+                # A github/url/relative source of THIS repo clones the whole tree --
+                # AGENTS.md, .claude/, .repo-governor.json, docs/research/ -- the
+                # leak install-skill.sh exists to stop, arriving through the
+                # distribution door. Only an archive of the pruned build is pruned.
+                # (Measured: a github-source install shipped every one of those.)
+                fails += check(f"{mkt.name}: {name!r} ships the pruned build (archive source)",
+                               kind == "archive",
+                               f"source kind {kind!r} clones the repository tree, which "
+                               "carries the paths install-skill.sh prunes; point it at the "
+                               "pruned release archive (ADR-034 rule 1)")
+                # ADR-034 decision 2: pinned to the CURRENT engine version, so the
+                # channel tracks releases and never publishes HEAD. Derived from
+                # ENGINE_VERSION, not a git tag, so it is checkable before a tag is
+                # cut and forces the pin to be bumped on release (issue 243).
+                if ver:
+                    url = src.get("url", "") if isinstance(src, dict) else ""
+                    url_vers = set(re.findall(r"/v(\d+\.\d+\.\d+)/", url))
+                    pin_ok = e.get("version") == ver and (not url_vers or url_vers == {ver})
+                    fails += check(f"{mkt.name}: {name!r} pins the engine version {ver}",
+                                   pin_ok,
+                                   f"entry version {e.get('version')!r}, url version(s) "
+                                   f"{sorted(url_vers)}; engine reports {ver} -- the channel "
+                                   "must ship the current release (ADR-034 rule 2, issue 243)")
+        # ADR-034 rule 1 at the install door: the in-tree manifest must not travel
+        # into a copy of the skill. install-skill.sh prunes it and self-verifies;
+        # assert both, so the prune cannot be dropped from one place while looking
+        # present in another.
         installer = (ROOT / "tools" / "install-skill.sh").read_text(encoding="utf-8")
         fails += check("install-skill.sh prunes the channel manifest from a copy",
                        'rm -rf "$DEST/.claude-plugin"' in installer,
-                       "a .claude-plugin/ that survives an install points the copy at "
-                       "the source repository's tag (ADR-034 rule 1)")
+                       "a .claude-plugin/ that survives an install ships a marketplace "
+                       "entry into someone else's skill copy (ADR-034 rule 1)")
         fails += check("and its own prune self-check names it, so a regression is caught",
                        re.search(r"for f in[^\n]*\.claude-plugin", installer) is not None,
                        "the prune command exists but the verify loop does not list it, "

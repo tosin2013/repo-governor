@@ -104,6 +104,13 @@ jobs:
               --mtime="@$(git log -1 --format=%ct "$tag")" \
               -czf "repo-governor-${tag}.tar.gz" -C "$(dirname "$src")" repo-governor
           sha256sum "repo-governor-${tag}.tar.gz" | tee "repo-governor-${tag}.tar.gz.sha256"
+          # The Claude Code plugin marketplace entry uses an `archive` source,
+          # which requires a ZIP whose entries are the plugin at the archive ROOT
+          # (SKILL.md at top, because the entry declares skills:["."]) -- not the
+          # tarball's repo-governor/ wrapper. Same pruned bytes, a shape for a
+          # different consumer (ADR-034). zip is present on ubuntu-latest.
+          ( cd "$src" && zip -qXr "$GITHUB_WORKSPACE/repo-governor-${tag}.zip" . )
+          sha256sum "repo-governor-${tag}.zip" | tee "repo-governor-${tag}.zip.sha256"
 
       - name: The artifact is what it claims to be
         run: |
@@ -128,6 +135,20 @@ jobs:
             exit 1
           fi
           echo "artifact contains $(wc -l < "$listing") paths, SKILL.md present, prune verified"
+          # The plugin zip is consumed differently: the archive source unpacks it
+          # as the plugin root, so skills:["."] needs SKILL.md at the ZIP ROOT, and
+          # the same prune must hold or the plugin ships this repo's own files.
+          z="repo-governor-${{ steps.t.outputs.tag }}.zip"
+          zlist="$RUNNER_TEMP/zlist.txt"
+          unzip -Z1 "$z" > "$zlist"
+          grep -qx 'SKILL.md' "$zlist" \
+            || { echo "::error::no SKILL.md at the plugin zip root (archive source needs it there)"; head -20 "$zlist"; exit 1; }
+          if grep -Eq '^(AGENTS\.md|CLAUDE\.md|\.claude/|\.claude-plugin|\.repo-governor)' "$zlist"; then
+            echo "::error::a pruned path survived into the plugin zip"
+            grep -E '^(AGENTS\.md|CLAUDE\.md|\.claude/|\.claude-plugin|\.repo-governor)' "$zlist"
+            exit 1
+          fi
+          echo "plugin zip: SKILL.md at root, prune verified"
 
       - name: Publish
         env:
@@ -136,7 +157,8 @@ jobs:
           set -euo pipefail
           tag="${{ steps.t.outputs.tag }}"
           notes="docs/releases/${tag}.md"
-          assets=("repo-governor-${tag}.tar.gz" "repo-governor-${tag}.tar.gz.sha256")
+          assets=("repo-governor-${tag}.tar.gz" "repo-governor-${tag}.tar.gz.sha256"
+                  "repo-governor-${tag}.zip" "repo-governor-${tag}.zip.sha256")
           if gh release view "$tag" >/dev/null 2>&1; then
             # A hand-written draft may already exist. Adopt it rather than
             # failing -- gh release create refuses when the name is taken, even

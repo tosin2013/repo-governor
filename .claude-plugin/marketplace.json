@@ -6,18 +6,17 @@
     "url": "https://github.com/tosin2013"
   },
   "metadata": {
-    "description": "Curated entry for the Repo Governor skill. This marketplace carries one bounded pointer (ADR-034 decision 1); the skill lives at the repository root and is not copied here."
+    "description": "Curated entry for the Repo Governor skill. The source is the PRUNED release archive (ADR-034 rule 1), not this repository tree, so an install never carries this repo's AGENTS.md, .claude/ or manifest. The skill lives once, at the repository root; this entry is a pointer."
   },
   "plugins": [
     {
       "name": "repo-governor",
       "source": {
-        "source": "github",
-        "repo": "tosin2013/repo-governor",
-        "ref": "v0.6.0"
+        "source": "archive",
+        "url": "https://github.com/tosin2013/repo-governor/releases/download/v0.7.0/repo-governor-v0.7.0.zip"
       },
       "description": "Determine whether an AI coding agent is authorized to create, change, maintain, or retire something in this repository, and when it must stop.",
-      "version": "0.6.0",
+      "version": "0.7.0",
       "author": { "name": "Tosin Akinosho", "url": "https://github.com/tosin2013" },
       "homepage": "https://github.com/tosin2013/repo-governor",
       "repository": "https://github.com/tosin2013/repo-governor",
