@@ -151,7 +151,11 @@ def main():
                        bool(released),
                        "no vX.Y.Z tags in this checkout; a pin cannot be verified "
                        "against nothing -- fetch tags (CI uses fetch-depth: 0)")
-        for mkt in channels:
+        # Only rule on individual pins when there is a tag list to rule against.
+        # Without one the failure above is the single, accurate signal; asserting
+        # each pin here too would read as "your pin is wrong" when the truth is
+        # "this checkout cannot tell", which is the confusion ADR-007 forbids.
+        for mkt in (channels if released else []):
             for e in json.loads(mkt.read_text(encoding="utf-8")).get("plugins", []):
                 src = e.get("source")
                 # A relative source IS the marketplace tree and carries no

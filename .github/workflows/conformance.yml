@@ -42,6 +42,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # skill.py now asserts ADR-034 decision 2 -- a channel entry pins a
+          # RELEASED tag -- which needs the tag list to check against. A default
+          # shallow checkout carries no tags, so the check cannot verify the pin
+          # and fails rather than report a safety it never established (ADR-007),
+          # the same posture install.py takes when the network is unreachable.
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
