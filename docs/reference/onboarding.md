@@ -211,7 +211,7 @@ The specification may move to `IMPLEMENTATION_READY` only when:
 | 3 | low-complexity repositories operate without unnecessary providers | ✅ Met | fixture A: Git only, L0 |
 | 4 | provider detection does not assign authority | ✅ Met | proposal written; loader never reads it |
 | 5 | manifest semantics stable enough for implementation | ✅ Met | `conformance/manifest.py` 26/26 |
-| 6 | at least one provider per required core role has a viable adapter contract | ✅ Met | 9 adapters, Layer 1 112/112 |
+| 6 | at least one provider per required core role has a viable adapter contract | ✅ Met | 16 adapters, Layer 1 199/199 |
 | 7 | `UNKNOWN` and failure behavior defined | ✅ Met | `conformance/vocabulary.py`, closed sets enforced |
 
 **Met 2026-08-17**, each verified by `engine/completion.py GATE-N` returning `STOP_COMPLETE`, not by assertion. See the ADR index for what this does *not* mean.
