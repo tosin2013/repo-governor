@@ -122,9 +122,9 @@ jobs:
           # The prune is the whole reason install-skill.sh exists. A pruned path
           # surviving into a published artifact would ship this repository's own
           # manifest to everyone who downloads it (ADR-027).
-          if grep -Eq '^repo-governor/(AGENTS\.md|CLAUDE\.md|\.claude/|\.repo-governor)' "$listing"; then
+          if grep -Eq '^repo-governor/(AGENTS\.md|CLAUDE\.md|\.claude/|\.claude-plugin|\.repo-governor)' "$listing"; then
             echo "::error::a pruned path survived into the release artifact"
-            grep -E '^repo-governor/(AGENTS\.md|CLAUDE\.md|\.claude/|\.repo-governor)' "$listing"
+            grep -E '^repo-governor/(AGENTS\.md|CLAUDE\.md|\.claude/|\.claude-plugin|\.repo-governor)' "$listing"
             exit 1
           fi
           echo "artifact contains $(wc -l < "$listing") paths, SKILL.md present, prune verified"

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://code.claude.com/schemas/marketplace.json",
+  "name": "repo-governor",
+  "owner": {
+    "name": "Tosin Akinosho",
+    "url": "https://github.com/tosin2013"
+  },
+  "metadata": {
+    "description": "Curated entry for the Repo Governor skill. This marketplace carries one bounded pointer (ADR-034 decision 1); the skill lives at the repository root and is not copied here."
+  },
+  "plugins": [
+    {
+      "name": "repo-governor",
+      "source": {
+        "source": "github",
+        "repo": "tosin2013/repo-governor",
+        "ref": "v0.6.0"
+      },
+      "description": "Determine whether an AI coding agent is authorized to create, change, maintain, or retire something in this repository, and when it must stop.",
+      "version": "0.6.0",
+      "author": { "name": "Tosin Akinosho", "url": "https://github.com/tosin2013" },
+      "homepage": "https://github.com/tosin2013/repo-governor",
+      "repository": "https://github.com/tosin2013/repo-governor",
+      "license": "Apache-2.0",
+      "keywords": ["governance","agent-skills","ai-governance","claude-code","guardrails"],
+      "strict": false,
+      "skills": ["."]
+    }
+  ]
+}

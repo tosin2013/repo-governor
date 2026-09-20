@@ -133,6 +133,53 @@ def main():
     fails += check("exactly one copy of THIS skill is tracked; publication adds pointers",
                    mine == ["SKILL.md"], f"declaring name: repo-governor -> {mine}")
 
+    # ADR-034 decision 2: a published channel entry pins a released tag. A source
+    # with no version resolves to whatever the branch holds at fetch time, so an
+    # unpinned entry publishes HEAD -- a release nobody cut. The Confirmation
+    # table listed this as "not yet mechanical" because no channel manifest
+    # existed; #234 landed one under .claude-plugin/, so the assertion is now
+    # writable. It reads every remote plugin source in every marketplace manifest
+    # and requires its ref to be a released tag, which also forces the pin to be
+    # bumped when a tag is cut -- or this suite goes red at release time.
+    channels = sorted(ROOT.glob(".claude-plugin/marketplace.json"))
+    if channels:
+        print("\nEvery published channel entry pins a released tag (ADR-034 decision 2)\n")
+        released = {t for t in subprocess.run(
+            ["git", "-C", str(ROOT), "tag"], capture_output=True, text=True
+        ).stdout.split() if re.fullmatch(r"v\d+\.\d+\.\d+", t)}
+        fails += check(f"released tags are visible to the check ({len(released)})",
+                       bool(released),
+                       "no vX.Y.Z tags in this checkout; a pin cannot be verified "
+                       "against nothing -- fetch tags (CI uses fetch-depth: 0)")
+        for mkt in channels:
+            for e in json.loads(mkt.read_text(encoding="utf-8")).get("plugins", []):
+                src = e.get("source")
+                # A relative source IS the marketplace tree and carries no
+                # independent pin; only a remote source can drift from a release.
+                if not isinstance(src, dict):
+                    continue
+                ref = src.get("ref") or e.get("version")
+                fails += check(
+                    f"{mkt.name}: entry {e.get('name')!r} pins a released tag",
+                    ref in released,
+                    f"ref/version {ref!r} is not a released tag; an unpinned or "
+                    "unreleased entry publishes HEAD, not a release (ADR-034 rule 2)")
+
+        # ADR-034 rule 1 at the install door. A channel manifest publishes THIS
+        # repository by tag; carried into a copy by install-skill.sh it names the
+        # wrong tree -- rule 1's "no second copy" arriving through distribution.
+        # Assert the installer both prunes it and would catch a regression, so the
+        # prune cannot be dropped from one place while looking present in another.
+        installer = (ROOT / "tools" / "install-skill.sh").read_text(encoding="utf-8")
+        fails += check("install-skill.sh prunes the channel manifest from a copy",
+                       'rm -rf "$DEST/.claude-plugin"' in installer,
+                       "a .claude-plugin/ that survives an install points the copy at "
+                       "the source repository's tag (ADR-034 rule 1)")
+        fails += check("and its own prune self-check names it, so a regression is caught",
+                       re.search(r"for f in[^\n]*\.claude-plugin", installer) is not None,
+                       "the prune command exists but the verify loop does not list it, "
+                       "so dropping the command would pass silently")
+
     print("\nEvery entry point the surface names exists and runs\n")
 
     named = sorted(set(ENTRY_RE.findall(skill + agents)))
