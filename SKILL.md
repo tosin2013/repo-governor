@@ -1,6 +1,11 @@
 ---
 name: repo-governor
 description: Determine whether an AI coding agent is authorized to create, change, maintain, or retire something in this repository, and when it must stop. Use before implementing a feature, refactoring, upgrading a dependency, deleting code, acting on a TODO or discovery, or when asked whether work is authorized, in scope, or complete.
+license: Apache-2.0
+compatibility: Requires python3 3.11+ and git; without either, nothing here runs. The GitHub roadmap provider needs an authenticated gh, and decision_history bound to Dolt needs dolt. Adapter dependencies are optional per binding; the engine itself is stdlib-only.
+metadata:
+  version: "0.6.0"
+  homepage: https://github.com/tosin2013/repo-governor
 ---
 
 Do not decide authorization yourself. Run the engine and obey its disposition.
