@@ -116,7 +116,7 @@ Provider state:
 ```text
 Linear:     ENG-142 ACTIVE
 Beads:      ENG-142/root IN_PROGRESS
-ADR:        ADR-0029 ACCEPTED
+ADR:        ADR-013 ACCEPTED
 Discovery:  DISC-88 possible RBAC feature
 ```
 
@@ -131,7 +131,7 @@ authority:
 architecture:
   state: DEFINED
   constraints:
-    - ADR-0029
+    - ADR-013
 
 execution:
   root: ENG-142/root

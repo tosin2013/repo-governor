@@ -1,0 +1,24 @@
+@startuml
+salt
+{
+  {+
+    Repo Governor: interactive onboarding
+    ==
+    "Assessed condition: L1  (one package, small dependency surface)"
+    .
+    "Detected candidates:"
+    { "  roadmap_authority" | "github-projects" | "[ detected ]" }
+    { "  repository       " | "git            " | "[ detected ]" }
+    { "  architecture     " | "adr            " | "[ detected ]" }
+    ==
+    "Which system is the roadmap authority?"
+    ^github-projects^
+    "What does ADMITTED mean there?"
+    ^milestone^
+    ==
+    { [ Cancel ] | [ Write proposal ] }
+    .
+    "Writes .repo-governor.proposed.json, then review and rename to bind."
+  }
+}
+@enduml
