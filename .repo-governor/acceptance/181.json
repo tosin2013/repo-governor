@@ -33,9 +33,9 @@
       "target": "bash -c 'grep -q \"FLOOR_INDICATORS\" engine/manifest.py && [ \"$(grep -c \"public_api_surface\" engine/manifest.py)\" = 0 ]'"
     },
     {
-      "$comment": "C6 this repository still onboards. It is L1/GOVERNOR_LITE with no floor indicator, so enforcement must change nothing here -- an end-to-end control on the live manifest.",
+      "$comment": "C6 this repository passes its own --validate. CORRECTED 2026-09-26: the original premise ('L1/GOVERNOR_LITE with no floor indicator, so enforcement must change nothing here') was false -- release tags since v0.4.0 raise public_api_surface -- and the original target ran manifest.py WITHOUT --validate, so it never reached the floor check and passed vacuously. Measured when 181 was implemented; the repository was raised to L4 by the maintainer in the same change.",
       "check": "command_exit",
-      "target": "bash -c 'python3 engine/manifest.py >/dev/null 2>&1; [ $? -ne 2 ]'"
+      "target": "python3 engine/manifest.py --validate"
     },
     {
       "check": "command_exit",
