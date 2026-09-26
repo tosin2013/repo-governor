@@ -424,8 +424,95 @@ def main():
                             "documentation would produce MANIFEST_INVALID and degrade "
                             "every verdict to UNKNOWN"))
 
+    # --- issue 181: the floor may not be overridden downward ----------------
+    #
+    # ADR-006 rule 3, Accepted and Ratified: "the floor may not be overridden
+    # downward". condition.assessed was taken on trust, so a hand edit from L4
+    # to L1 read READY_FOR_GOVERNANCE with nothing about the repository changed.
+    # Controls in both directions, because refusing everything satisfies the
+    # first check and flooring everything satisfies the second.
+    print("\nA floor may not be overridden downward (ADR-006 rule 3)\n")
+
+    def _validate_floor(level, profile, tag=False, tracked_gen=False, ignored_gen=False):
+        with _tf.TemporaryDirectory() as td:
+            r = pathlib.Path(td) / "repo"
+            r.mkdir()
+            g = ["git", "-C", str(r), "-c", "user.name=t", "-c", "user.email=t@t"]
+            _sp.run(["git", "init", "-q", str(r)], capture_output=True)
+            (r / "README.md").write_text("x\n")
+            if tracked_gen or ignored_gen:
+                (r / "src" / "generated").mkdir(parents=True)
+                (r / "src" / "generated" / "api.ts").write_text("x\n")
+            if ignored_gen:
+                (r / ".gitignore").write_text("src/generated/\n")
+            _sp.run(g + ["add", "-A"], capture_output=True)
+            _sp.run(g + ["commit", "-q", "-m", "x"], capture_output=True)
+            if tag:
+                _sp.run(g + ["tag", "v1.0.0"], capture_output=True)
+            m_ = {"repo_governor": {"version": 1, "engine_min_version": "0.1.0"},
+                  "repository": {"id": "example/floor"},
+                  "condition": {"assessed": level, "profile": profile},
+                  "permissions": {"repository": {"read": True, "write": False}},
+                  "providers": {"repository": {"type": "git", "adapter": "adapters/git",
+                                               "contract_version": 1}}}
+            (r / ".repo-governor.json").write_text(json.dumps(m_))
+            env = dict(_os.environ); env["REPO_GOVERNOR_TARGET"] = str(r)
+            pr = _sp.run([sys.executable, str(ROOT / "engine" / "manifest.py"), "--validate"],
+                         capture_output=True, text=True, cwd=str(r), env=env, timeout=120)
+            return pr.stdout, pr.returncode
+
+    def _floor_check(label, ok, detail):
+        nonlocal extra
+        extra += not ok
+        print(f"  [{'PASS' if ok else 'FAIL'}] {label}" + ("" if ok else f"\n         {detail}"))
+
+    # A release tag is a compatibility obligation (issue 164): it floors.
+    out, rc = _validate_floor("L1", "GOVERNOR_LITE", tag=True)
+    _floor_check("a level below the floor is refused, naming the indicator",
+                 rc == 1 and "CONDITION_BELOW_FLOOR" in out and "public_api_surface" in out,
+                 f"rc={rc} {out.strip()[-200:]}")
+
+    out, rc = _validate_floor("L4", "GOVERNOR_LITE", tag=True)
+    _floor_check("a floored level with a profile below the floor is refused",
+                 rc == 1 and "CONDITION_BELOW_FLOOR" in out,
+                 "the profile decides the required roles; lowering it alone is the same override")
+
+    out, rc = _validate_floor("L4", "GOVERNOR_HIGH_ASSURANCE", tag=True)
+    _floor_check("control: a level at the floor is accepted",
+                 rc == 0 and "CONDITION_BELOW_FLOOR" not in out,
+                 f"refusing everything would satisfy the first check; rc={rc} {out.strip()[-200:]}")
+
+    # The floor is L4, the top of the scale, so nothing lies above it on a
+    # floored repository. What ADR-006 rule 1 protects is that the check never
+    # RECOMPUTES a level: an unfloored repository declaring more than onboarding
+    # would suggest keeps what a human chose.
+    out, rc = _validate_floor("L4", "GOVERNOR_HIGH_ASSURANCE")
+    _floor_check("control: a level above the floor is accepted, not recomputed",
+                 rc == 0 and "CONDITION_BELOW_FLOOR" not in out,
+                 f"rc={rc} {out.strip()[-200:]}")
+
+    bad = []
+    for lv, pf in (("L0", "GOVERNOR_GREENFIELD"), ("L1", "GOVERNOR_LITE"),
+                   ("L2", "GOVERNOR_STANDARD"), ("L3", "GOVERNOR_FULL")):
+        out, rc = _validate_floor(lv, pf)
+        if rc != 0 or "CONDITION_BELOW_FLOOR" in out:
+            bad.append(lv)
+    _floor_check("control: a repository with no floor indicator is unaffected at every level",
+                 not bad, f"refused at {bad} -- flooring everything satisfies the refusal check")
+
+    # generated_consumers read the working tree, so gitignored installs
+    # floored a repository (observed: node_modules/@babel/types/**/generated on
+    # tosin2013/local-knowledge-vault). An enforced floor must read what is
+    # tracked, or two checkouts of one revision disagree.
+    out, rc = _validate_floor("L1", "GOVERNOR_LITE", ignored_gen=True)
+    _floor_check("a gitignored generated/ directory does not raise the floor",
+                 rc == 0 and "CONDITION_BELOW_FLOOR" not in out, f"rc={rc} {out.strip()[-200:]}")
+    out, rc = _validate_floor("L1", "GOVERNOR_LITE", tracked_gen=True)
+    _floor_check("control: a tracked generated/ directory does",
+                 rc == 1 and "generated_consumers" in out, f"rc={rc} {out.strip()[-200:]}")
+
     fails += extra
-    total = len(CASES) + len(PERM_CASES) + 9
+    total = len(CASES) + len(PERM_CASES) + 9 + 7
     print(f"\n{total - fails}/{total} checks passed")
     print("MANIFEST LOADER: " + ("CONFORMANT" if not fails else f"NON-CONFORMANT ({fails})"))
     return 0 if not fails else 1
