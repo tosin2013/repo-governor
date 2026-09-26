@@ -32,7 +32,7 @@ python3 engine/completion.py <work-id>     # govern
 | | |
 | --- | --- |
 | Roadmap authority | GitHub issues, admission by milestone ([ADR-018](docs/adrs/018-admission-signal-is-declared-not-assumed.md), [ADR-022](docs/adrs/022-repo-governor-does-not-own-roadmap-state.md)) |
-| Decisions | 33 ADRs — **24 Accepted** (23 on 2026-08-17, [024](docs/adrs/024-scope-envelope-compiler.md) on 2026-08-31), 8 `Proposed` ([020](docs/adrs/020-agent-supplied-transport-with-adapter-as-normalizer.md), [029](docs/adrs/029-hooks-as-deterministic-delivery-surface.md), [030](docs/adrs/030-backend-recommendation-from-declared-capability.md), [031](docs/adrs/031-authority-source-missing-obliges-disclosure-not-refusal.md), [032](docs/adrs/032-a-decision-declares-how-it-will-be-confirmed.md), [033](docs/adrs/033-repo-local-providers-answer-about-the-checked-out-revision.md), [034](docs/adrs/034-publication-is-per-channel-and-a-listing-claims-only-what-is-calibrated.md), [035](docs/adrs/035-a-release-may-depend-on-a-proposed-adr-only-on-declared-and-expiring-terms.md)) — **two of which, 031 and 033, the runtime depends on**, recorded as a departure in [RATIFICATION-v0.5.0.md](docs/adrs/RATIFICATION-v0.5.0.md) and again in [RATIFICATION-v0.6.0.md](docs/adrs/RATIFICATION-v0.6.0.md) — and 1 `Superseded` ([014](docs/adrs/014-scope-envelope-as-bounded-execution-contract.md), split) |
+| Decisions | 34 ADRs — **26 Accepted** (23 on 2026-08-17, [024](docs/adrs/024-scope-envelope-compiler.md) on 2026-08-31, [029](docs/adrs/029-hooks-as-deterministic-delivery-surface.md) and [031](docs/adrs/031-authority-source-missing-obliges-disclosure-not-refusal.md) reduced, on 2026-09-26), 7 `Proposed` ([020](docs/adrs/020-agent-supplied-transport-with-adapter-as-normalizer.md), [030](docs/adrs/030-backend-recommendation-from-declared-capability.md), [032](docs/adrs/032-a-decision-declares-how-it-will-be-confirmed.md), [033](docs/adrs/033-repo-local-providers-answer-about-the-checked-out-revision.md), [034](docs/adrs/034-publication-is-per-channel-and-a-listing-claims-only-what-is-calibrated.md), [035](docs/adrs/035-a-release-may-depend-on-a-proposed-adr-only-on-declared-and-expiring-terms.md), [036](docs/adrs/036-an-agent-that-reaches-authority-source-missing-discloses-rather-than-refuses.md)) — **one of which, 034, the runtime depends on**, recorded in [RATIFICATION-v0.8.0.md](docs/adrs/RATIFICATION-v0.8.0.md) under [ADR-035](docs/adrs/035-a-release-may-depend-on-a-proposed-adr-only-on-declared-and-expiring-terms.md) — and 1 `Superseded` ([014](docs/adrs/014-scope-envelope-as-bounded-execution-contract.md), split) |
 | Open thesis risks | [#1](https://github.com/tosin2013/repo-governor/issues/1) normalization (fixtures only), [#2](https://github.com/tosin2013/repo-governor/issues/2) envelope thinness (measured: *always* thin on real trackers), [#5](https://github.com/tosin2013/repo-governor/issues/5) skill activation (unmeasured) |
 
 ---
@@ -81,7 +81,7 @@ Governance depth scales with repository condition (L0 greenfield → L4 mature/h
 ## Install
 
 ```bash
-git clone --branch v0.7.0 https://github.com/tosin2013/repo-governor /tmp/rg
+git clone --branch v0.8.0 https://github.com/tosin2013/repo-governor /tmp/rg
 /tmp/rg/tools/install-skill.sh /path/to/your/repo .claude/skills
 ```
 
@@ -117,7 +117,7 @@ engine/        deterministic policy engine, Python stdlib only
 conformance/   19 suites — the evidence behind every gate claim
 schemas/       manifest v1 JSON Schema
 docs/
-  adrs/        33 architectural decisions (24 Accepted) + index + three ratification reviews
+  adrs/        34 architectural decisions (26 Accepted) + index + three ratification reviews
   reference/   normative specification, §1–§70, INV-001…INV-014
   research/    external landscape sweep + transport/capability research
 ```
