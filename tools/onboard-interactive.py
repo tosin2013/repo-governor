@@ -505,9 +505,9 @@ def main(argv):
     }
     # Where the repository carries compatibility obligations, say what the
     # default store does NOT guarantee. Capability language, not a product
-    # name: ADR-003 keeps adapter knowledge out of the engine and ADR-030 is
-    # Proposed with four unmet conditions, the first being whether level
-    # predicts this need at all. So this is a note a person reads, never a
+    # name: ADR-003 keeps adapter knowledge out of the engine, and whether a
+    # condition level predicts this need at all is an open, Proposed question
+    # (the backend-recommendation ADR). This is a note a person reads, never a
     # rule that changes a binding, and nothing below is conditional on it.
     if floors:
         print(f"\n  This repository floors at {level} ({', '.join(floors)}), meaning other")
