@@ -2,7 +2,7 @@
 
 Generated 2026-08-17 from PRD v0.2 (provider-oriented draft) using the MCP ADR Analysis Server's PRD-to-ADR protocol, informed by the external landscape research in [`../research/2026-08-17-external-landscape.md`](../research/2026-08-17-external-landscape.md).
 
-**24 of 32 ADRs are Accepted.** 23 were ratified 2026-08-17 under [RATIFICATION-v0.1.0.md](RATIFICATION-v0.1.0.md); ADR-024 was ratified 2026-08-31 under [RATIFICATION-v0.5.0.md](RATIFICATION-v0.5.0.md), which also records why ADR-031 and ADR-033 were **not**. ADR-020, ADR-029, ADR-030, ADR-031, ADR-032, ADR-033 and ADR-034 are held `Proposed`; ADR-014 is `Superseded` by the 023/024 split.
+**24 of 33 ADRs are Accepted.** 23 were ratified 2026-08-17 under [RATIFICATION-v0.1.0.md](RATIFICATION-v0.1.0.md); ADR-024 was ratified 2026-08-31 under [RATIFICATION-v0.5.0.md](RATIFICATION-v0.5.0.md), which also records why ADR-031 and ADR-033 were **not**. ADR-020, ADR-029, ADR-030, ADR-031, ADR-032, ADR-033, ADR-034 and ADR-035 are held `Proposed`; ADR-014 is `Superseded` by the 023/024 split.
 
 > **Runtime-dependent and still `Proposed`: ADR-031, ADR-033.** This line used to assert that no held ADR was cited by the engine or a bound adapter — the release condition [RATIFICATION-v0.1.0.md](RATIFICATION-v0.1.0.md) states — *every architecture decision the runtime depends on is Accepted* — asserted as though it still held. It stopped holding when #153 and #183 gave ADR-024 and ADR-031 engine citations, and four releases shipped without anyone recomputing it. `conformance/skill.py` now derives this list from `engine/` and the adapters this repository binds, using the method that record itself prescribes, so it cannot go stale again. **ADR-033 joined the list with the Beads adapter (#216)**, which is the guard working rather than a documentation task: `engine/onboard.py` now applies ADR-033's rule to decide whether a `.beads/` store may be bound, so the runtime depends on a decision that is `Proposed`. Recording the fact is not ratifying it (§68). ADR-024 left this list on 2026-08-31 by being accepted, not by being reworded; ADR-031 and ADR-033 remain on it, and v0.5.0 ships as a departure recorded in that review. Per §61, the project cannot reach `IMPLEMENTATION_READY` until the `RG-SIM-ONBOARDING-v0.1` simulation passes.
 
@@ -45,6 +45,7 @@ Generated 2026-08-17 from PRD v0.2 (provider-oriented draft) using the MCP ADR A
 | [032](032-a-decision-declares-how-it-will-be-confirmed.md) | A decision declares how it will be confirmed | Architecture | 267 obligations across the Accepted ADRs, one discharge marker between them |
 | [033](033-repo-local-providers-answer-about-the-checked-out-revision.md) | A repo-local provider answers about the checked-out revision | Providers | The branch-varying methods are the two the engine never calls |
 | [034](034-publication-is-per-channel-and-a-listing-claims-only-what-is-calibrated.md) | Publication is per-channel, and a listing claims only what is calibrated | Delivery surface | Five hook templates ship; one calibration record exists |
+| [035](035-a-release-may-depend-on-a-proposed-adr-only-on-declared-and-expiring-terms.md) | A release may depend on a Proposed ADR only on declared and expiring terms | Governance | Every release since v0.2.0 depended on a Proposed ADR, and v0.7.0 recorded nothing |
 
 ## Dependency order
 
