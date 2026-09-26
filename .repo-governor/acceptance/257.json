@@ -1,0 +1,38 @@
+{
+  "$comment": "Acceptance criteria for issue 257: a release runbook, and v0.8.0 prepared with it. Scope per the issue: notes, version sites, ratification record; 'the tag is a maintainer act' and is excluded by the issue itself, not left uncovered. Carries ADR-035's check (split to this issue from 223): the scope reaching tools/ and .claude-plugin/, the record, the count from tags, and the two-release expiry. Each was mutation-tested in the change: deleting the record, dropping ADR-034's row, a wrong count, a scope without tools/, and ADR-029 set back to Proposed (fails the expiry at 12). THE VACUITY THIS BAR IS BUILT AGAINST: a record that exists but lists nothing; C3 requires the check to pass, and the check fails on an omitted dependent. WHAT THIS BAR CANNOT CHECK: that the maintainer's ADR decisions were right.",
+  "authority_id": "257",
+  "covers": {
+    "declared": "docs/runbooks/release.md; ADR-035's check in conformance/skill.py; RATIFICATION-v0.8.0.md with the ADR-029/031/033/030/020 resolutions; docs/releases/v0.8.0.md; every version site at 0.8.0"
+  },
+  "criteria": [
+    {
+      "$comment": "C1 the runbook exists and covers ADR-035 duties",
+      "check": "command_exit",
+      "target": "bash -c 'grep -q \"ADR-035\" docs/runbooks/release.md && grep -q \"RATIFICATION-v\" docs/runbooks/release.md'"
+    },
+    {
+      "$comment": "C2 every version site agrees on 0.8.0",
+      "check": "command_exit",
+      "target": "python3 tools/check-version.py v0.8.0"
+    },
+    {
+      "$comment": "C3 the record exists and the ADR-035 check accepts it (fails on a missing record, an omitted dependent, a wrong count, or an expired dependency)",
+      "check": "command_exit",
+      "target": "bash -c 'test -f docs/adrs/RATIFICATION-v0.8.0.md && python3 conformance/skill.py | grep -q \"\\[PASS\\] RATIFICATION-v0.8.0.md lists ADR-034 with a release count\" && python3 conformance/skill.py'"
+    },
+    {
+      "$comment": "C4 the ADR-035 scope includes tools/ and .claude-plugin/ and excludes only the named measurement tools",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/skill.py | grep -q \"\\[PASS\\] the ADR-035 scope reaches tools/ and .claude-plugin/\" && grep -q \"MEASUREMENT_TOOLS = {\\\"tools/live-equivalence.py\\\", \\\"tools/provider-readiness.py\\\"}\" conformance/skill.py'"
+    },
+    {
+      "$comment": "C5 release notes exist before the tag",
+      "check": "command_exit",
+      "target": "test -s docs/releases/v0.8.0.md"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh --hermetic"
+    }
+  ]
+}

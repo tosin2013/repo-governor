@@ -13,10 +13,10 @@
       "name": "repo-governor",
       "source": {
         "source": "archive",
-        "url": "https://github.com/tosin2013/repo-governor/releases/download/v0.7.0/repo-governor-v0.7.0.zip"
+        "url": "https://github.com/tosin2013/repo-governor/releases/download/v0.8.0/repo-governor-v0.8.0.zip"
       },
       "description": "Determine whether an AI coding agent is authorized to create, change, maintain, or retire something in this repository, and when it must stop.",
-      "version": "0.7.0",
+      "version": "0.8.0",
       "author": { "name": "Tosin Akinosho", "url": "https://github.com/tosin2013" },
       "homepage": "https://github.com/tosin2013/repo-governor",
       "repository": "https://github.com/tosin2013/repo-governor",
