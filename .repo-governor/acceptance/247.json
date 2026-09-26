@@ -1,0 +1,48 @@
+{
+  "$comment": "Acceptance criteria for issue 247, scoped by the maintainer on 2026-09-26 to the hook-host half. Refact already speaks the converged hook convention and reads .claude/settings.json, so a repository governed for Claude Code looked governed under Refact and was not: four defects each made the hook fall open (project_dir, tool_output, *_textdoc/mv/rm/merge tool names, a dropped args array). C1-C4 pin each. C5 pins the capture bug found on the LIVE host (a quoted completion.py path recorded nothing), which affects every host. THE VACUITY THIS BAR IS BUILT AGAINST: a gate that refuses every tool passes C1-C3, so C4 asserts that reads and near-miss names (format, confirm, buddy_memory_merge) are NOT treated as file changes. WHAT THIS BAR CANNOT CHECK: behaviour on a running Refact host. That was verified by hand on Refact 8.6.4 (three runs, one model; recorded in PR 249), not by anything a commit can re-run.",
+  "authority_id": "247",
+  "covers": {
+    "declared": "Refact governed as an ADR-029 hook host: the shared hook reads Refact's payload, gates its file-changing tools with exit 2, captures verdicts from its shell tool, and ships an installable template",
+    "uncovered": "the provider half (adapters/refact over .refact/tasks) and Buddy as an observer whose mined decisions are audited against authority",
+    "split_to": [
+      "251",
+      "252"
+    ],
+    "split_note": "Split by the maintainer before this bar was read, not after it reached STOP_COMPLETE. 251 is the adapter the issue's own Acceptance section described; 252 is the decision audit that came out of observing Buddy on a real repository. 248 (agents admitting their own work) was found while verifying this and is separate work, not a split."
+  },
+  "criteria": [
+    {
+      "$comment": "C1 the payload: project_dir finds the repository from the daemon's cwd, and tool_output is read",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/hooks.py | grep -q \"\\[PASS\\] refact: capture finds the repo from project_dir and reads tool_output\"'"
+    },
+    {
+      "$comment": "C2 every Refact file-changing tool is blocked with exit 2 under a refusal, including the planner's merge tools",
+      "check": "command_exit",
+      "target": "bash -c '[ \"$(python3 conformance/hooks.py | grep -c \"\\[PASS\\] refact: .* is blocked with exit 2\")\" = 10 ]'"
+    },
+    {
+      "$comment": "C3 the shipped template: anchored matcher, single command string, --exit2-on-deny, capture on shell",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/hooks.py | grep -q \"\\[PASS\\] refact hooks use a single command string, no args array\"'"
+    },
+    {
+      "$comment": "C4 CONTROL: reads and near-miss names are not file changes. Without this, a gate that refuses everything passes C2.",
+      "check": "command_exit",
+      "target": "bash -c '[ \"$(python3 conformance/hooks.py | grep -c \"\\[PASS\\] refact: .* is not treated as a file change\")\" = 6 ]'"
+    },
+    {
+      "$comment": "C5 found on the live host: a quoted completion.py invocation is captured, on every host",
+      "check": "command_exit",
+      "target": "bash -c '[ \"$(python3 conformance/hooks.py | grep -c \"\\[PASS\\] capture survives a quoted invocation\")\" = 3 ]'"
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/hooks.py"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh --hermetic"
+    }
+  ]
+}
