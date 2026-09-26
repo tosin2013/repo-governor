@@ -265,7 +265,7 @@ It runs detection, shows the evidence, then asks the two things no amount of fil
 
 The second is [ADR-018](adrs/018-admission-signal-is-declared-not-assumed.md): the admission signal is *declared*, never assumed. Whether admission means a milestone or a label is a fact about how a team works, not about the repository. Guessing it produces an engine that governs confidently against the wrong roadmap — which has happened twice here ([ADR-022](adrs/022-repo-governor-does-not-own-roadmap-state.md), and [ADR-028](adrs/028-provider-identity-is-never-defaulted.md) where adapters defaulted to the author's repository).
 
-Output is deny-by-default ([ADR-005](adrs/005-deny-by-default-authority-resolution.md)): every bound role gets read, nothing gets write. Verify before binding:
+Output is deny-by-default ([ADR-005](adrs/005-deny-by-default-permission-model.md)): every bound role gets read, nothing gets write. Verify before binding:
 
 ```bash
 mv .repo-governor.proposed.json .repo-governor.json

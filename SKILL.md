@@ -4,7 +4,7 @@ description: Determine whether an AI coding agent is authorized to create, chang
 license: Apache-2.0
 compatibility: Requires python3 3.11+ and git; without either, nothing here runs. The GitHub roadmap provider needs an authenticated gh, and decision_history bound to Dolt needs dolt. Adapter dependencies are optional per binding; the engine itself is stdlib-only.
 metadata:
-  version: "0.6.0"
+  version: "0.7.0"
   homepage: https://github.com/tosin2013/repo-governor
 ---
 

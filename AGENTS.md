@@ -75,7 +75,7 @@ python3 engine/manifest.py --validate
 
 All suites pass on `main`. A suite that fails is a defect in your change, not a flaky test.
 
-All of them are hermetic **except `hooks`**, which runs `engine/completion.py` against the live board and therefore depends on issue state no commit controls. Offline, or when you want a result that only your change can move, run `./tools/run-conformance.sh --hermetic`. This file previously claimed none of them touched the network; that was wrong for `hooks` and the claim is now checked by `conformance/skill.py`.
+All of them are hermetic **except `hooks`, `install` and `roadmap`**, which read the live board or a remote and therefore depend on state no commit controls (`hooks` runs `engine/completion.py` against the live board, `install` asks the remote whether the documented tag exists, and `roadmap` reads which issues are milestoned and assigned). Offline, or when you want a result that only your change can move, run `./tools/run-conformance.sh --hermetic`. This file previously claimed none of them touched the network, and later named only `hooks`; `conformance/skill.py` now checks this sentence against the runner's `LIVE` array.
 
 ## Decisions
 

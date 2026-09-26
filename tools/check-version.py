@@ -49,6 +49,14 @@ INSTALL_PIN = {
                              "the version the installation guide tells people to clone"),
 }
 
+# The version the SKILL itself declares. Agent hosts read SKILL.md's frontmatter,
+# not engine/version.py, so a stale value here tells every host it runs a
+# release it does not. v0.7.0 shipped saying "0.6.0" because nothing read it
+# (issue 256). Same class as ENGINE_VERSION: it must equal the tag exactly.
+SKILL_META = {
+    "SKILL.md": (r'^\s+version:\s*"([^"]+)"', "the version the skill's frontmatter declares"),
+}
+
 FLOOR = {
     ".repo-governor.json": (r'"engine_min_version"\s*:\s*"([^"]+)"',
                             "this repository's own manifest floor"),
@@ -101,6 +109,15 @@ def main(argv):
         fails += check(f"{rel} ({meaning}) is {tag}", got == tag,
                        f"states {got!r}, the tag says {tag!r} -- decision records would "
                        "cite an engine that is not this one")
+
+    for rel, (pat, meaning) in SKILL_META.items():
+        got, err = read(rel, pat)
+        if err:
+            fails += check(f"{rel} states metadata.version", False, err)
+            continue
+        fails += check(f"{rel} ({meaning}) is {tag}", got == tag,
+                       f"states {got!r}, the tag says {tag!r} -- every host that loads "
+                       "the skill is told it runs a release it does not")
 
     for rel, (pat, meaning) in INSTALL_PIN.items():
         got, err = read(rel, pat)

@@ -58,6 +58,129 @@ def adr_status(num):
     return None
 
 
+# --- issue 256: relative links and anchors in every tracked Markdown file -----
+#
+# The CI link check only looked at external URLs. Three relative links pointed
+# at ADR filenames that had been renamed (030 twice, docs/installation.md once)
+# and nothing read them. A one-off script found them; this is that script made
+# permanent, because a check that lives only in an audit expires with the audit.
+#
+# Code spans and fenced blocks are stripped first: a link shown as an EXAMPLE is
+# not a link. Anchors are checked only into Markdown files, with GitHub's slug
+# rule (lowercase, punctuation dropped, spaces to hyphens, -N for repeats).
+LINK_EXCLUDE = ("conformance/fixtures/", ".mcp-adr-cache/")
+_FENCE = re.compile(r"^\s*(`{3,}|~{3,})")
+_INLINE_LINK = re.compile(r"\[(?:[^\]\[]|\[[^\]]*\])*\]\(\s*<?([^)\s>]+)>?(?:\s+\"[^\"]*\")?\s*\)")
+_REF_DEF = re.compile(r"^\s{0,3}\[[^\]]+\]:\s*<?(\S+?)>?(?:\s|$)")
+_HEADING = re.compile(r"^\s{0,3}#{1,6}\s+(.*?)\s*#*\s*$")
+
+
+def _prose_lines(text):
+    """The text with fenced blocks blanked and code spans removed, line numbers kept."""
+    out, fence = [], None
+    for ln in text.splitlines():
+        m = _FENCE.match(ln)
+        if fence:
+            if m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence):
+                fence = None
+            out.append("")
+            continue
+        if m:
+            fence = m.group(1)
+            out.append("")
+            continue
+        out.append(re.sub(r"(`+)(.+?)\1", "", ln))
+    return out
+
+
+def _anchors(text):
+    """Every anchor a Markdown file defines, by GitHub's heading slug rule."""
+    seen, out, fence = {}, set(), None
+    for ln in text.splitlines():
+        m = _FENCE.match(ln)
+        if fence:
+            if m and m.group(1)[0] == fence[0]:
+                fence = None
+            continue
+        if m:
+            fence = m.group(1)
+            continue
+        h = _HEADING.match(ln)
+        if h:
+            s = re.sub(r"<[^>]+>", "", h.group(1).replace("`", ""))
+            s = re.sub(r"!?\[([^\]]*)\]\([^)]*\)", r"\1", s).strip().lower()
+            s = re.sub(r"[^\w\- ]", "", s).replace(" ", "-")
+            n = seen.get(s, 0)
+            seen[s] = n + 1
+            out.add(s if n == 0 else f"{s}-{n}")
+        out.update(re.findall(r"<a\s+(?:name|id)=\"([^\"]+)\"", ln))
+    return out
+
+
+def broken_links(root, files):
+    """(broken, links_checked) for the given repository-relative Markdown files.
+
+    ONE implementation, two callers: the tracked-file scan and the control
+    below. A control that exercises a copy of the logic proves nothing about it.
+    """
+    from urllib.parse import unquote
+    bad, n, cache = [], 0, {}
+    for rel in files:
+        src = root / rel
+        for i, ln in enumerate(_prose_lines(src.read_text(encoding="utf-8")), 1):
+            targets = _INLINE_LINK.findall(ln)
+            ref = _REF_DEF.match(ln)
+            if ref:
+                targets.append(ref.group(1))
+            for t in targets:
+                if re.match(r"^[a-z][a-z0-9+.-]*:", t, re.I) or t.startswith("//"):
+                    continue  # external: the URL checker's job, not this one
+                n += 1
+                path, _, frag = t.partition("#")
+                dest = src if not path else (src.parent / unquote(path)).resolve()
+                if path and not dest.exists():
+                    bad.append(f"{rel}:{i} -> {t} (no such file)")
+                    continue
+                if frag and dest.suffix == ".md" and dest.is_file():
+                    if dest not in cache:
+                        cache[dest] = _anchors(dest.read_text(encoding="utf-8"))
+                    if unquote(frag).lower() not in cache[dest]:
+                        bad.append(f"{rel}:{i} -> {t} (no such anchor)")
+    return bad, n
+
+
+def check_links():
+    print("\nEvery relative link and anchor in tracked Markdown resolves (issue 256)\n")
+    fails = 0
+    tracked = subprocess.run(["git", "-C", str(ROOT), "ls-files", "*.md"],
+                             capture_output=True, text=True).stdout.split()
+    files = [f for f in tracked if not f.startswith(LINK_EXCLUDE)]
+    bad, n = broken_links(ROOT, files)
+    fails += check(f"the tracked Markdown set was actually read ({len(files)} files, "
+                   f"{n} relative links)",
+                   len(files) >= 50 and n >= 100 and "AGENTS.md" in files,
+                   "a git ls-files that returns nothing passes every link check vacuously")
+    fails += check("every relative link and anchor resolves", not bad, "; ".join(bad))
+
+    # POSITIVE CONTROL. Every real link resolves today, so a checker that never
+    # reports anything looks exactly like one that works. Feed it one missing
+    # file, one missing anchor and one good anchor, through the same function.
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        r = Path(d)
+        (r / "a.md").write_text("# Real Heading\n\n[ok](#real-heading) [ok2](b.md#two)\n"
+                                "[gone](missing.md) [bad](b.md#nope)\n"
+                                "`[code](missing.md)`\n", encoding="utf-8")
+        (r / "b.md").write_text("## Two\n", encoding="utf-8")
+        cbad, cn = broken_links(r, ["a.md"])
+    fails += check("control: a missing file and a missing anchor ARE reported, and only those",
+                   cn == 4 and len(cbad) == 2
+                   and any("missing.md" in b for b in cbad)
+                   and any("#nope" in b for b in cbad),
+                   f"checked {cn} link(s), reported {cbad}")
+    return fails
+
+
 def main():
     fails = 0
     skill = SKILL.read_text()
@@ -540,6 +663,13 @@ def main():
                    "without it the checks below pass vacuously")
     if m:
         ver = m.group(1)
+        # SKILL.md's frontmatter is what a host reads. v0.7.0 shipped saying
+        # "0.6.0" (issue 256); check-version.py only runs at tag time, so the
+        # same comparison is made here where every commit sees it.
+        sm = _vre.search(r'^\s+version:\s*"([^"]+)"', skill, _vre.M)
+        fails += check(f"SKILL.md metadata.version is {ver}, the version the engine reports",
+                       bool(sm) and sm.group(1) == ver,
+                       f"states {sm.group(1) if sm else 'nothing'!r}")
         for doc in ("README.md", "docs/installation.md"):
             t = (ROOT / doc).read_text()
             tags = set(_vre.findall(r"--branch\s+v([0-9]+\.[0-9]+\.[0-9]+)", t))
@@ -715,6 +845,21 @@ def main():
                        f"LIVE={sorted(live)} step-title={sorted(named)} -- a job "
                        "whose name lies about what it ran is how a live failure "
                        "gets read as the wrong kind of failure")
+
+    # The fifth source is AGENTS.md, which tells every agent which suites are
+    # NOT hermetic. It said "except `hooks`" while LIVE held three suites, so an
+    # agent reading it would treat a red `install` or `roadmap` as its own
+    # defect (issue 256). Derived from the runner, never restated here.
+    if runner.is_file():
+        live_arr = re.search(r"^LIVE=\(([^)]*)\)", rsrc, re.M)
+        live_set = set(live_arr.group(1).split()) if live_arr else set()
+        hs = re.search(r"hermetic \*\*except ([^*]+)\*\*", agents)
+        named = set(re.findall(r"`([a-z0-9_]+)`", hs.group(1))) if hs else set()
+        fails += check("AGENTS.md's hermetic sentence names exactly the runner's LIVE suites",
+                       bool(live_set) and named == live_set,
+                       f"LIVE={sorted(live_set)} AGENTS.md names {sorted(named)}"
+                       + ("" if hs else " (the 'hermetic **except ...**' sentence was "
+                          "not found, so this check would otherwise go blind)"))
 
     # Any loop still pasted into prose is a second source of truth. The runner
     # replaced them; one surviving is drift waiting to happen.
@@ -943,6 +1088,8 @@ def main():
                    total_claims > 0,
                    "found 0 -- either every count was removed, or the pattern went "
                    "blind; a check that matches nothing is not a passing check")
+
+    fails += check_links()
 
     print(f"\n{'AGENT SURFACE: CONFORMANT' if not fails else f'AGENT SURFACE: NON-CONFORMANT ({fails})'}")
     return 0 if not fails else 1
