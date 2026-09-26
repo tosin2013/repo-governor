@@ -1,9 +1,6 @@
 {
-  "$comment": "Acceptance criteria for issue 257: a release runbook, and v0.8.0 prepared with it. Scope per the issue: notes, version sites, ratification record; 'the tag is a maintainer act' and is excluded by the issue itself, not left uncovered. Carries ADR-035's check (split to this issue from 223): the scope reaching tools/ and .claude-plugin/, the record, the count from tags, and the two-release expiry. Each was mutation-tested in the change: deleting the record, dropping ADR-034's row, a wrong count, a scope without tools/, and ADR-029 set back to Proposed (fails the expiry at 12). THE VACUITY THIS BAR IS BUILT AGAINST: a record that exists but lists nothing; C3 requires the check to pass, and the check fails on an omitted dependent. WHAT THIS BAR CANNOT CHECK: that the maintainer's ADR decisions were right.",
+  "$comment": "Acceptance criteria for issue 257: a release runbook, and v0.8.0 prepared with it. Scope per the issue, all of it covered (so no covers block): notes, version sites, ratification record; 'the tag is a maintainer act' and is excluded by the issue itself, not left uncovered. Carries ADR-035's check (split to this issue from 223): the scope reaching tools/ and .claude-plugin/, the record, the count from tags, and the two-release expiry. Each was mutation-tested in the change: deleting the record, dropping ADR-034's row, a wrong count, a scope without tools/, and ADR-029 set back to Proposed (fails the expiry at 12). THE VACUITY THIS BAR IS BUILT AGAINST: a record that exists but lists nothing; C3 requires the check to pass, and the check fails on an omitted dependent. WHAT THIS BAR CANNOT CHECK: that the maintainer's ADR decisions were right.",
   "authority_id": "257",
-  "covers": {
-    "declared": "docs/runbooks/release.md; ADR-035's check in conformance/skill.py; RATIFICATION-v0.8.0.md with the ADR-029/031/033/030/020 resolutions; docs/releases/v0.8.0.md; every version site at 0.8.0"
-  },
   "criteria": [
     {
       "$comment": "C1 the runbook exists and covers ADR-035 duties",

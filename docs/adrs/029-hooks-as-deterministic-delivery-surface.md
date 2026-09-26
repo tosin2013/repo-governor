@@ -1,6 +1,7 @@
 # 29. Hooks as a Deterministic Delivery Surface
 
-**Status**: Accepted (reduced), 2026-09-26, under [RATIFICATION-v0.8.0.md](RATIFICATION-v0.8.0.md). The accepted scope is the **Reduction** section below. The claim that the surface works across vendors is not accepted: it waits on calibration this project cannot run (issues 37, 42, 254). Validated 2026-08-19 by a four-condition controlled comparison, and on Refact 8.6.4 on 2026-09-26. Acceptance is a human act (§68).
+**Status**: Accepted (reduced 2026-09-26). The accepted scope is the Reduction section below. The claim that the surface works across vendors is not accepted: it waits on calibration this project cannot run (issues 37, 42, 254). Acceptance is a human act (§68).
+**Ratified**: 2026-09-26 under [RATIFICATION-v0.8.0.md](RATIFICATION-v0.8.0.md), after validation on 2026-08-19 (a four-condition controlled comparison) and on Refact 8.6.4 on 2026-09-26.
 **Date**: 2026-08-19
 **Domain**: Distribution & agent integration
 **Amends**: [ADR-001](001-agent-skill-as-primary-delivery-surface.md) — promotes "coding-agent hooks" from a deferred §65 candidate to a secondary delivery surface. The Agent Skill remains primary.

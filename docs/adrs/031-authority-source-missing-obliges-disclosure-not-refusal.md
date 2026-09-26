@@ -1,6 +1,8 @@
 # ADR-031 — `AUTHORITY_SOURCE_MISSING` obliges disclosure, not refusal
 
-**Status**: Accepted (reduced), 2026-09-26, under [RATIFICATION-v0.8.0.md](RATIFICATION-v0.8.0.md). The accepted scope is the **Reduction** section below: the engine's rule for configuration gaps. The obligation this ADR is named for, that an agent discloses rather than refuses, is **not** accepted. It moved to [ADR-036](036-an-agent-that-reaches-authority-source-missing-discloses-rather-than-refuses.md), which stays `Proposed`.
+**Status**: Accepted (reduced 2026-09-26). The accepted scope is the Reduction section below: the engine's rule for configuration gaps.
+**Ratified**: 2026-09-26 under [RATIFICATION-v0.8.0.md](RATIFICATION-v0.8.0.md).
+**Split**: the obligation this ADR is named for, that an agent discloses rather than refuses, is **not** accepted. It moved to [ADR-036](036-an-agent-that-reaches-authority-source-missing-discloses-rather-than-refuses.md), which stays `Proposed`.
 
 **Date**: 2026-08-20
 
