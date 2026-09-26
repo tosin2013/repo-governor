@@ -176,4 +176,9 @@ def main(argv):
 
 
 if __name__ == "__main__":
+    # --help is not an id. Read as one it produced a confident verdict about an
+    # authority named "--help" (issue 256).
+    if sys.argv[1:2] in (["-h"], ["--help"]):
+        print(__doc__)
+        sys.exit(0)
     sys.exit(main(sys.argv[1:]))

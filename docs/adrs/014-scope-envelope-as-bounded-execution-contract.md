@@ -1,7 +1,7 @@
 # 14. ScopeEnvelope as a Bounded Execution Contract with a Completion Firewall
 
 **Status**: Superseded
-**Split** 2026-08-17 into [ADR-023 — The Completion Firewall](023-completion-firewall.md) (**Accepted**) and [ADR-024 — The ScopeEnvelope Is Compiled, Not Authored](024-scope-envelope-compiler.md) (**Proposed**).
+**Split** 2026-08-17 into [ADR-023 — The Completion Firewall](023-completion-firewall.md) (**Accepted**) and [ADR-024 — The ScopeEnvelope Is Compiled, Not Authored](024-scope-envelope-compiler.md) (held at the split; **Accepted** 2026-08-31 under [RATIFICATION-v0.5.0.md](RATIFICATION-v0.5.0.md)).
 
 > **Why this was split.** The [ratification review](RATIFICATION-v0.1.0.md) found that this ADR bundled two decisions and only one of them shipped. The completion firewall is implemented and verified; the envelope compiler was never built and the engine never calls `get_scope`. Accepting it whole would have ratified architecture that does not exist; holding it whole would have left a working, load-bearing mechanism unaccepted.
 >

@@ -13,7 +13,7 @@ git clone --branch v0.7.0 https://github.com/tosin2013/repo-governor /tmp/repo-g
 /tmp/repo-governor/tools/install-skill.sh <target-repo>
 ```
 
-**Use the script rather than cloning straight into the skills directory.** A plain clone puts this repository's own `AGENTS.md` inside your project, and it opens *"This repository is governed by Repo Governor"* — a true statement about Repo Governor and a false one about yours. Cursor was observed injecting that file as an always-on workspace rule from inside the skill directory of an unrelated project, which hands your agent our house rules and tells it your repository is governed by something it has not agreed to. The script clones and then removes the three paths that are correct here and wrong anywhere else; see `INSTALLED.md` in the result.
+**Use the script rather than cloning straight into the skills directory.** A plain clone puts this repository's own `AGENTS.md` inside your project, and it opens *"This repository is governed by Repo Governor"* — a true statement about Repo Governor and a false one about yours. Cursor was observed injecting that file as an always-on workspace rule from inside the skill directory of an unrelated project, which hands your agent our house rules and tells it your repository is governed by something it has not agreed to. The script clones and then removes the paths that are correct here and wrong anywhere else (listed below); see `INSTALLED.md` in the result.
 
 Then add whatever pointer your host needs beside it:
 
@@ -47,13 +47,17 @@ Verified on Cursor, 2026-08-18. Asked which instruction files were applied to a 
 
 So on that host, installing Repo Governor by cloning applies **Repo Governor's own house rules to the user's repository**, including a first line asserting that repository is governed by us. Nobody asked for that, and it is invisible unless you think to ask the host what it loaded.
 
-`tools/install-skill.sh` removes three paths after cloning:
+`tools/install-skill.sh` removes these paths after cloning, and fails if any survives:
 
 | Removed | Why |
 |---|---|
 | `AGENTS.md` | the assertion above |
 | `CLAUDE.md` | loader shim for it |
 | `.claude/` | carries `github-project-release-manager`, an unrelated skill that recursive discovery offers as available — also observed on Cursor |
+| `.repo-governor.json`, `.repo-governor/` | bind and configure governance for this repository, not yours. Left in place, an agent standing in the install directory reads the wrong project. |
+| `docs/research/` | this project's working notes. Nothing the skill reads is in it, and it holds the activation protocol that an agent under measurement must not read. |
+| `CONTRIBUTING.md` | this project's contribution rules, not yours |
+| `.claude-plugin/` | the marketplace entry for this repository ([ADR-034](adrs/034-publication-is-per-channel-and-a-listing-claims-only-what-is-calibrated.md)); in a copy it names the wrong tree |
 
 The engine still runs from the pruned copy; none of the removed files are read by it.
 
@@ -84,7 +88,7 @@ The engine is Python stdlib only ([ADR-011](adrs/011-python-stdlib-only-engine-w
 |---|---|---|
 | `python3` **3.11+** | the engine ([ADR-011](adrs/011-python-stdlib-only-engine-with-language-agnostic-adapters.md) declares the floor) | nothing works |
 | `git` | provider resolution, target detection | nothing works |
-| `dolt` | `decision_history` via `adapters/dolt-decisions` | **4 of 19 conformance suites fail** |
+| `dolt` | `decision_history` via `adapters/decision-history-dolt` | **4 of 19 conformance suites fail** |
 | `gh`, authenticated | the GitHub roadmap provider | live GitHub queries fail; offline suites are unaffected |
 
 **`dolt` is the one that misleads.** Without it, `layer1`, `layer2`, `bindings` and `execution` all fail — including the portability thesis test, which reports `NOT EQUIVALENT`. That reads like a real result and is not one. The suites print a preflight line naming the missing binary, and `tools/bootstrap-decisions.sh` refuses before you reach them, but never report a red verdict from a box without `dolt`.
@@ -94,7 +98,7 @@ The engine is Python stdlib only ([ADR-011](adrs/011-python-stdlib-only-engine-w
 ./tools/run-conformance.sh
 ```
 
-Expect 19/19 from a fresh clone.
+Expect 19/19 from a fresh clone with network access and an authenticated `gh`. Three of those suites (`hooks`, `install` and `roadmap`) read the live board or a remote, so their result can change with no commit. Offline, run `./tools/run-conformance.sh --hermetic`, which runs every suite except those three.
 
 ## Governing a repository other than this one
 
@@ -104,7 +108,7 @@ The skill governs the repository you are standing in, not the one it is installe
 REPO_GOVERNOR_TARGET=/path/to/governed/repo python3 engine/completion.py <id>
 ```
 
-Installing the skill into a target's `.agents/skills/` puts a full clone of this repository inside it — including this repository's `AGENTS.md`, which announces that *this* repo is governed. On a host that loads nested agent-instruction files, that statement leaks into the target. It is harmless in normal use and fatal to an Arm A activation measurement; the [activation protocol](research/activation-protocol.md) carries the check.
+A plain `git clone` into a target's `.agents/skills/` puts a full copy of this repository inside it, including this repository's `AGENTS.md`, which announces that *this* repo is governed. `tools/install-skill.sh` deletes that file; only a plain clone carries it. On a host that loads nested agent-instruction files, that statement leaks into the target. It is harmless in normal use and fatal to an Arm A activation measurement; the [activation protocol](research/activation-protocol.md) carries the check.
 
 ## Hooks — deterministic delivery (optional, [ADR-029](adrs/029-hooks-as-deterministic-delivery-surface.md))
 
@@ -130,7 +134,7 @@ The hook was built to fix an activation miss ([#36](https://github.com/tosin2013
 | Codex | `.codex/hooks.json` | **none exists** | no — [issue 47](https://github.com/tosin2013/repo-governor/issues/47) |
 | Gemini CLI | `.gemini/settings.json` | `BeforeAgent` | no — [issue 48](https://github.com/tosin2013/repo-governor/issues/48) |
 | VS Code / Copilot | `.github/hooks/*.json` | `UserPromptSubmit` | no — [issue 49](https://github.com/tosin2013/repo-governor/issues/49) |
-| Refact | `.refact/hooks.yaml` | **runs, but its output is discarded** | no — read from source only, [issue 247](https://github.com/tosin2013/repo-governor/issues/247) |
+| Refact | `.refact/hooks.yaml` | **runs, but its output is discarded** | **blocking tested** on Refact 8.6.4, 2026-09-26 ([runbook](runbooks/refact-integration.md), [issue 247](https://github.com/tosin2013/repo-governor/issues/247)). The token check cannot run on Refact, because Refact discards hook output. |
 
 **"Verified" means one specific thing**: someone installed it, asked the model for a delivery token with no tool calls, and the model stated the token the operator saw. Event names and exit codes taken from vendor documentation are *not* verification — on Claude Code the documented output shape was wrong, and every visible signal said the hook was working while the model received nothing.
 
@@ -138,7 +142,7 @@ Each unverified row has an issue explaining exactly what is unknown for that hos
 
 Codex documents **no prompt-submit event at all**, so only the write check installs there — the hook cannot deliver the requirement before the agent acts, and an `AGENTS.md` is the whole activation remedy on that host. Its project hooks also load only when `.codex/` is *trusted*, which otherwise looks identical to a hook doing nothing.
 
-Refact ([JegernOUTT/refact](https://github.com/JegernOUTT/refact), the maintained continuation of the archived `smallcloudai/refact`) differs from every other host in three ways, all read from its source rather than observed:
+Refact ([JegernOUTT/refact](https://github.com/JegernOUTT/refact), the maintained continuation of the archived `smallcloudai/refact`) differs from every other host in three ways. All three were read from its source. The blocking behaviour was then tested on Refact 8.6.4 on 2026-09-26 (see the [runbook](runbooks/refact-integration.md)):
 
 - **Only the exit code reaches it.** Refact discards hook stdout on every event, so the prompt moment cannot deliver anything and is not installed, and advisory mode is silence. Its template is therefore the one that ships with `--exit2-on-deny`: in a repository whose manifest sets `enforcement: "blocking"`, an unauthorised write is refused and the reason is returned to the agent as the tool result. Elsewhere the flag still does nothing. `AGENTS.md` is the activation remedy; Refact loads it.
 - **Project hooks run only for trusted projects.** List the repository root in `~/.config/refact/privacy.yaml`:
@@ -151,7 +155,7 @@ Refact ([JegernOUTT/refact](https://github.com/JegernOUTT/refact), the maintaine
 
 Setup, verification, troubleshooting and removal are in the [Refact runbook](runbooks/refact-integration.md).
 
-The installer offers it when the host is Claude Code and the target is **governed**:
+The installer offers it when the host is declared (`claude`, `cursor`, `codex`, `gemini`, `vscode` or `refact`) and the target is **governed**:
 
 ```bash
 tools/install-skill.sh <target> .claude/skills yes            # -> .claude/settings.json
@@ -168,7 +172,7 @@ An earlier version guessed from whichever host directory the target happened to 
 
 Omit the third argument to be prompted; pass `no` to never ask. The host decides which config file is written, and the script uses the same template documented above rather than a second copy — a config the installer writes and one the docs describe must not be able to drift.
 
-Defaults to **no**. Non-interactive runs never write. It merges into an existing `.claude/settings.json` rather than replacing it, and reports any of its own keys it overwrote. It installs **advisory** hooks only — blocking needs `enforcement: "blocking"` in the manifest *and* `--exit2-on-deny` on the write hook, neither of which the installer adds.
+Defaults to **no**. Non-interactive runs never write. It merges into an existing `.claude/settings.json` rather than replacing it, and reports any of its own keys it overwrote. For every host except Refact it installs **advisory** hooks only. Blocking needs `enforcement: "blocking"` in the manifest *and* `--exit2-on-deny` on the write hook, and the installer adds neither. Refact's template already carries `--exit2-on-deny` (see above), so on Refact the manifest setting alone decides.
 
 **It refuses outright in an un-onboarded repository**, because the hook cannot speak without a manifest and onboarding one purely to enable a hook ends any activation measurement running against it.
 
@@ -194,7 +198,7 @@ The last command prints an `additionalContext` block in a governed repository an
 | Moment | Effect |
 |---|---|
 | every prompt | injects the requirement to run the engine before acting |
-| before `Edit`/`Write` | reports if no authority was established, if the engine refused, or if authorization is exhausted (`STOP_COMPLETE`) |
+| before a file-changing tool (the matcher is per host: `Edit`/`Write` on Claude Code) | reports if no authority was established, if the engine refused, or if authorization is exhausted (`STOP_COMPLETE`) |
 | after a Bash call | records the authority id and disposition the engine returned |
 
 It **never decides authorization** — `engine/completion.py` remains the only thing that produces a disposition — and it makes **no claim about file scope**. Roadmap providers do not declare paths; a compiled envelope for a real GitHub issue returns `in_scope: []`, so a path check there would refuse every write with a fabricated reason. See ADR-029's *What this deliberately does not do*.
@@ -265,14 +269,19 @@ It runs detection, shows the evidence, then asks the two things no amount of fil
 
 The second is [ADR-018](adrs/018-admission-signal-is-declared-not-assumed.md): the admission signal is *declared*, never assumed. Whether admission means a milestone or a label is a fact about how a team works, not about the repository. Guessing it produces an engine that governs confidently against the wrong roadmap — which has happened twice here ([ADR-022](adrs/022-repo-governor-does-not-own-roadmap-state.md), and [ADR-028](adrs/028-provider-identity-is-never-defaulted.md) where adapters defaulted to the author's repository).
 
-Output is deny-by-default ([ADR-005](adrs/005-deny-by-default-authority-resolution.md)): every bound role gets read, nothing gets write. Verify before binding:
+Output is deny-by-default ([ADR-005](adrs/005-deny-by-default-permission-model.md)): every bound role gets read, nothing gets write. Verify before binding:
 
 ```bash
 mv .repo-governor.proposed.json .repo-governor.json
+python3 <skill>/engine/manifest.py --validate      # want: READY_FOR_GOVERNANCE ON THIS HOST ONLY
+git add .repo-governor.json
+git commit -m "Govern this repository with Repo Governor"
 python3 <skill>/engine/manifest.py --validate      # want: READY_FOR_GOVERNANCE
 ```
 
-If it fails, rename it back. Nothing governs until it passes.
+Before the commit the manifest is untracked, so a valid one reads `READY_FOR_GOVERNANCE ON THIS HOST ONLY` with a `MANIFEST_UNTRACKED` finding: a fresh clone, a CI job or another developer sees no governance. After the commit it reads `READY_FOR_GOVERNANCE`.
+
+If it fails, rename it back. Nothing governs until it passes. Do not lower `condition.assessed` by hand to get past a finding. A level below the floor that the engine derives fails with `CONDITION_BELOW_FLOOR` ([ADR-006](adrs/006-repository-condition-model-drives-governance-profiles.md)); a floor may be raised, never lowered.
 
 **If your tracker is not one we support**, pick *"Something else"* — the tool prints a `gh issue create` line for an adapter request and points at `adapters/_protocol.py`, which is the whole contract. Every shipped adapter is a single file, and the engine never changes to accommodate one ([ADR-003](adrs/003-seven-provider-roles-with-normalized-contracts.md)).
 

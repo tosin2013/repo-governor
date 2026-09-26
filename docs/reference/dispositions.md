@@ -65,18 +65,21 @@ The vocabularies live in [`engine/vocabulary.py`](../../engine/vocabulary.py) an
 
 **Exactly one disposition per evaluation.** The top-level decision is singular; per-discovery dispositions nest beneath it.
 
-**`UNKNOWN` must be actionable.** An `UNKNOWN` carrying only "unknown" is a defect. Required payload:
+**`UNKNOWN` must be actionable.** An `UNKNOWN` carrying only "unknown" is a defect. The payload as `engine/completion.py` emits it:
 
 ```yaml
 decision: UNKNOWN
 unknowns:
   - dimension: authority          # which of the seven questions failed
     reason: PROVIDER_UNREACHABLE  # typed, enumerated
-    provider: linear
+    detail: ...                   # what the adapter or engine observed
+    meaning: ...                  # the engine's gloss on the reason
     resolution: |                 # what a human can do about it
       Verify LINEAR_API_KEY is set, or bind a manual roadmap provider.
     blocking: true                # does this prevent EXECUTE?
 ```
+
+An unknown carries no `provider` field; the decision's `provenance[]` names the sources that were read. Every adapter-raised unknown carries `resolution` (`adapters/_protocol.py`). Some unknowns the engine raises itself carry only `detail`.
 
 The engine distinguishes **unresolvable** (evidence genuinely absent) from **unavailable** (provider down). Both yield `UNKNOWN`; the resolution differs.
 

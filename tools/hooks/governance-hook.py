@@ -243,8 +243,9 @@ def moment_write(pl, repo, mf, enforcing, exit2):
 
     if not sf.exists():
         msg = ("No authority has been established in this session. A write "
-               "without a named authority has nothing behind it (INV-015: "
-               "write capability is not authority to choose a transition). "
+               "without a named authority has nothing behind it (INV-014 and "
+               "ADR-005: write capability is not authority to choose a "
+               "transition; INV-015 is proposed, issue 30). "
                f"Run: python3 {ENGINE / 'completion.py'} <authority-id>")
         return _emit(context=msg, deny_reason=msg if enforcing else None,
                      exit2=exit2, event=pl.get("hook_event_name"))

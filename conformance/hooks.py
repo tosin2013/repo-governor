@@ -205,6 +205,28 @@ def main():
                    rc == 0 and out == {}, f"said {out}")
     (sess / f"{sid}.json").unlink()
 
+    # --- the no-authority message cites only invariants that exist ---------
+    # It cited INV-015, which the ledger does not define: the invariants end
+    # at INV-014 and INV-015 is only proposed in issue 30 (issue 256). An agent
+    # told to look up a rule that is not there learns to stop looking. Read
+    # from the message the hook actually emits, against invariants.md.
+    sid = "conf_nosession_citation"
+    if (sess / f"{sid}.json").exists():
+        (sess / f"{sid}.json").unlink()
+    rc, out, _ = run("write", {"session_id": sid, "cwd": str(ROOT),
+                               "tool_input": {"file_path": "README.md"}})
+    said = json.dumps(out)
+    defined = set(re.findall(r"^### (INV-\d{3})\b",
+                             (ROOT / "docs" / "reference" / "invariants.md").read_text(
+                                 encoding="utf-8"), re.M))
+    cited = set(re.findall(r"INV-\d{3}", said))
+    undefined = sorted(c for c in cited - defined
+                       if not re.search(re.escape(c) + r" is proposed", said))
+    fails += check("the no-authority message cites only defined invariants, or says proposed",
+                   "No authority has been established" in said and bool(cited) and not undefined,
+                   f"cites {sorted(cited)}; not in invariants.md and not marked proposed: "
+                   f"{undefined}")
+
     # --- advisory is the default, and it must not block --------------------
     sid = "conf_advisory"
     (sess / f"{sid}.json").write_text(json.dumps(

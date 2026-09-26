@@ -6,7 +6,7 @@
 
 ## Context
 
-[ADR-006](006-repository-condition-assessment-with-progressive-governance.md)
+[ADR-006](006-repository-condition-model-drives-governance-profiles.md)
 established progressive governance: condition level selects a profile, and the
 profile determines which policy packs load and which provider **roles** are
 required. Issue 79 implemented the second half — `required_roles` had been
@@ -37,7 +37,7 @@ rather than encoded.**
 2. **The distinguishing property is already declared.**
    `adapters/decision-history-dolt` reports `chain_supplied_by_store: true`;
    `adapters/decision-history-file` reports `false`. That field exists because
-   [ADR-019](019-append-only-decision-history-with-dolt.md) rule 3 requires a
+   [ADR-019](019-database-backed-decision-history.md) rule 3 requires a
    backend that cannot supply history natively to implement chaining itself
    **and say so**. A recommendation phrased as *"at this level you want a store
    that supplies its own chain; yours hand-rolls one"* is computable from

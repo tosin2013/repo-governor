@@ -69,7 +69,9 @@ def target():
 
 
 # Skills directories, by host. `docs/installation.md` carries the full table.
-SKILL_ROOTS = (".agents", ".claude", ".cursor", ".codex")
+# Every host tools/install-skill.sh can install into must be here, or an agent
+# standing inside that install resolves the install as the target (issue 256).
+SKILL_ROOTS = (".agents", ".claude", ".cursor", ".codex", ".gemini", ".refact")
 
 
 def _escape_install(repo):
@@ -373,11 +375,14 @@ def check_tracked(manifest, path=None):
     READY_FOR_GOVERNANCE. Onboarding says "rename and commit" in a $comment and
     a docstring; neither is a check.
 
-    Severity is deliberately uneven. An untracked MANIFEST blocks: a repository
-    claiming READY_FOR_GOVERNANCE on a file no other host can see asserts
-    something false, and the tempting repair -- re-onboarding -- is not recovery
-    but re-founding, silently redeciding bindings, profile and admission.
-    Untracked bars or decisions are advisory: still governed, just answering
+    Every finding here is ADVISORY (ADVISORY_FINDINGS), and an untracked
+    MANIFEST is reported by qualifying the banner instead: `--validate` reads
+    READY_FOR_GOVERNANCE ON THIS HOST ONLY. It was blocking once, which broke
+    onboarding, because a manifest is legitimately uncommitted between the
+    rename and the commit (see the note under ADVISORY_FINDINGS; ADR-031). The
+    tempting repair for an untracked manifest -- re-onboarding -- is still not
+    recovery but re-founding, silently redeciding bindings, profile and
+    admission. Untracked bars or decisions: still governed, just answering
     less on the next clone.
     """
     root = target()
@@ -586,4 +591,9 @@ def main(argv):
 
 
 if __name__ == "__main__":
+    # --help is not an id. Read as one it produced a confident verdict about an
+    # authority named "--help" (issue 256).
+    if sys.argv[1:2] in (["-h"], ["--help"]):
+        print(__doc__)
+        sys.exit(0)
     sys.exit(main(sys.argv[1:]))

@@ -4,7 +4,7 @@
 **Ratified**: 2026-08-17 by Tosin Akinosho (§68), under the [v0.1.0 architecture ratification review](RATIFICATION-v0.1.0.md).
 **Date**: 2026-08-17
 **Domain**: Distribution & agent integration
-**Amended by**: [ADR-029](029-hooks-as-deterministic-delivery-surface.md) — "coding-agent hooks" is promoted from a deferred §65 candidate to a secondary delivery surface. The Agent Skill remains primary; the negative consequence below was measured, and the vendor-bet reasoning that deferred hooks expired when all three target hosts converged on one hook convention.
+**Amended by**: [ADR-029](029-hooks-as-deterministic-delivery-surface.md), which is still `Proposed`, so this amendment is not yet in force. If it is accepted: "coding-agent hooks" is promoted from a deferred §65 candidate to a secondary delivery surface. The Agent Skill remains primary; the negative consequence below was measured, and the vendor-bet reasoning that deferred hooks expired when all three target hosts converged on one hook convention.
 
 ## Context
 

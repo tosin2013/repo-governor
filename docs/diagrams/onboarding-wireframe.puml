@@ -4,7 +4,8 @@ salt
   {+
     Repo Governor: interactive onboarding
     ==
-    "Assessed condition: L1  (one package, small dependency surface)"
+    "Condition assessed: L4 / GOVERNOR_HIGH_ASSURANCE"
+    "  floor raised by : public_api_surface"
     .
     "Detected candidates:"
     { "  roadmap_authority" | "github-projects" | "[ detected ]" }

@@ -16,7 +16,7 @@
 # None of that is wanted in an install. All of it is wanted in the repository.
 # So: clone, then prune.
 #
-#   tools/install-skill.sh <target-repo> [skills-dir]
+#   tools/install-skill.sh <target-repo> [skills-dir] [ask|yes|no] [harness]
 #
 # skills-dir defaults to .agents/skills -- read by Cursor and Codex. Claude Code
 # reads .claude/skills; see docs/installation.md for the table.
@@ -31,7 +31,8 @@ HOST_OPT="${4:-}"         # claude | cursor | codex | gemini | vscode | refact -
                           # never inferred. See the host block below.
 
 if [ -z "$TARGET" ]; then
-  echo "usage: tools/install-skill.sh <target-repo> [skills-dir]" >&2
+  echo "usage: tools/install-skill.sh <target-repo> [skills-dir] [ask|yes|no] [harness]" >&2
+  echo "  harness: claude | cursor | codex | gemini | vscode | refact" >&2
   exit 2
 fi
 if [ ! -d "$TARGET" ]; then
@@ -149,7 +150,10 @@ if [ ! -f "$TARGET/.repo-governor.json" ]; then
   echo
   echo "It writes a PROPOSAL. Review it, then:"
   echo "    mv $TARGET/.repo-governor.proposed.json $TARGET/.repo-governor.json"
-  echo "    python3 $DEST/engine/manifest.py --validate"
+  echo "    cd $TARGET && python3 $DEST/engine/manifest.py --validate"
+  echo "    (run it from $TARGET: the engine validates the repository you stand in)"
+  echo "Then commit .repo-governor.json. Until it is tracked, validation reads"
+  echo "READY_FOR_GOVERNANCE ON THIS HOST ONLY."
   echo
   echo "CAUTION: the proposal lands in the repository root and is itself a"
   echo "governance signal. Do not run it against a repository under activation"
@@ -290,7 +294,8 @@ print(f"  hook installed -> {p}")
 if kept:
     print(f"  NOTE: replaced your existing {', '.join(kept)} entries -- check them")
 if host == "refact":
-    print("  REFACT: verified from its source, not yet on a running host (issue 247).")
+    print("  REFACT: blocking tested on Refact 8.6.4 (issue 247). The delivery-token")
+    print("  check cannot run on Refact, because Refact discards hook output.")
     print("  Project hooks run ONLY when this repository is listed in")
     print("  hooks.trusted_projects in ~/.config/refact/privacy.yaml:")
     print(f"      hooks:\n        trusted_projects: [\"{target.resolve()}\"]")

@@ -131,15 +131,18 @@ docs/
 | `skill.py` | the agent surface teaches an invocation that works, and cites no moved decision |
 | `envelope.py` | §40 verbatim — the completion firewall admits no exception |
 | `execution.py` | execution state informs; it never grants authority |
-| `manifest.py` | 28 checks — 20 refusal cases; the loader's value is what it rejects |
+| `manifest.py` | 45 checks, 20 of them refusal cases; the loader's value is what it rejects |
 | `onboarding.py` | `RG-SIM-ONBOARDING-v0.1`, fixtures A–C |
 | `vocabulary.py` | closed sets cannot drift from the code |
-| `hooks.py` | the hook delivers a real verdict, and stays silent where it has none |
+| `hooks.py` | *live:* the hook delivers a real verdict, and stays silent where it has none |
 | `imports.py` | ADR-011 rule 1 — the engine's dependency surface, including adapter code it execs |
 | `status.py` | the status view reports what it cannot answer, rather than omitting it |
 | `acceptance.py` | an empty completion bar is never a met one — two guards, each tested alone |
 | `coverage.py` | every suite reports how much it did, so a suite that stops asserting cannot look green |
 | `benchmark.py` | the activation harness withholds a rate for a host it has not calibrated |
+| `union.py` | a multi-valued role reads every bound provider, and escalates a contradiction without blocking (ADR-013) |
+| `install.py` | *live:* the tag the install docs tell people to clone exists on the remote |
+| `roadmap.py` | *live:* no issue is cleared to execute without an acceptance bar |
 
 **Start here:**
 
