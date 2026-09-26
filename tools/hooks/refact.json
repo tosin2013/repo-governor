@@ -1,0 +1,32 @@
+{
+  "$comment": "Refact hook config (ADR-029, issue 247). Install as .refact/hooks.yaml -- JSON is valid YAML and Refact's loader ignores unknown keys such as this one. VERIFIED 2026-09-26 against JegernOUTT/refact 0d096c9 (the maintained continuation of the archived smallcloudai/refact) by reading the source, NOT on a running host: crates/refact-ext/src/hooks.rs (file format, events), src/ext/hooks_runner.rs (payload, `sh -c`, exit codes), src/chat/tools.rs and src/chat/queue.rs (what is done with the result). Matchers are unanchored regexes there, hence ^...$. Each entry takes one `command` string; an `args` array is silently dropped, which is why a Claude-shaped .claude/settings.json does NOT govern Refact even though Refact reads that file. Substitute the placeholder token (skill dir) with sed before use; the installer does it for you.",
+  "$comment_trust": "Project hooks run ONLY when the repository root is listed in hooks.trusted_projects in ~/.config/refact/privacy.yaml. An untrusted project behaves exactly like a hook that does nothing. Global ~/.config/refact/hooks.yaml always runs.",
+  "$comment_exit2": "--exit2-on-deny is present by default here, unlike every other host. Refact reads only the exit code: 2 blocks and returns stderr to the agent as the tool result; stdout is discarded on every event. Without the flag the write hook can say nothing at all, so advisory mode on this host is silence. The flag alone still does nothing -- the governed repository's repo_governor.enforcement='blocking' remains the one switch.",
+  "$comment_no_prompt_event": "Refact runs UserPromptSubmit hooks but discards their stdout (src/chat/queue.rs uses only the block result), so the 'prompt' moment cannot deliver the requirement and is not installed. Refact does load AGENTS.md into its system context; that is the activation remedy on this host.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^(apply_patch|create_textdoc|update_textdoc.*|undo_textdoc|mv|rm|worktree_merge|merge_agent|merge_ready_in_order)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 RG_SKILL_DIR/tools/hooks/governance-hook.py write --exit2-on-deny",
+            "timeout": 20
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "^shell$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 RG_SKILL_DIR/tools/hooks/governance-hook.py capture",
+            "timeout": 20
+          }
+        ]
+      }
+    ]
+  }
+}
