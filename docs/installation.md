@@ -147,7 +147,9 @@ Refact ([JegernOUTT/refact](https://github.com/JegernOUTT/refact), the maintaine
     trusted_projects: ["/absolute/path/to/repo"]
   ```
   Untrusted, it behaves exactly like a hook that does nothing. Hooks in `~/.config/refact/hooks.yaml` always run.
-- **It also reads `.claude/settings.json`, but that does not govern it.** Refact drops a hook's `args` array, so the Claude template would run a bare `python3`, and its matchers name none of Refact's tools. Install `refact.json` as `.refact/hooks.yaml` instead (JSON is valid YAML). The write check covers `apply_patch`, `create_textdoc`, `update_textdoc*`, `undo_textdoc`, `mv`, `rm`, and the planner's three merge tools, which write a fleet agent's worktree branch into the repository. Fleet agents report the source repository as their `project_dir`, so each card's session is governed like any other.
+- **It also reads `.claude/settings.json`, but that does not govern it.** Refact drops a hook's `args` array, so the Claude template would run a bare `python3`, and its matchers name none of Refact's tools. Install `refact.json` as `.refact/hooks.yaml` instead (JSON is valid YAML). The write check covers `apply_patch`, `create_textdoc`, `update_textdoc*`, `undo_textdoc`, `mv`, `rm`, and the planner's three merge tools, which write a fleet agent's worktree branch into the repository. Fleet agents report the source repository as their `project_dir`, so the hook finds the manifest from a worktree. **A Refact subagent is not gated in its first loop**, because Refact runs no `PreToolUse` hook there ([JegernOUTT/refact#35](https://github.com/JegernOUTT/refact/issues/35)), and a blocked agent can delegate around the block ([issue 254](https://github.com/tosin2013/repo-governor/issues/254)). Do not use Refact's planner or subagents in a governed repository until issue 254 closes.
+
+Setup, verification, troubleshooting and removal are in the [Refact runbook](runbooks/refact-integration.md).
 
 The installer offers it when the host is Claude Code and the target is **governed**:
 
