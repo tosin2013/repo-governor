@@ -1,8 +1,8 @@
 # Architecture Ratification Review — v0.6.0
 
-**Prepared** 2026-09-04 · **Not ratified.** The acceptance line at the end is the
-maintainer's to write (§68). Everything above it is evidence, and evidence is not
-a decision.
+**Prepared** 2026-09-04 · **Ratified 2026-09-04 by Tosin Akinosho (§68)**, as a
+recorded departure. The decision is the [acceptance line at the end](#maintainers-acceptance).
+Everything above it is evidence, and evidence is not a decision.
 
 ## Why this review exists
 

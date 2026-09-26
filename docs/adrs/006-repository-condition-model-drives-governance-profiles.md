@@ -5,6 +5,12 @@
 **Date**: 2026-08-17
 **Domain**: Policy scaling
 
+> **Implementation note (2026-09-26, [issue 256](https://github.com/tosin2013/repo-governor/issues/256)).** The decision below is unchanged. Three things about its implementation are recorded here so the text is not read as current fact where it is not.
+>
+> - **Rule 3 is enforced.** `engine/manifest.py` `check_floor` re-derives the floor indicators and refuses a declared `condition.assessed` or profile below the floor with `CONDITION_BELOW_FLOOR`, naming the indicator that raised it ([issue 181](https://github.com/tosin2013/repo-governor/issues/181), PR 250).
+> - **Profiles are JSON, not YAML.** Rule 4 and step 1 say YAML. The files are `policies/*.json` (for example `policies/high-assurance.json`), in line with [ADR-015](015-json-as-canonical-manifest-format.md).
+> - **Step 3's "active override" does not occur.** The code refuses a level below the floor. It does not accept it and record an override, so there is no active override for a decision record to name.
+
 ## Context
 
 §23–28 defines five repository conditions (L0 greenfield through L4 mature/high-assurance) mapped to five governance profiles. §55 makes the stakes explicit: the project should stop or simplify if "provider configuration is too complex for simple repositories" or if "governance causes material developer friction without corresponding safety benefit."

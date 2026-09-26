@@ -4,12 +4,13 @@
 **Ratified**: 2026-08-17 by Tosin Akinosho (§68), under the [v0.1.0 architecture ratification review](RATIFICATION-v0.1.0.md).
 **Date**: 2026-08-17
 **Domain**: Engine architecture / authorization
-**Implements**: [ADR-005](005-deny-by-default-permission-model.md) rule 2
+**Implements**: [ADR-005](005-deny-by-default-permission-model.md) implementation step 2
+**Amended by**: [ADR-027](027-the-governed-repository-is-not-the-install-directory.md). Repo-local providers resolve against the governed repository, never the install directory.
 **Resolves**: issue 21
 
 ## Context
 
-ADR-005 rule 2 specified an implementation step in plain terms:
+ADR-005 implementation step 2 specified the chokepoint in plain terms:
 
 > Implement the permission gate as a single chokepoint every adapter invocation passes through — **no adapter may be called except through it.**
 

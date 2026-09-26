@@ -126,7 +126,7 @@ which two rather than implying the whole is enforced.
 
 ## Acceptance conditions
 
-`Proposed` until all four are met. **One is met today.**
+`Proposed` until all four are met. **Two are met today.**
 
 1. **The compatibility declaration is enforced, not merely written.** `conformance/skill.py`
    asserts that `SKILL.md` declares `compatibility` and that it names the tools the
@@ -135,7 +135,10 @@ which two rather than implying the whole is enforced.
 
 2. **A channel entry exists and is pinned.** At least one curated channel carries an entry
    for this skill, pinned to a released tag, and updating that pin is part of cutting a
-   release. Until then rules 2 and 4 are a convention with nothing under them. *(Not met.)*
+   release. Until then rules 2 and 4 are a convention with nothing under them. *(Met.
+   `.claude-plugin/marketplace.json` pins the entry to the released archive, and
+   `conformance/skill.py` fails when that pin differs from `ENGINE_VERSION`, so a release
+   cannot be cut without updating it.)*
 
 3. **A host claimed in a listing has been run.** Whatever host list a published entry
    carries is backed by a calibration record under `docs/research/calibration/`. There is

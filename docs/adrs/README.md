@@ -2,7 +2,7 @@
 
 Generated 2026-08-17 from PRD v0.2 (provider-oriented draft) using the MCP ADR Analysis Server's PRD-to-ADR protocol, informed by the external landscape research in [`../research/2026-08-17-external-landscape.md`](../research/2026-08-17-external-landscape.md).
 
-**24 of 33 ADRs are Accepted.** 23 were ratified 2026-08-17 under [RATIFICATION-v0.1.0.md](RATIFICATION-v0.1.0.md); ADR-024 was ratified 2026-08-31 under [RATIFICATION-v0.5.0.md](RATIFICATION-v0.5.0.md), which also records why ADR-031 and ADR-033 were **not**. ADR-020, ADR-029, ADR-030, ADR-031, ADR-032, ADR-033, ADR-034 and ADR-035 are held `Proposed`; ADR-014 is `Superseded` by the 023/024 split.
+**24 of 33 ADRs are Accepted.** 23 were ratified 2026-08-17 under [RATIFICATION-v0.1.0.md](RATIFICATION-v0.1.0.md); ADR-024 was ratified 2026-08-31 under [RATIFICATION-v0.5.0.md](RATIFICATION-v0.5.0.md), which also records why ADR-031 and ADR-033 were **not**. [RATIFICATION-v0.6.0.md](RATIFICATION-v0.6.0.md), ratified 2026-09-04, records the second departure, for v0.6.0. ADR-020, ADR-029, ADR-030, ADR-031, ADR-032, ADR-033, ADR-034 and ADR-035 are held `Proposed`; ADR-014 is `Superseded` by the 023/024 split.
 
 > **Runtime-dependent and still `Proposed`: ADR-031, ADR-033.** This line used to assert that no held ADR was cited by the engine or a bound adapter — the release condition [RATIFICATION-v0.1.0.md](RATIFICATION-v0.1.0.md) states — *every architecture decision the runtime depends on is Accepted* — asserted as though it still held. It stopped holding when #153 and #183 gave ADR-024 and ADR-031 engine citations, and four releases shipped without anyone recomputing it. `conformance/skill.py` now derives this list from `engine/` and the adapters this repository binds, using the method that record itself prescribes, so it cannot go stale again. **ADR-033 joined the list with the Beads adapter (#216)**, which is the guard working rather than a documentation task: `engine/onboard.py` now applies ADR-033's rule to decide whether a `.beads/` store may be bound, so the runtime depends on a decision that is `Proposed`. Recording the fact is not ratifying it (§68). ADR-024 left this list on 2026-08-31 by being accepted, not by being reworded; ADR-031 and ADR-033 remain on it, and v0.5.0 ships as a departure recorded in that review. Per §61, the project cannot reach `IMPLEMENTATION_READY` until the `RG-SIM-ONBOARDING-v0.1` simulation passes.
 
@@ -32,10 +32,10 @@ Generated 2026-08-17 from PRD v0.2 (provider-oriented draft) using the MCP ADR A
 | [018](018-admission-signal-is-declared-not-assumed.md) | Admission signal is declared, not assumed | Provider abstraction | Makes GitHub usable without a Project; **found by real-data testing** |
 | [019](019-database-backed-decision-history.md) | Database-backed decision history | Storage | Closes the last unbound role; amends ADR-009 |
 | [020](020-agent-supplied-transport-with-adapter-as-normalizer.md) | Agent-supplied transport, adapter as normalizer | Transport | Moves credentials out of remote adapters; amends ADR-003 and ADR-016 |
-| [021](021-every-provider-resolved-through-the-manifest.md) | Every provider resolved through the manifest | Engine architecture | Builds ADR-005 rule 2, specified and never implemented |
+| [021](021-every-provider-resolved-through-the-manifest.md) | Every provider resolved through the manifest | Engine architecture | Builds ADR-005 implementation step 2, specified and never implemented |
 | [022](022-repo-governor-does-not-own-roadmap-state.md) | Repo Governor does not own roadmap state | Product boundary | **Section 54 reproduced inside the tool**; roadmap rebound to GitHub |
 | [023](023-completion-firewall.md) | The completion firewall | Policy engine | Split from 014 — the half that shipped |
-| [024](024-scope-envelope-compiler.md) | ScopeEnvelope is compiled, not authored | Policy engine | Split from 014 — **the half that did not**; held Proposed |
+| [024](024-scope-envelope-compiler.md) | ScopeEnvelope is compiled, not authored | Policy engine | Split from 014 — **the half that did not**; held at v0.1.0, Accepted 2026-08-31 under [RATIFICATION-v0.5.0.md](RATIFICATION-v0.5.0.md) |
 | ~~025~~ ~~026~~ | **never written.** Reserved in a plan that proposed a dialect ADR and an identity ADR; only the second was written, and it landed as 028. Nothing was deleted — recorded so a gap in the sequence does not read as two missing decisions. | — | — |
 | [027](027-the-governed-repository-is-not-the-install-directory.md) | The governed repository is not the install directory | Portability | The engine governed **itself** whatever it was pointed at |
 | [028](028-provider-identity-is-never-defaulted.md) | Provider identity is never defaulted | Safety | Adapters named the author's repository as a fallback |
@@ -52,7 +52,8 @@ Generated 2026-08-17 from PRD v0.2 (provider-oriented draft) using the MCP ADR A
 ```text
 001 (skill)  ──┬──> 006 (profiles) ──> 008 (conformance)
                │
-002 (engine) ──┼──> 007 (dispositions) ──> 014 (envelope + firewall)
+002 (engine) ──┼──> 007 (dispositions) ──┬──> 023 (completion firewall)
+               │                          └──> 024 (envelope compiler)
                │
 003 (roles)  ──┼──> 004 (manifest) ──┬──> 005 (permissions)
                │                     ├──> 010 (detection)
@@ -123,7 +124,7 @@ The gate ids are GitHub issue numbers, not `GATE-N`. They were file-roadmap ids 
 
 The gate asks whether the architecture is stable enough to build on. It does not ask whether the product is worth building, and four things remain open:
 
-* ~~**All 22 ADRs are still `Proposed`.**~~ **Resolved 2026-08-17.** 21 of 24 Accepted; ADR-020 and ADR-024 deliberately held. See [`RATIFICATION-v0.1.0.md`](RATIFICATION-v0.1.0.md).
+* ~~**All 22 ADRs are still `Proposed`.**~~ **Resolved 2026-08-17.** 23 of 26 Accepted; ADR-020 and ADR-024 deliberately held, and ADR-014 superseded. See [`RATIFICATION-v0.1.0.md`](RATIFICATION-v0.1.0.md).
 * **#1 (cross-provider normalization) has weak evidence.** 9/9 scenarios agree, but all three adapters were written by the same author against the same map — that measures shared intent as much as portability. A third-party adapter is the real test.
 * **#2 (envelope thinness) is not merely unmeasured — it is unanswerable as written.** ADR-014's envelope compiler was never built, so nothing compiles an envelope whose thinness could be measured. Found by the ratification sweep.
 * **The criteria-drift weakness is unresolved.** Acceptance criteria were amended twice during implementation. Both amendments were justified and recorded, and nothing but that record distinguishes a legitimate correction from a convenient one.

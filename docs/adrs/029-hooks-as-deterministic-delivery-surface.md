@@ -1,6 +1,6 @@
 # 29. Hooks as a Deterministic Delivery Surface
 
-**Status**: Proposed — **ready for ratification**. Validated 2026-08-19 by a four-condition controlled comparison: the activation claim holds only where no `AGENTS.md` exists, and the enforcement claim is proven. Acceptance is a human act (§68).
+**Status**: Proposed — **ready for ratification**. Validated 2026-08-19 by a four-condition controlled comparison: the activation claim holds only where no `AGENTS.md` exists, and the enforcement claim is proven. Amended 2026-09-26 to add Refact as a host (see the amendment section below); Refact blocking was tested on Refact 8.6.4 that day. Acceptance is a human act (§68).
 **Date**: 2026-08-19
 **Domain**: Distribution & agent integration
 **Amends**: [ADR-001](001-agent-skill-as-primary-delivery-surface.md) — promotes "coding-agent hooks" from a deferred §65 candidate to a secondary delivery surface. The Agent Skill remains primary.
@@ -103,7 +103,7 @@ Full record: [`docs/research/hook-validation-results.md`](../research/hook-valid
 
 ## Amendment — Refact as a host (2026-09-26, [issue 247](https://github.com/tosin2013/repo-governor/issues/247))
 
-Refact ([JegernOUTT/refact](https://github.com/JegernOUTT/refact), which continues the archived `smallcloudai/refact`) ships the converged convention: `PreToolUse`/`PostToolUse`, JSON on stdin, exit 2 blocks. That makes it a host, not a provider. It is added the same way as the others, with one template (`tools/hooks/refact.json`, installed as `.refact/hooks.yaml`) and no new code path. Its source was read at commit `0d096c9`, but no running host has been tested. It departs from the other hosts in ways that change what this ADR's moments can do there:
+Refact ([JegernOUTT/refact](https://github.com/JegernOUTT/refact), which continues the archived `smallcloudai/refact`) ships the converged convention: `PreToolUse`/`PostToolUse`, JSON on stdin, exit 2 blocks. That makes it a host, not a provider. It is added the same way as the others, with one template (`tools/hooks/refact.json`, installed as `.refact/hooks.yaml`) and no new code path. Its source was read at commit `0d096c9`. Blocking was then tested on a running host, Refact 8.6.4, on 2026-09-26 (PR 249, and the [Refact runbook](../runbooks/refact-integration.md)). The delivery-token check cannot run there, because Refact discards hook output. It departs from the other hosts in ways that change what this ADR's moments can do there:
 
 - **Stdout is discarded on every event.** The `prompt` moment cannot deliver, so it is not installed. Advisory mode is silence, so the Refact template is the only one that carries `--exit2-on-deny` by default. The manifest's `enforcement` stays the single switch.
 - **It fell open before this amendment, silently.** The payload names the repository `project_dir` and the hook runs in the daemon's working directory. Tool output arrives as `tool_output`. File changes go through `*_textdoc`, `mv`, `rm` and three merge tools. Each of these alone made the hook find no manifest, record a null verdict, or treat the tool as unknown. All four are fixed in the shared script and pinned by `conformance/hooks.py`.

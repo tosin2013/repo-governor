@@ -20,13 +20,9 @@
 > condition being repealed by habit, and the next reviewer should treat a second
 > one as a signal to settle F3 rather than to repeat this line.
 
-> **This document is the evidence half only.** An agent produced it. The
-> acceptance decision belongs to the maintainer (§68) and is deliberately absent
-> — v0.1.0 keeps the two in one file and separate, and this follows that.
->
-> To ratify, add a line here naming who accepted what, on what date. To ship a
-> departure instead, record that here in the same place, with its reason. A
-> reader must be able to tell which happened without reading the git log.
+> **The evidence below was produced by an agent.** The decision at the top of
+> this file is the maintainer's (§68), recorded 2026-08-31. v0.1.0 keeps the two
+> in one file and separate, and this follows that.
 
 ## Why this review exists
 
