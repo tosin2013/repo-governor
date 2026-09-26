@@ -4,7 +4,7 @@
 **Risk level**: Medium. A wrong setup looks governed and is not.
 **Last updated**: 2026-09-26
 **Last tested**: 2026-09-26, Refact 8.6.4, on a clone of `tosin2013/local-knowledge-vault`
-**Version**: 1.0.0
+**Version**: 1.0.1
 **Tracks**: [issue 247](https://github.com/tosin2013/repo-governor/issues/247) (the integration), [issue 254](https://github.com/tosin2013/repo-governor/issues/254) and [issue 248](https://github.com/tosin2013/repo-governor/issues/248) (open gaps)
 
 ---
@@ -16,7 +16,7 @@
 | **Execution time** | About 15 minutes for one repository |
 | **Impact window** | None. Only new Refact chats in the repository are affected. |
 | **Rollback time** | About 2 minutes |
-| **Prerequisites** | An onboarded repository, Refact 8.6.4 or later with a working model, Python 3 |
+| **Prerequisites** | An onboarded repository, Refact 8.6.4 or later with a working model, Python 3.11 or later |
 
 ---
 
@@ -142,7 +142,7 @@ Green chats go through the hook. The red chat does not ([JegernOUTT/refact#35](h
 ### Required tools
 
 - [ ] Refact 8.6.4 or later, with a chat model that works in agent mode.
-- [ ] Python 3.9 or later.
+- [ ] Python 3.11 or later. [ADR-011](../adrs/011-python-stdlib-only-engine-with-language-agnostic-adapters.md) sets this minimum.
 - [ ] Git.
 - [ ] A local clone of Repo Governor. This runbook calls its path `$RG_SRC`.
 
@@ -254,7 +254,8 @@ bash "$RG_SRC/tools/install-skill.sh" "$PWD" .refact/skills yes
 
 ```text
   hook installed -> /path/to/your/repo/.refact/hooks.yaml
-  REFACT: verified from its source, not yet on a running host (issue 247).
+  REFACT: blocking tested on Refact 8.6.4 (issue 247). The delivery-token
+  check cannot run on Refact, because Refact discards hook output.
   Project hooks run ONLY when this repository is listed in
   hooks.trusted_projects in ~/.config/refact/privacy.yaml:
 ```
@@ -314,7 +315,7 @@ echo "exit=$?"
 **Expected output**:
 
 ```text
-No authority has been established in this session. A write without a named authority has nothing behind it (INV-015: write capability is not authority to choose a transition). Run: python3 /path/to/your/repo/.refact/skills/repo-governor/engine/completion.py <authority-id>
+No authority has been established in this session. A write without a named authority has nothing behind it (INV-014 and ADR-005: write capability is not authority to choose a transition; INV-015 is proposed, issue 30). Run: python3 /path/to/your/repo/.refact/skills/repo-governor/engine/completion.py <authority-id>
 exit=2
 ```
 
@@ -572,6 +573,7 @@ cat ".repo-governor/sessions/$(ls -t .repo-governor/sessions/ | head -1)"
 | Version | Date | Author | Changes |
 |---|---|---|---|
 | 1.0.0 | 2026-09-26 | Repo Governor maintainer, with Claude Code | First version, after the single-agent and fleet tests |
+| 1.0.1 | 2026-09-26 | Repo Governor maintainer, with Claude Code | The Python minimum is 3.11. The expected hook and installer output matches the current code ([issue 256](https://github.com/tosin2013/repo-governor/issues/256)). |
 
 ---
 
