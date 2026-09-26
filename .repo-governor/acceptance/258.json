@@ -1,0 +1,59 @@
+{
+  "$comment": "Acceptance criteria for issue 258. The documented install clones a tag into a temporary directory and runs tools/install-skill.sh from there; the installed copy was a detached HEAD whose origin was that temporary clone, so the update line INSTALLED.md carried (stash, pull, stash pop) failed with 'You are not currently on a branch', and again with 'does not appear to be a git repository' once the clone was deleted. Reproduced against v0.7.0 before the change. C1-C5 pin the fixed life of a copy in conformance/hooks.py: origin is the canonical URL, INSTALLED.md records the installed tag, the upgrade commands READ FROM that INSTALLED.md work after the temporary clone is deleted, the prune is re-applied, and the host hook config does not change. THE VACUITY THIS BAR IS BUILT AGAINST: an installer that writes the nearest tag, or any tag, passes C2 and C4. C6 is the ADR-028 control: a copy not at a tag claims no tag, only its commit. C7 is the safety control: --prune refuses a directory with no INSTALLED.md, so it cannot strip a source checkout of its AGENTS.md. C8 keeps the prune list in one place. Mutation-tested: against the installer on main before this change, C1, C2, C3, C4 and C6 fail (six of the eight upgrade checks). WHAT THIS BAR CANNOT CHECK: an upgrade against GitHub to a real release tag, because no release carries the fixed installer yet (the case maps the canonical URL onto a local upstream with url.insteadOf), and the Claude Code plugin channel commands in the runbook, which were not run. NO covers BLOCK: the bar covers all four scope items of the issue. The two limits above are limits of verification, not scope left out, so they are recorded here and in the runbook's 'What was run and what was not' rather than as uncovered scope. The runbook's Next review says to run Procedure A against GitHub once the next release exists.",
+  "authority_id": "258",
+  "criteria": [
+    {
+      "$comment": "C1 THE DEFECT, part 1: the installed copy's origin is the canonical repository, not the temporary clone",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/hooks.py | grep -q \"\\[PASS\\] upgrade: the installed copy.s origin is the canonical repository\"'"
+    },
+    {
+      "$comment": "C2 INSTALLED.md records the tag that was installed",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/hooks.py | grep -q \"\\[PASS\\] upgrade: INSTALLED.md records the tag that was installed\"'"
+    },
+    {
+      "$comment": "C3 THE DEFECT, part 2: the upgrade commands read from INSTALLED.md work after the temporary clone is deleted",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/hooks.py | grep -q \"\\[PASS\\] upgrade: the documented command upgrades after the temp clone is gone\"'"
+    },
+    {
+      "$comment": "C4 after the upgrade the new tag is recorded and the prune is re-applied",
+      "check": "command_exit",
+      "target": "bash -c 'out=$(python3 conformance/hooks.py); echo \"$out\" | grep -q \"\\[PASS\\] upgrade: INSTALLED.md records the new tag afterwards\" && echo \"$out\" | grep -q \"\\[PASS\\] upgrade: the prune is re-applied after the checkout\"'"
+    },
+    {
+      "$comment": "C5 the upgrade does not touch the host hook configuration",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/hooks.py | grep -q \"\\[PASS\\] upgrade: the host hook config is untouched\"'"
+    },
+    {
+      "$comment": "C6 CONTROL (ADR-028): an untagged install claims no tag. Without this, an installer that writes the nearest tag passes C2 and C4.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/hooks.py | grep -q \"\\[PASS\\] upgrade control: an untagged install claims no tag, only its commit\"'"
+    },
+    {
+      "$comment": "C7 CONTROL: --prune refuses a checkout with no INSTALLED.md, so a mistyped path cannot prune a source tree",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/hooks.py | grep -q \"\\[PASS\\] upgrade control: --prune refuses a checkout with no INSTALLED.md\"'"
+    },
+    {
+      "$comment": "C8 ONE PRUNE LIST: the install and --prune share one set of rm lines in the script",
+      "check": "command_exit",
+      "target": "bash -c '[ \"$(grep -c \"rm -f  \\\"\\$DEST/AGENTS.md\\\"\" tools/install-skill.sh)\" = 1 ] && grep -q \"^prune_copy() {\" tools/install-skill.sh'"
+    },
+    {
+      "$comment": "C9 the runbook exists and installation.md links it",
+      "check": "command_exit",
+      "target": "bash -c 'test -f docs/runbooks/upgrade-and-uninstall.md && grep -q \"runbooks/upgrade-and-uninstall.md\" docs/installation.md'"
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/hooks.py"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh --hermetic"
+    }
+  ]
+}
