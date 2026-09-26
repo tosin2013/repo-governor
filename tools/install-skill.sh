@@ -17,41 +17,32 @@
 # So: clone, then prune.
 #
 #   tools/install-skill.sh <target-repo> [skills-dir] [ask|yes|no] [harness]
+#   tools/install-skill.sh --prune <installed-copy>
 #
 # skills-dir defaults to .agents/skills -- read by Cursor and Codex. Claude Code
 # reads .claude/skills; see docs/installation.md for the table.
+#
+# The second form is the upgrade path (issue 258). The documented install
+# clones a TAG into a temporary directory and runs this script from there, so
+# the installed copy is a detached HEAD whose `origin` was that temporary
+# clone. The update line INSTALLED.md used to carry (`stash && pull && stash
+# pop`) failed on the detached HEAD, and failed again once the temporary clone
+# was gone. Now the copy's `origin` is the canonical repository, INSTALLED.md
+# records what was actually installed, and an upgrade is fetch, checkout of a
+# tag, then `--prune` from the version just checked out -- so the prune list
+# below stays the only one, and a newer version prunes with its own list.
 
 set -euo pipefail
 
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-TARGET="${1:-}"
-SKILLS_DIR="${2:-.agents/skills}"
-HOOKS_OPT="${3:-ask}"     # ask | yes | no -- see the hook block at the end
-HOST_OPT="${4:-}"         # claude | cursor | codex | gemini | vscode | refact -- DECLARED,
-                          # never inferred. See the host block below.
 
-if [ -z "$TARGET" ]; then
-  echo "usage: tools/install-skill.sh <target-repo> [skills-dir] [ask|yes|no] [harness]" >&2
-  echo "  harness: claude | cursor | codex | gemini | vscode | refact" >&2
-  exit 2
-fi
-if [ ! -d "$TARGET" ]; then
-  echo "target does not exist: $TARGET" >&2
-  exit 1
-fi
-
-DEST="$TARGET/$SKILLS_DIR/repo-governor"
-
-if [ -e "$DEST" ]; then
-  echo "already installed at $DEST -- remove it first, or pull inside it" >&2
-  exit 1
-fi
-
-mkdir -p "$TARGET/$SKILLS_DIR"
-git clone -q "$SRC" "$DEST"
+# Where an installed copy fetches upgrades from. A constant, not a guess: the
+# temporary clone the install ran from is deleted afterwards and cannot be it.
+UPSTREAM_URL="https://github.com/tosin2013/repo-governor"
 
 # The prune. Each of these is correct inside this repository and wrong inside
-# somebody else's.
+# somebody else's. Used by the install and by `--prune`, so there is one list.
+prune_copy() {
 rm -f  "$DEST/AGENTS.md"       # "This repository is governed by Repo Governor"
 rm -f  "$DEST/CLAUDE.md"       # loader shim for the above
 rm -rf "$DEST/.claude"         # the maintainer's own board-management skill
@@ -63,9 +54,11 @@ rm -rf "$DEST/.claude-plugin"        # Claude Code marketplace entry (ADR-034): 
                                      # publishes THIS repository by tag, so in a copy
                                      # it points at the wrong tree -- ADR-034 rule 1's
                                      # "no second copy" arriving via the install door
+}
 
 # Leave a note, because a pruned clone is otherwise a mystery to whoever finds
 # it, and because `git status` inside it will now show deletions.
+write_note() {
 cat > "$DEST/INSTALLED.md" <<'NOTE'
 # Installed as a skill
 
@@ -82,17 +75,56 @@ with the paths below removed by `tools/install-skill.sh`:
 | `docs/research/` | this project's working notes. `SKILL.md` reads `docs/workflows/` and `docs/reference/` and never these. One of them is the protocol for measuring whether this skill activates — shipping it means an agent being measured can read the experiment it is part of. |
 | `.claude-plugin/` | the Claude Code marketplace entry (ADR-034). It publishes *this* repository as a plugin pinned to a tag; inside a copy it names the wrong tree, which is ADR-034 rule 1's "no second copy" arriving through the install door. |
 
-`git status` here shows them as deletions. That is expected. To update:
+`git status` here shows them as deletions. That is expected.
+NOTE
+
+# What is installed, read from the copy itself. A tag is named only when HEAD
+# is exactly at one; otherwise the commit is all that is claimed (ADR-028).
+local commit tag
+commit="$(git -C "$DEST" rev-parse HEAD)"
+tag="$(git -C "$DEST" describe --tags --exact-match HEAD 2>/dev/null || true)"
+{
+  echo
+  echo "## What is installed"
+  echo
+  if [ -n "$tag" ]; then
+    echo "- Installed tag: \`$tag\`"
+  else
+    echo "- Installed tag: none. HEAD is not exactly at a tag, so no tag is claimed."
+  fi
+  echo "- Installed commit: \`$commit\`"
+  echo
+  cat <<'NOTE'
+## To upgrade
+
+Run these from this directory. Replace `vX.Y.Z` with the release tag you want:
 
 ```sh
-git -C . stash && git -C . pull && git -C . stash pop
+git fetch --tags origin
+git checkout --force vX.Y.Z
+bash tools/install-skill.sh --prune .
 ```
+
+`--force` discards local changes in this copy, and the prune is one of them.
+The third command applies the prune list of the version you checked out and
+rewrites this file. Hook configuration in the host repository is not touched:
+it names this directory, and this directory does not move.
+
+`origin` is https://github.com/tosin2013/repo-governor. A copy installed
+before this note carried an upgrade section has a temporary directory as its
+`origin`; run `git remote set-url origin https://github.com/tosin2013/repo-governor`
+once, first.
+
+To remove the skill and its hook configuration, see
+https://github.com/tosin2013/repo-governor/blob/main/docs/runbooks/upgrade-and-uninstall.md
 
 The engine governs the repository you are standing in, not this directory
 (`REPO_GOVERNOR_TARGET`, ADR-027).
 NOTE
+} >> "$DEST/INSTALLED.md"
+}
 
-echo "installed: $DEST"
+verify_prune() {
 [ -f "$DEST/SKILL.md" ] && echo "  SKILL.md present" || { echo "  SKILL.md MISSING" >&2; exit 1; }
 for f in AGENTS.md CLAUDE.md .claude .claude-plugin .repo-governor.json .repo-governor docs/research CONTRIBUTING.md; do
   [ -e "$DEST/$f" ] && { echo "  PRUNE FAILED: $f still present" >&2; exit 1; }
@@ -107,6 +139,68 @@ for f in LICENSE NOTICE; do
   [ -e "$DEST/$f" ] || { echo "  $f MISSING from the install -- Apache-2.0 requires it travel" >&2; exit 1; }
 done
 echo "  kept: LICENSE, NOTICE (Apache-2.0 sections 4a and 4d)"
+}
+
+# --- upgrade: re-prune a copy after `git checkout --force <tag>` ------------
+# Refuses anything without an INSTALLED.md. Every install writes one, and this
+# repository's own checkout has none, so a mistyped path cannot prune the
+# source tree of its AGENTS.md.
+if [ "${1:-}" = "--prune" ]; then
+  DEST="${2:-}"
+  if [ -z "$DEST" ] || [ ! -d "$DEST" ]; then
+    echo "usage: tools/install-skill.sh --prune <installed-copy>" >&2
+    exit 2
+  fi
+  DEST="$(cd "$DEST" && pwd)"
+  if [ ! -f "$DEST/INSTALLED.md" ] || ! git -C "$DEST" rev-parse --git-dir >/dev/null 2>&1; then
+    echo "not an installed copy: $DEST (no INSTALLED.md, or not a git clone)" >&2
+    exit 1
+  fi
+  prune_copy
+  write_note
+  echo "re-pruned: $DEST"
+  verify_prune
+  grep '^- Installed' "$DEST/INSTALLED.md" | sed 's/^/  /'
+  exit 0
+fi
+
+TARGET="${1:-}"
+SKILLS_DIR="${2:-.agents/skills}"
+HOOKS_OPT="${3:-ask}"     # ask | yes | no -- see the hook block at the end
+HOST_OPT="${4:-}"         # claude | cursor | codex | gemini | vscode | refact -- DECLARED,
+                          # never inferred. See the host block below.
+
+if [ -z "$TARGET" ]; then
+  echo "usage: tools/install-skill.sh <target-repo> [skills-dir] [ask|yes|no] [harness]" >&2
+  echo "       tools/install-skill.sh --prune <installed-copy>" >&2
+  echo "  harness: claude | cursor | codex | gemini | vscode | refact" >&2
+  echo "       tools/install-skill.sh --prune <installed-copy>" >&2
+  exit 2
+fi
+if [ ! -d "$TARGET" ]; then
+  echo "target does not exist: $TARGET" >&2
+  exit 1
+fi
+
+DEST="$TARGET/$SKILLS_DIR/repo-governor"
+
+if [ -e "$DEST" ]; then
+  echo "already installed at $DEST -- to upgrade it, follow $DEST/INSTALLED.md" >&2
+  exit 1
+fi
+
+mkdir -p "$TARGET/$SKILLS_DIR"
+git clone -q "$SRC" "$DEST"
+# The clone's origin is $SRC, which the documented install deletes when it is
+# done. Point it at the repository an upgrade actually fetches from.
+git -C "$DEST" remote set-url origin "$UPSTREAM_URL"
+
+prune_copy
+write_note
+
+echo "installed: $DEST"
+verify_prune
+grep '^- Installed' "$DEST/INSTALLED.md" | sed 's/^/  /'
 echo
 echo "Next: start a NEW session in the host, and confirm it lists 'repo-governor'."
 echo "Skills are discovered at session start; one added mid-session is invisible."
