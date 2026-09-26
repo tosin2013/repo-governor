@@ -1,7 +1,7 @@
 # DESIGN_DOC.md
 
 **System:** Repo Governor
-**Version:** 0.6.0
+**Version:** 0.7.0
 **Status:** Architecture Accepted, core thesis under validation
 **Audience:** Architects, adapter authors, reviewers, technical evaluators
 **Voice:** STE100
@@ -174,7 +174,7 @@ repo-governor/
   policies/             profile definitions (lite, standard, full, ...)
   references/           tiered reference material for the skill
   docs/
-    adrs/               31 ADRs + index + ratification reviews
+    adrs/               32 ADRs + index + ratification reviews
     reference/          normative spec, §1–§70, INV-001…INV-014
     workflows/          per-situation recipes
     research/           landscape and activation research (not shipped)
@@ -334,7 +334,7 @@ The full record is `docs/adrs/`. Three decisions carry most of the design weight
 - Envelope thinness. Most trackers lack explicit non-goals, so a compiled scope envelope is often thin, and a thin envelope governs weakly. Mitigation: issue #2, measured across six repositories.
 - Activation is model-mediated. A skill can be installed and never fire. Measured at 20 of 20 on one host and 0 of 2 on another. Mitigation: `tools/selftest.py`, an `AGENTS.md`, and community measurement requests (milestone RG-VALIDATION-v0.2, issues #5 and #42).
 - Distribution is near zero. The artifact is high quality and effectively invisible, with no registry or directory presence. Mitigation: milestone RG-DISTRIBUTION-v0.7 (issues #233, #234, #235) and ADR-034.
-- Unverified hook surfaces. Six hook templates ship and one is verified. An unverified hook can look identical to a hook that does nothing. Mitigation: per-host issues #47 through #50 and #247, and a delivery-token check. Refact discards hook stdout, so the token check cannot work there; its write hook is the evidence.
+- Unverified hook surfaces. Six hook templates ship. The Claude Code hook is verified with the delivery-token check. Refact blocking was tested on Refact 8.6.4 (#247). The token check cannot run on Refact, because Refact discards hook stdout. The other four are not verified. An unverified hook can look identical to a hook that does nothing. Mitigation: per-host issues #47 through #50, and the delivery-token check.
 - Two Proposed ADRs the runtime already depends on (031 and 033), recorded as a departure in the ratification reviews. Owner: maintainer.
 
 ---
@@ -381,7 +381,8 @@ salt
   {+
     Repo Governor: interactive onboarding
     ==
-    "Assessed condition: L1  (one package, small dependency surface)"
+    "Condition assessed: L4 / GOVERNOR_HIGH_ASSURANCE"
+    "  floor raised by : public_api_surface"
     .
     "Detected candidates:"
     { "  roadmap_authority" | "github-projects" | "[ detected ]" }

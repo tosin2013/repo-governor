@@ -42,7 +42,7 @@ GitHub repository + Projects metadata   → candidate RoadmapAuthorityProvider
 
 Detection output must use `PROVIDER_DETECTED` or `PROVIDER_UNCONFIRMED`. **It must not silently assign authority** (INV-013).
 
-> ADR-010 makes this structural: detection writes `.repo-governor.proposed.yaml`, which the engine never reads.
+> ADR-010 makes this structural: detection writes `.repo-governor.proposed.json` (JSON since [ADR-015](../adrs/015-json-as-canonical-manifest-format.md)), which the engine never reads.
 
 ## §20 — Provider Conflict Handling
 

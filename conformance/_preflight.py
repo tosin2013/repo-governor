@@ -24,7 +24,7 @@ import shutil
 # Adapter dependencies (ADR-011 rule 4). The engine itself is stdlib-only
 # (rule 1) and must never appear in this list.
 DEPENDENCIES = {
-    "dolt": "decision_history via adapters/dolt-decisions (INV-005)",
+    "dolt": "decision_history via adapters/decision-history-dolt (INV-005)",
 }
 
 

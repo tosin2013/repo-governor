@@ -8,7 +8,7 @@ A new version exists — a framework major, a security advisory, an EOL notice. 
 
 ## Prompt recipes
 
-> Framework X released version Y. Assess the impact **on this repository specifically**: what do we use that changed, what breaks, what do we gain, what is the migration cost? Report `NO_IMPACT`, `WATCH`, or a maintenance candidate with your evidence. **Do not upgrade anything.**
+> Framework X released version Y. Assess the impact **on this repository specifically**: what do we use that changed, what breaks, what do we gain, what is the migration cost? Report `NO_ACTION`, `WATCH`, or a maintenance candidate with your evidence. **Do not upgrade anything.**
 
 When the assessment says a candidate is warranted:
 

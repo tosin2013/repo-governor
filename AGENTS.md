@@ -33,6 +33,7 @@ Work items are **GitHub issue numbers** — the roadmap of record is GitHub Issu
 | `STOP_COMPLETE` | Acceptance conditions satisfied. **Stop.** |
 | `NO_EXECUTION_AUTHORITY` | Admitted, not cleared to execute. Do not start. |
 | `AUTHORITY_WITHDRAWN` | Cancelled. Stop. |
+| `CONFLICT` | Two providers disagree as peers. Stop; a human selects. |
 | `UNKNOWN` | Read `unknowns[]`. Any `blocking: true` means stop and report. |
 
 ## Two things the engine cannot enforce, so they are on you

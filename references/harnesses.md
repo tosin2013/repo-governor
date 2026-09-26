@@ -32,7 +32,7 @@ written from a documentation summary rather than a run.
 | `cmd` | the executable |
 | `argv` | headless invocation, with `{prompt}` where the prompt goes |
 | `model_flag` | the flag that selects a model, if the host has one — without it, that host cannot join the model comparison |
-| `skills_dir` | where the host discovers skills — `docs/installation.md` already records this for six hosts |
+| `skills_dir` | where the host discovers skills. `docs/installation.md` records this for three hosts (Claude Code, Cursor and Codex); its hook table covers six, but names config files, not skills directories |
 | `installer_host` | the declared host argument for `tools/install-skill.sh` |
 | **a calibration record** | `docs/research/calibration/<host>.json` |
 
