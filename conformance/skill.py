@@ -911,6 +911,24 @@ def main():
     fails += check(f"the bound-adapter set was derived ({len(bound)})", len(bound) >= 3,
                    "an empty set makes every ADR read as runtime-independent")
 
+    # ADR-035 rule 1 widened the scope to what ships, runs AND governs: the
+    # hook script and templates, the installer and the onboarding tools under
+    # tools/, and the publication channel under .claude-plugin/. The old scope
+    # read engine/ and bound adapters only, so ADR-029 (hooks, eleven
+    # releases) and ADR-034 (the plugin channel) never appeared. Measurement
+    # tools govern nothing and are excluded, like unbound adapters.
+    MEASUREMENT_TOOLS = {"tools/live-equivalence.py", "tools/provider-readiness.py"}
+    governing = list((ROOT / "engine").glob("*.py")) + [ROOT / a for a in sorted(bound)]
+    governing += [f for f in sorted((ROOT / "tools").rglob("*"))
+                  if f.is_file() and "__pycache__" not in f.parts
+                  and str(f.relative_to(ROOT)) not in MEASUREMENT_TOOLS]
+    governing += [f for f in sorted((ROOT / ".claude-plugin").rglob("*")) if f.is_file()]
+    fails += check(f"the ADR-035 scope reaches tools/ and .claude-plugin/ ({len(governing)} files)",
+                   any("hooks" in f.parts for f in governing)
+                   and any(".claude-plugin" in f.parts for f in governing),
+                   "a scope without the hook templates or the channel file is the gap "
+                   "that hid ADR-029 for eleven releases")
+
     proposed, dependent = [], []
     for adr in sorted((ROOT / "docs" / "adrs").glob("[0-9]*.md")):
         body = adr.read_text(encoding="utf-8")
@@ -919,11 +937,7 @@ def main():
             continue
         num = re.match(r"(\d+)", adr.name).group(1)
         proposed.append(num)
-        cited = any(f"ADR-{num}" in f.read_text(encoding="utf-8")
-                    for f in (ROOT / "engine").glob("*.py"))
-        cited = cited or any(f"ADR-{num}" in (ROOT / a).read_text(encoding="utf-8")
-                             for a in bound)
-        if cited:
+        if any(f"ADR-{num}" in f.read_text(encoding="utf-8", errors="ignore") for f in governing):
             dependent.append(num)
     fails += check(f"proposed ADRs were actually found ({len(proposed)})", bool(proposed),
                    "a status regex that matches nothing reads as an all-Accepted repository")
@@ -959,6 +973,46 @@ def main():
                        "RATIFICATION-v0.1.0.md: every architecture decision the runtime "
                        "depends on is Accepted. A new name here is a ratification "
                        "question, not a documentation edit.")
+    # ADR-035 rules 3-5: a release that depends on a Proposed ADR has a
+    # ratification record, written before the tag, that lists each dependent
+    # ADR with the number of releases that have depended on it while Proposed
+    # (this one included). At most two. The count comes from the tags, so it
+    # cannot be written down wrong and left there.
+    _ver = re.search(r'ENGINE_VERSION\s*=\s*"([^"]+)"',
+                     (ROOT / "engine" / "version.py").read_text(encoding="utf-8")).group(1)
+    _rec = ROOT / "docs" / "adrs" / f"RATIFICATION-v{_ver}.md"
+    if dependent:
+        fails += check(f"RATIFICATION-v{_ver}.md exists for a release with Proposed dependencies",
+                       _rec.is_file(),
+                       f"{sorted(dependent)} are depended on; ADR-035 rule 3 requires the "
+                       "record before the tag")
+    if dependent and _rec.is_file():
+        _rtext = _rec.read_text(encoding="utf-8")
+        _tags = subprocess.run(["git", "-C", str(ROOT), "tag", "--list", "v*"],
+                               capture_output=True, text=True).stdout.split()
+        _tags = [t for t in _tags if t != f"v{_ver}"]
+        _spec = (["engine/"] + sorted(bound) + ["tools/", ".claude-plugin/"]
+                 + [f":!{t}" for t in sorted(MEASUREMENT_TOOLS)])
+        for num in sorted(dependent):
+            row = re.search(rf"^\|\s*\[?ADR-{num}\b[^\n]*?\|\s*(\d+)\s*\|\s*$", _rtext, re.M)
+            fails += check(f"RATIFICATION-v{_ver}.md lists ADR-{num} with a release count",
+                           bool(row), "ADR-035 rule 3: each dependent ADR, its conditions, "
+                           "and the count, in a row ending '| <count> |'")
+            if not _tags:
+                # A shallow checkout has no tags. The full-history CI job runs
+                # this; saying so beats passing a count nobody computed.
+                print(f"  [NOTE] ADR-{num} release count not recomputed: no tags in this checkout")
+                continue
+            prior = sum(subprocess.run(["git", "-C", str(ROOT), "grep", "-q", f"ADR-{num}", t, "--"]
+                                       + _spec, capture_output=True).returncode == 0 for t in _tags)
+            if row:
+                fails += check(f"and the count for ADR-{num} matches the tags ({prior + 1})",
+                               int(row.group(1)) == prior + 1,
+                               f"record says {row.group(1)}, tags say {prior} earlier releases + this one")
+            fails += check(f"ADR-{num} is within the two-release expiry ({prior + 1})",
+                           prior + 1 <= 2,
+                           "ADR-035 rule 5: decide, reduce or remove it before this release")
+
     # The adapter COUNT was guarded; the contract-check count beside it was
     # not, and had been stale through two suite growths (149 claimed, 184 then
     # 199 actual) with every run green. A number nothing recomputes is a

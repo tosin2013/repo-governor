@@ -1,6 +1,7 @@
 # 29. Hooks as a Deterministic Delivery Surface
 
-**Status**: Proposed — **ready for ratification**. Validated 2026-08-19 by a four-condition controlled comparison: the activation claim holds only where no `AGENTS.md` exists, and the enforcement claim is proven. Amended 2026-09-26 to add Refact as a host (see the amendment section below); Refact blocking was tested on Refact 8.6.4 that day. Acceptance is a human act (§68).
+**Status**: Accepted (reduced 2026-09-26). The accepted scope is the Reduction section below. The claim that the surface works across vendors is not accepted: it waits on calibration this project cannot run (issues 37, 42, 254). Acceptance is a human act (§68).
+**Ratified**: 2026-09-26 under [RATIFICATION-v0.8.0.md](RATIFICATION-v0.8.0.md), after validation on 2026-08-19 (a four-condition controlled comparison) and on Refact 8.6.4 on 2026-09-26.
 **Date**: 2026-08-19
 **Domain**: Distribution & agent integration
 **Amends**: [ADR-001](001-agent-skill-as-primary-delivery-surface.md) — promotes "coding-agent hooks" from a deferred §65 candidate to a secondary delivery surface. The Agent Skill remains primary.
@@ -110,6 +111,30 @@ Refact ([JegernOUTT/refact](https://github.com/JegernOUTT/refact), which continu
 - **It reads `.claude/settings.json` but drops the `args` array**, so a repository governed for Claude Code looks governed under Refact and is not. The installation docs say so.
 
 The adapter half of issue 247 (Refact's `.refact/` task board as execution state) is not decided here.
+
+## Reduction (2026-09-26, under ADR-035)
+
+ADR-035 rule 5: this ADR had been a runtime dependency of eleven releases while `Proposed`. The maintainer chose to **reduce** it to what its evidence supports and accept that part.
+
+**Accepted:**
+
+1. Repo Governor ships a hook surface as a **secondary** delivery mechanism. The Agent Skill stays primary.
+2. The four constraints in the Decision: the hook never decides; the prompt moment delivers a requirement, not a verdict; enforcement is opt-in per repository; silence where the repository is not governed.
+3. Blocking (`enforcement: "blocking"` plus exit 2) is a **backstop** against a non-compliant agent. It is not a security boundary (see Measured consequences).
+4. **Verified hosts:** Claude Code (prompt, write and capture moments) and Refact (write and capture moments, in a single agent chat; not for subagents, [JegernOUTT/refact#35](https://github.com/JegernOUTT/refact/issues/35), issue 254).
+5. The prompt moment improves activation only where the repository has no `AGENTS.md`.
+6. Templates for other hosts ship **labelled unverified** and claim nothing beyond their label.
+
+**Not accepted:** the claim that one script with a thin config per host governs every host. For Cursor, Codex, Gemini CLI and VS Code the templates exist and have not run on a real host. That claim waits for per-host calibration, which is external evidence (issues 37 and 42). A host joins the verified list in item 4 when it has a calibration record, without a new ADR.
+
+## Acceptance conditions
+
+For the reduced scope above. **All met.**
+
+1. **Enforcement stops a write on a real host.** *(Met: Claude Code, 2026-08-19, [hook-validation-results.md](../research/hook-validation-results.md); Refact 8.6.4, 2026-09-26, PR 249.)*
+2. **The four constraints are held by a suite.** *(Met: `conformance/hooks.py`, mutation-tested; live `hooks` suite green in CI.)*
+3. **Delivery to the model is proven where the prompt moment is claimed.** *(Met for Claude Code: the delivery token matched on both sides, 2026-08-19. Not claimed for Refact, which discards hook output.)*
+4. **Unverified templates say so.** *(Met: each template's `$comment` and `docs/installation.md` mark them unverified, and the installer warns.)*
 
 ## What this deliberately does not do
 

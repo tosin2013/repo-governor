@@ -455,10 +455,12 @@ def detect(repo: Path):
             [_cite(repo, ".beads/issues.jsonl", "beads JSONL export present; adapters/beads "
                                                 "reads exactly this file")])
     elif (repo / ".beads").is_dir():
-        # The store is there and nothing here can open it. An embedded Dolt
-        # database is also not revision-scoped (ADR-033) and is routinely
-        # gitignored, so binding it would answer about the machine rather than
-        # the checked-out revision even if an adapter could read it.
+        # The store is there and nothing here can open it, which alone decides
+        # the result below. An embedded Dolt database is also routinely
+        # gitignored, so it would describe one machine rather than the
+        # checked-out revision. Whether every repo-local provider must answer
+        # about the revision is an open, Proposed question; nothing here rests
+        # on its answer (see RATIFICATION-v0.8.0.md).
         add("execution", "beads", None, "PROVIDER_UNCONFIRMED",
             [_cite(repo, ".beads/", "beads database directory present")],
             [_cite(repo, ".beads/", "no adapter here reads a beads database. `adapters/beads` "

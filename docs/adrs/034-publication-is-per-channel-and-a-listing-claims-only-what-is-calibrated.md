@@ -126,7 +126,7 @@ which two rather than implying the whole is enforced.
 
 ## Acceptance conditions
 
-`Proposed` until all four are met. **Two are met today.**
+`Proposed` until all four are met. **Three are met today** (updated 2026-09-26 for [RATIFICATION-v0.8.0.md](RATIFICATION-v0.8.0.md)).
 
 1. **The compatibility declaration is enforced, not merely written.** `conformance/skill.py`
    asserts that `SKILL.md` declares `compatibility` and that it names the tools the
@@ -143,13 +143,18 @@ which two rather than implying the whole is enforced.
 3. **A host claimed in a listing has been run.** Whatever host list a published entry
    carries is backed by a calibration record under `docs/research/calibration/`. There is
    one such record today, for one host, so any listing claiming more is currently
-   unearned. *(Not met.)*
+   unearned. *(Met for the only entry that exists: `.claude-plugin/marketplace.json` is a
+   Claude Code marketplace entry, and `docs/research/calibration/claude.json` is its
+   calibration record. A listing for another host reopens this condition.)*
 
 4. **The trade in rule 4 survives contact with wanting reach.** If the short honest host
    list proves to cost adoption badly enough that someone wants to widen it, this ADR is
    the thing to argue with — and widening it by calibrating hosts is the intended path,
    while widening it by claiming uncalibrated ones means this decision was wrong and should
-   be superseded rather than quietly ignored. *(Not met, and not met until it is tested.)*
+   be superseded rather than quietly ignored. *(Not met, and not met until it is tested.
+   External evidence under ADR-035 rule 2: it waits on an adoption event this project cannot
+   produce. Under ADR-035 rule 5, v0.8.0 is this ADR's second and last release as a runtime
+   dependency while `Proposed`; before v0.9.0 it is decided, reduced or removed.)*
 
 ## Related Specification Sections
 

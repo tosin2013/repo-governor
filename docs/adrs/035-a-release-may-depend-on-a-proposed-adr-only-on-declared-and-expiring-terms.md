@@ -26,6 +26,8 @@ The condition held at v0.1.0 because no held ADR was referenced by the runtime. 
 
 Measured on 2026-09-26 by searching each tag's `engine/`, `adapters/`, `tools/` and `.claude-plugin/` for `ADR-0NN`. The index and `conformance/skill.py` name only ADR-031 and ADR-033, because the check reads `engine/*.py` and bound adapters. The hook surface (ADR-029) and the plugin channel (ADR-034) ship from `tools/` and `.claude-plugin/`, which the check never reads.
 
+> **Correction, 2026-09-26 (before any release under this ADR).** The measurement above searched only for the four ADRs already suspected. Applied with rule 1's scope as first written, it also finds **ADR-020** (cited by `tools/live-equivalence.py` and `tools/provider-readiness.py`, 11 releases) and **ADR-030** (cited by `tools/onboard-interactive.py`, 7 releases). Both citations exposed a flaw in rule 1: it counted citations, not dependencies. ADR-020 is relied on only by two measurement tools that govern nothing. ADR-030's citation said, in the comment itself, that nothing depended on it. Rule 1 now excludes measurement tools, and the ADR-030 comment names its open question instead of the ADR. Found by the release runbook's derivation step (issue 257), and recorded here rather than silently re-measured.
+
 `RATIFICATION-v0.5.0.md` predicted this: *"A departure recorded once is an exception; recorded every release, it is the condition being repealed by habit."* v0.7.0 went one step further and did not record it at all.
 
 Issue 223 set out three readings:
@@ -40,7 +42,7 @@ The warning in reading 3 is about using an amendment to escape. The condition ha
 
 **A release may depend on a Proposed ADR only on terms that the ADR declares, that the release records, that a check verifies, and that expire.**
 
-1. **What counts as a dependency.** A release depends on a Proposed ADR when anything it ships and runs cites the ADR: `engine/`, an adapter this repository binds, `tools/` (the hook script, the hook templates, the installer), or a publication channel file (`.claude-plugin/`). The scope follows what ships, not where the engine lives.
+1. **What counts as a dependency.** A release depends on a Proposed ADR when code that ships, runs **and governs** cites it: `engine/`, an adapter this repository binds, `tools/` (the hook script, the hook templates, the installer, the onboarding tools), or a publication channel file (`.claude-plugin/`). The scope follows what ships, not where the engine lives. Measurement tools that govern nothing (`tools/live-equivalence.py`, `tools/provider-readiness.py`) are excluded, for the same reason unbound adapters are: they ship, and they decide nothing about a governed repository. A comment that cites an ADR in order to say nothing depends on it still counts. Reword it to name the open question instead of the ADR.
 
 2. **The blocker is declared.** A Proposed ADR that a release depends on names, in its `## Acceptance conditions`, what evidence it waits for. It also says whether that evidence is external: produced on repositories, hosts or users this project does not control. A dependency on an ADR whose blocker is internal work is not permitted. Do the work, or remove the dependency.
 

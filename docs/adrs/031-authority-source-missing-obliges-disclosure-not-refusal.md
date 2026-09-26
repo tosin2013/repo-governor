@@ -1,6 +1,8 @@
 # ADR-031 — `AUTHORITY_SOURCE_MISSING` obliges disclosure, not refusal
 
-**Status**: Proposed
+**Status**: Accepted (reduced 2026-09-26). The accepted scope is the Reduction section below: the engine's rule for configuration gaps.
+**Ratified**: 2026-09-26 under [RATIFICATION-v0.8.0.md](RATIFICATION-v0.8.0.md).
+**Split**: the obligation this ADR is named for, that an agent discloses rather than refuses, is **not** accepted. It moved to [ADR-036](036-an-agent-that-reaches-authority-source-missing-discloses-rather-than-refuses.md), which stays `Proposed`.
 
 **Date**: 2026-08-20
 
@@ -82,6 +84,16 @@ That is a real cost and an argument for care, not for pretending otherwise. It
 is also why nothing changes today: the arm in progress is graded against the
 text as it stands, and editing `SKILL.md` mid-measurement would make prompts
 1–4 incomparable with 5–20.
+
+## Reduction (2026-09-26, under ADR-035)
+
+ADR-035 rule 5: this ADR had been a runtime dependency of four releases while `Proposed`, with none of its four acceptance conditions met. The runtime never depended on the agent-facing obligation: `SKILL.md` still tells an agent to stop. It depended on reason 2's rule, which `engine/manifest.py` enforces. The maintainer chose to **reduce** this ADR to that rule and accept it.
+
+**Accepted:** A configuration gap that the engine reports is stated with its consequence and blocks no command. The set of such findings is closed (`ADVISORY_FINDINGS` in `engine/manifest.py`). Every finding outside it blocks. A missed advisory is noise; a missed blocker is a false green.
+
+**Evidence:** issue 180 (a correctly assessed L4 repository could not finish onboarding until an unmet `required_roles` became a finding rather than a failure); `conformance/manifest.py` and `conformance/status.py`, which assert that the two surfaces agree; this repository's own `--validate`, green at L4 with `execution` unbound.
+
+**Not accepted, moved:** the Decision's obligation on an agent that reaches `AUTHORITY_SOURCE_MISSING`, with the four acceptance conditions below, is now [ADR-036](036-an-agent-that-reaches-authority-source-missing-discloses-rather-than-refuses.md). The conditions below apply to ADR-036 and are kept here as they were written.
 
 ## Acceptance conditions
 
