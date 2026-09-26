@@ -1,0 +1,43 @@
+{
+  "$comment": "Acceptance criteria for issue 223. Its deliverable is 'an ADR adopting one reading, carrying its own Acceptance conditions and Confirmation (ADR-032)', and it states it does NOT ratify ADR-031 or ADR-033. The maintainer chose reading 3 (amend the condition, narrow and testable) with an expiry of two releases on 2026-09-26. C1-C4 pin the deliverable's shape: the ADR exists, is Proposed (acceptance is a human act, §68), carries both ADR-032 sections, states the reading's four mechanisms and the two-release expiry, and says plainly what the expiry does to v0.8.0. THE VACUITY THIS BAR IS BUILT AGAINST: an ADR that adopts reading 3 in its title and states no expiry, no scope and no check would satisfy 'an ADR exists'. C3 requires each mechanism by name. WHAT THIS BAR CANNOT CHECK: whether reading 3 is right. That is a ratification judgement.",
+  "authority_id": "223",
+  "covers": {
+    "declared": "an ADR (035) adopting reading 3 of the release condition, with its own Confirmation and Acceptance conditions, saying what happens to the current dependencies",
+    "uncovered": "implementing ADR-035's check (rules 1, 3, 4, 5 in conformance/skill.py), widening the index line's scope, and the first release under it. Those are ADR-035's own acceptance conditions 1-3.",
+    "split_to": [
+      "257"
+    ],
+    "split_note": "Declared before this bar was read. Issue 257 prepares v0.8.0 with a ratification record; the check that enforces that record and the widened dependency scope land with it, because they are tested by exactly that release."
+  },
+  "criteria": [
+    {
+      "$comment": "C1 the ADR exists and is Proposed, not self-ratified",
+      "check": "command_exit",
+      "target": "bash -c 'grep -q \"^\\*\\*Status\\*\\*: Proposed\" docs/adrs/035-a-release-may-depend-on-a-proposed-adr-only-on-declared-and-expiring-terms.md'"
+    },
+    {
+      "$comment": "C2 ADR-032: both sections present",
+      "check": "command_exit",
+      "target": "bash -c 'grep -q \"^## Confirmation\" docs/adrs/035-a-release-may-depend-on-a-proposed-adr-only-on-declared-and-expiring-terms.md && grep -q \"^## Acceptance conditions\" docs/adrs/035-a-release-may-depend-on-a-proposed-adr-only-on-declared-and-expiring-terms.md'"
+    },
+    {
+      "$comment": "C3 each mechanism of reading 3 is stated, not only named: scope incl tools/ and .claude-plugin/, declared blocker, ratification record, the check, the two-release expiry",
+      "check": "command_exit",
+      "target": "bash -c 'for p in \"tools/\" \".claude-plugin/\" \"RATIFICATION-vX.Y.Z.md\" \"conformance/skill.py\" \"at most two releases\"; do grep -qF \"$p\" docs/adrs/035-a-release-may-depend-on-a-proposed-adr-only-on-declared-and-expiring-terms.md || exit 1; done'"
+    },
+    {
+      "$comment": "C4 the consequence for v0.8.0 is stated, with the counts",
+      "check": "command_exit",
+      "target": "bash -c 'grep -q \"v0.8.0 cannot ship until ADR-029, ADR-031 and ADR-033\" docs/adrs/035-a-release-may-depend-on-a-proposed-adr-only-on-declared-and-expiring-terms.md'"
+    },
+    {
+      "$comment": "C5 the index and README count it; the count guard agrees",
+      "check": "command_exit",
+      "target": "bash -c 'grep -q \"035-a-release-may-depend\" docs/adrs/README.md && python3 conformance/skill.py'"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh --hermetic"
+    }
+  ]
+}
