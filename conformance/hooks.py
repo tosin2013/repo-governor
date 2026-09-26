@@ -27,6 +27,7 @@ import json
 import os
 import pathlib
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -629,6 +630,114 @@ def main():
                        "it states this project's branch policy and conformance counts, "
                        "which are false inside the repository it was installed into")
         fails += check("SKILL.md survives the prune", (dest / "SKILL.md").exists())
+
+    # --- an install made the documented way can be upgraded (issue 258) -----
+    # The documented install clones a TAG into a temporary directory and runs
+    # the installer from there. The copy used to end up on a detached HEAD whose
+    # `origin` was that temporary clone, and the update line INSTALLED.md
+    # carried (`stash && pull && stash pop`) failed on the detached HEAD, then
+    # failed again once the temporary clone was deleted. Every adopter upgrading
+    # from v0.7.0 hit it and nothing here noticed, because no check ever
+    # UPGRADED anything.
+    #
+    # So this runs the whole life: a local upstream with two tags carrying the
+    # WORKING-TREE installer (a plain clone of ROOT would test the last commit,
+    # the blind spot noted above), a tag clone, the install, the tag clone
+    # deleted, then the upgrade commands READ FROM THE INSTALLED.md the install
+    # wrote -- the documented command, not a second copy of it. url.insteadOf
+    # maps the canonical URL onto the local upstream for the child processes
+    # only, so the copy's recorded origin is the real one and no network is used.
+    UPSTREAM_URL = "https://github.com/tosin2013/repo-governor"
+    TAG_A, TAG_B = "v0.0.1-installed-fixture", "v0.0.2-upgrade-fixture"
+    with tempfile.TemporaryDirectory() as td:
+        td = pathlib.Path(td)
+        G = ["git", "-c", "user.name=fixture", "-c", "user.email=fixture@example.invalid"]
+        q = dict(capture_output=True, text=True, stdin=subprocess.DEVNULL)
+        up = td / "upstream"
+        subprocess.run(["git", "clone", "-q", str(ROOT), str(up)], **q)
+        shutil.copy(installer, up / "tools" / "install-skill.sh")
+        subprocess.run(G + ["-C", str(up), "commit", "-qam", "fixture: installer under test",
+                            "--allow-empty"], **q)
+        subprocess.run(G + ["-C", str(up), "tag", "-a", TAG_A, "-m", "a"], **q)
+        (up / "UPGRADE-FIXTURE.txt").write_text("b\n", encoding="utf-8")
+        subprocess.run(G + ["-C", str(up), "add", "UPGRADE-FIXTURE.txt"], **q)
+        subprocess.run(G + ["-C", str(up), "commit", "-qm", "fixture: upgrade target"], **q)
+        subprocess.run(G + ["-C", str(up), "tag", "-a", TAG_B, "-m", "b"], **q)
+        commit_b = subprocess.run(["git", "-C", str(up), "rev-parse", "HEAD"], **q).stdout.strip()
+        env = {**os.environ, "GIT_CONFIG_COUNT": "1",
+               "GIT_CONFIG_KEY_0": f"url.{up}.insteadOf", "GIT_CONFIG_VALUE_0": UPSTREAM_URL}
+
+        tag_clone = td / "rg-tmp"
+        subprocess.run(["git", "clone", "-q", "--branch", TAG_A, str(up), str(tag_clone)], **q)
+        tgt = td / "adopter"
+        tgt.mkdir()
+        subprocess.run(["git", "init", "-q", str(tgt)], **q)
+        (tgt / ".repo-governor.json").write_text(
+            (ROOT / ".repo-governor.json").read_text(), encoding="utf-8")
+        r = subprocess.run(["bash", str(tag_clone / "tools" / "install-skill.sh"),
+                            str(tgt), ".claude/skills", "yes", "claude"], **q)
+        shutil.rmtree(tag_clone)
+        dest = tgt / ".claude" / "skills" / "repo-governor"
+        settings = tgt / ".claude" / "settings.json"
+        settings_before = settings.read_bytes() if settings.exists() else b""
+        origin = subprocess.run(["git", "-C", str(dest), "config", "--get",
+                                 "remote.origin.url"], **q).stdout.strip()
+        fails += check("upgrade: the installed copy's origin is the canonical repository",
+                       r.returncode == 0 and origin == UPSTREAM_URL,
+                       f"origin is {origin!r}; the temporary clone it was installed from "
+                       "is deleted, so an upgrade from it can never work")
+        note = (dest / "INSTALLED.md").read_text(encoding="utf-8") if dest.exists() else ""
+        fails += check("upgrade: INSTALLED.md records the tag that was installed",
+                       f"Installed tag: `{TAG_A}`" in note,
+                       "which release a copy is cannot be answered from the copy")
+
+        m = re.search(r"## To upgrade.*?```sh\n(.*?)```", note, re.S) \
+            or re.search(r"```sh\n(.*?)```", note, re.S)
+        steps = [l.strip() for l in (m.group(1) if m else "").splitlines() if l.strip()]
+        cmd = " && ".join(steps).replace("vX.Y.Z", TAG_B)
+        u = subprocess.run(["bash", "-c", cmd or "false"], cwd=str(dest), env=env, **q)
+        head = subprocess.run(["git", "-C", str(dest), "rev-parse", "HEAD"], **q).stdout.strip()
+        fails += check("upgrade: the documented command upgrades after the temp clone is gone",
+                       u.returncode == 0 and head == commit_b,
+                       f"exit {u.returncode}, HEAD {head[:12]} (want {commit_b[:12]}); ran "
+                       f"{cmd!r}: {(u.stderr or u.stdout).strip()[-200:]}")
+        note = (dest / "INSTALLED.md").read_text(encoding="utf-8") if dest.exists() else ""
+        fails += check("upgrade: INSTALLED.md records the new tag afterwards",
+                       f"Installed tag: `{TAG_B}`" in note and f"`{commit_b}`" in note)
+        back = [p for p in ("AGENTS.md", "CLAUDE.md", ".claude", ".claude-plugin",
+                            ".repo-governor.json", "CONTRIBUTING.md") if (dest / p).exists()]
+        fails += check("upgrade: the prune is re-applied after the checkout", not back,
+                       f"back after upgrade: {back}")
+        fails += check("upgrade: the host hook config is untouched",
+                       settings_before and settings.exists()
+                       and settings.read_bytes() == settings_before,
+                       "an upgrade must not cost the user their hook configuration")
+
+        # CONTROL (ADR-028): a copy NOT at a tag claims no tag. Without this, an
+        # installer that writes whatever tag is nearest passes every check above.
+        subprocess.run(G + ["-C", str(up), "commit", "-q", "--allow-empty", "-m",
+                            "fixture: untagged"], **q)
+        commit_c = subprocess.run(["git", "-C", str(up), "rev-parse", "HEAD"], **q).stdout.strip()
+        plain = td / "plain"
+        plain.mkdir()
+        subprocess.run(["git", "init", "-q", str(plain)], **q)
+        subprocess.run(["bash", str(up / "tools" / "install-skill.sh"),
+                        str(plain), ".agents/skills", "no"], **q)
+        pnote = plain / ".agents" / "skills" / "repo-governor" / "INSTALLED.md"
+        pnote = pnote.read_text(encoding="utf-8") if pnote.exists() else ""
+        fails += check("upgrade control: an untagged install claims no tag, only its commit",
+                       "Installed tag: none" in pnote and f"`{commit_c}`" in pnote,
+                       "a tag guessed from the nearest release is an identity invented, "
+                       "not read (ADR-028)")
+
+        # CONTROL: --prune refuses a checkout that is not an install, so a
+        # mistyped path cannot strip a source tree of its AGENTS.md.
+        src_co = td / "source-checkout"
+        subprocess.run(["git", "clone", "-q", str(up), str(src_co)], **q)
+        r = subprocess.run(["bash", str(up / "tools" / "install-skill.sh"), "--prune",
+                            str(src_co)], **q)
+        fails += check("upgrade control: --prune refuses a checkout with no INSTALLED.md",
+                       r.returncode != 0 and (src_co / "AGENTS.md").exists())
 
     # Onboarding advice must reach a target with NO recognisable host directory
     # and NO terminal. It was nested inside the host block and gated on a TTY,
