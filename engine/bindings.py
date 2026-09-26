@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Provider resolution and the permission chokepoint (ADR-021, implements ADR-005 rule 2).
+"""Provider resolution and the permission chokepoint (ADR-021, implements ADR-005 implementation step 2).
 
 Every adapter invocation the engine makes passes through `call()`. Nothing else
 in `engine/` may spawn an adapter, and `conformance/bindings.py` asserts it by
 refusing any `adapters/` path literal elsewhere in this package.
 
-Why this module exists at all: ADR-005 rule 2 specified
+Why this module exists at all: ADR-005 implementation step 2 specified
 
     "the permission gate as a single chokepoint every adapter invocation passes
      through -- no adapter may be called except through it"
@@ -295,4 +295,9 @@ def main(argv):
 
 
 if __name__ == "__main__":
+    # --help is not an id. Read as one it produced a confident verdict about an
+    # authority named "--help" (issue 256).
+    if sys.argv[1:2] in (["-h"], ["--help"]):
+        print(__doc__)
+        sys.exit(0)
     sys.exit(main(sys.argv[1:]))
