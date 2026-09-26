@@ -13,6 +13,8 @@ git clone --branch v0.7.0 https://github.com/tosin2013/repo-governor /tmp/repo-g
 /tmp/repo-governor/tools/install-skill.sh <target-repo>
 ```
 
+To upgrade, run `git fetch --tags origin && git checkout --force vX.Y.Z && bash tools/install-skill.sh --prune .` inside the installed copy, as its `INSTALLED.md` says. Upgrade and removal for each host, and for the Claude Code plugin: [runbooks/upgrade-and-uninstall.md](runbooks/upgrade-and-uninstall.md).
+
 **Use the script rather than cloning straight into the skills directory.** A plain clone puts this repository's own `AGENTS.md` inside your project, and it opens *"This repository is governed by Repo Governor"* — a true statement about Repo Governor and a false one about yours. Cursor was observed injecting that file as an always-on workspace rule from inside the skill directory of an unrelated project, which hands your agent our house rules and tells it your repository is governed by something it has not agreed to. The script clones and then removes the paths that are correct here and wrong anywhere else (listed below); see `INSTALLED.md` in the result.
 
 Then add whatever pointer your host needs beside it:
