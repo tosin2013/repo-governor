@@ -1,0 +1,73 @@
+{
+  "$comment": "Acceptance criteria for issue 256: documentation drift found by the 2026-09-26 audit, and three guards so the classes that drifted cannot drift silently again. THE AUDIT'S OWN FINDING IS THE DESIGN CONSTRAINT: every count and safety claim a suite pinned was correct, and every drift was in prose no suite read. So the bar pins the GUARDS first (C1-C4), each of which was run against the unfixed tree and failed before the fix: check-version.py and skill.py on SKILL.md 0.6.0, skill.py on AGENTS.md naming only hooks while LIVE held three suites, and the link check on the three renamed ADR filenames. THE VACUITY THIS BAR IS BUILT AGAINST: a link check that reads no files, or a comparator that never reports, passes C4 on any tree. C5 is the control: a synthetic tree with one missing file and one missing anchor must be reported, and nothing else; C6 requires the tracked set to have actually been read. The hermetic-sentence check fails when the sentence cannot be found, so it cannot go blind either. C7 pins the INV-015 citation with a check that reads the message the hook emits. C8-C10 are a SAMPLE of the prose fixes, not all of them: most are one-off corrections that no mechanical check can hold, which is the audit's point. WHAT THIS BAR CANNOT CHECK: whether prose outside these guards has drifted since. A future audit is the only instrument for that.",
+  "authority_id": "256",
+  "covers": {
+    "declared": "the High, Medium and Low drift items in issue 256 that re-verified against the code, and its three guards: SKILL.md metadata.version in check-version.py, the AGENTS.md hermetic sentence against the runner's LIVE array, and relative links and anchors in every tracked Markdown file",
+    "uncovered": "prose drift outside what the guards read. The fixes are pinned by a sample (C8-C10); the rest are one-off edits that a later change can undo with every suite green.",
+    "split_note": "NO split_to. The release and upgrade runbooks are issues 257 and 258, filed separately and not part of this work."
+  },
+  "criteria": [
+    {
+      "$comment": "C1 guard a: check-version.py reads SKILL.md metadata.version, and it matches the engine's own version (read at run time, never restated here)",
+      "check": "command_exit",
+      "target": "bash -c 'v=$(sed -n \"s/^ENGINE_VERSION = \\\"\\(.*\\)\\\"$/\\1/p\" engine/version.py); [ -n \"$v\" ] && python3 tools/check-version.py \"v$v\" | grep -qF \"[PASS] SKILL.md\"'"
+    },
+    {
+      "$comment": "C2 guard a, on every commit: skill.py compares SKILL.md metadata.version with ENGINE_VERSION, because check-version.py runs only at tag time",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/skill.py | grep -qF \"[PASS] SKILL.md metadata.version is\"'"
+    },
+    {
+      "$comment": "C3 guard b: the AGENTS.md hermetic sentence names exactly the runner's LIVE suites, derived from tools/run-conformance.sh",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/skill.py | grep -F \"hermetic sentence names exactly the runner\" | grep -qF \"[PASS]\"'"
+    },
+    {
+      "$comment": "C4 guard c: every relative link and anchor in tracked Markdown resolves",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/skill.py | grep -qF \"[PASS] every relative link and anchor resolves\"'"
+    },
+    {
+      "$comment": "C5 CONTROL for C4: the checker reports a missing file and a missing anchor in a synthetic tree, and only those. Without this, a checker that never reports passes C4.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/skill.py | grep -qF \"[PASS] control: a missing file and a missing anchor ARE reported, and only those\"'"
+    },
+    {
+      "$comment": "C6 CONTROL for C4: the tracked Markdown set was actually read. An empty git ls-files passes C4 vacuously.",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/skill.py | grep -qF \"[PASS] the tracked Markdown set was actually read\"'"
+    },
+    {
+      "$comment": "C7 the hook's no-authority message cites only invariants the ledger defines, or marks them proposed (the INV-015 item)",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/hooks.py | grep -qF \"[PASS] the no-authority message cites only defined invariants, or says proposed\"'"
+    },
+    {
+      "$comment": "C8 sample fix: no document or suite names the adapter that does not exist",
+      "check": "command_exit",
+      "target": "bash -c '! grep -rqF \"adapters/dolt-decisions\" README.md AGENTS.md docs conformance/_preflight.py'"
+    },
+    {
+      "$comment": "C9 sample fix: the onboarding steps expect the qualified banner before the commit",
+      "check": "command_exit",
+      "target": "bash -c 'grep -qF \"want: READY_FOR_GOVERNANCE ON THIS HOST ONLY\" docs/installation.md'"
+    },
+    {
+      "$comment": "C10 sample fix: completion.py answers --help with its docstring instead of a verdict about an authority named --help",
+      "check": "command_exit",
+      "target": "bash -c 'out=$(python3 engine/completion.py --help) && ! printf \"%s\" \"$out\" | grep -qF \"authority_id\"'"
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/skill.py"
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/hooks.py"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh --hermetic"
+    }
+  ]
+}
