@@ -130,6 +130,7 @@ The hook was built to fix an activation miss ([#36](https://github.com/tosin2013
 | Codex | `.codex/hooks.json` | **none exists** | no — [issue 47](https://github.com/tosin2013/repo-governor/issues/47) |
 | Gemini CLI | `.gemini/settings.json` | `BeforeAgent` | no — [issue 48](https://github.com/tosin2013/repo-governor/issues/48) |
 | VS Code / Copilot | `.github/hooks/*.json` | `UserPromptSubmit` | no — [issue 49](https://github.com/tosin2013/repo-governor/issues/49) |
+| Refact | `.refact/hooks.yaml` | **runs, but its output is discarded** | no — read from source only, [issue 247](https://github.com/tosin2013/repo-governor/issues/247) |
 
 **"Verified" means one specific thing**: someone installed it, asked the model for a delivery token with no tool calls, and the model stated the token the operator saw. Event names and exit codes taken from vendor documentation are *not* verification — on Claude Code the documented output shape was wrong, and every visible signal said the hook was working while the model received nothing.
 
@@ -137,12 +138,24 @@ Each unverified row has an issue explaining exactly what is unknown for that hos
 
 Codex documents **no prompt-submit event at all**, so only the write check installs there — the hook cannot deliver the requirement before the agent acts, and an `AGENTS.md` is the whole activation remedy on that host. Its project hooks also load only when `.codex/` is *trusted*, which otherwise looks identical to a hook doing nothing.
 
+Refact ([JegernOUTT/refact](https://github.com/JegernOUTT/refact), the maintained continuation of the archived `smallcloudai/refact`) differs from every other host in three ways, all read from its source rather than observed:
+
+- **Only the exit code reaches it.** Refact discards hook stdout on every event, so the prompt moment cannot deliver anything and is not installed, and advisory mode is silence. Its template is therefore the one that ships with `--exit2-on-deny`: in a repository whose manifest sets `enforcement: "blocking"`, an unauthorised write is refused and the reason is returned to the agent as the tool result. Elsewhere the flag still does nothing. `AGENTS.md` is the activation remedy; Refact loads it.
+- **Project hooks run only for trusted projects.** List the repository root in `~/.config/refact/privacy.yaml`:
+  ```yaml
+  hooks:
+    trusted_projects: ["/absolute/path/to/repo"]
+  ```
+  Untrusted, it behaves exactly like a hook that does nothing. Hooks in `~/.config/refact/hooks.yaml` always run.
+- **It also reads `.claude/settings.json`, but that does not govern it.** Refact drops a hook's `args` array, so the Claude template would run a bare `python3`, and its matchers name none of Refact's tools. Install `refact.json` as `.refact/hooks.yaml` instead (JSON is valid YAML). The write check covers `apply_patch`, `create_textdoc`, `update_textdoc*`, `undo_textdoc`, `mv`, `rm`, and the planner's three merge tools, which write a fleet agent's worktree branch into the repository. Fleet agents report the source repository as their `project_dir`, so each card's session is governed like any other.
+
 The installer offers it when the host is Claude Code and the target is **governed**:
 
 ```bash
 tools/install-skill.sh <target> .claude/skills yes            # -> .claude/settings.json
 tools/install-skill.sh <target> .cursor/skills yes            # -> .cursor/hooks.json
 tools/install-skill.sh <target> .codex/skills  yes            # -> .codex/hooks.json
+tools/install-skill.sh <target> .refact/skills yes            # -> .refact/hooks.yaml
 tools/install-skill.sh <target> .agents/skills yes cursor     # cross-vendor path:
                                                               # declare the harness
 ```

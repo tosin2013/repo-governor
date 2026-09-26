@@ -27,7 +27,7 @@ SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TARGET="${1:-}"
 SKILLS_DIR="${2:-.agents/skills}"
 HOOKS_OPT="${3:-ask}"     # ask | yes | no -- see the hook block at the end
-HOST_OPT="${4:-}"         # claude | cursor | codex | gemini | vscode -- DECLARED,
+HOST_OPT="${4:-}"         # claude | cursor | codex | gemini | vscode | refact -- DECLARED,
                           # never inferred. See the host block below.
 
 if [ -z "$TARGET" ]; then
@@ -195,13 +195,14 @@ else
     *.cursor*) HOST=cursor ;;
     *.codex*)  HOST=codex ;;
     *.gemini*) HOST=gemini ;;
+    *.refact*) HOST=refact ;;
     *vscode*|*.github*) HOST=vscode ;;
   esac
 fi
 case "$HOST" in
-  claude|cursor|codex|gemini|vscode) ;;
+  claude|cursor|codex|gemini|vscode|refact) ;;
   "") ;;                                  # undeclared; handled below
-  *) echo "unknown host: '$HOST' (claude|cursor|codex|gemini|vscode)" >&2; exit 2 ;;
+  *) echo "unknown host: '$HOST' (claude|cursor|codex|gemini|vscode|refact)" >&2; exit 2 ;;
 esac
 # `.agents/skills` is the cross-vendor path and declares nothing. Ask if there
 # is a terminal; otherwise say what is missing and install the skill anyway --
@@ -213,7 +214,7 @@ if [ -z "$HOST" ] && [ "$HOOKS_OPT" != "no" ] && [ -f "$TARGET/.repo-governor.js
     echo "reads hooks here cannot be known. Guessing it from a stray .cursor/ or"
     echo "\.claude/ directory is how you write a config the host never reads --"
     echo "indistinguishable from a hook that does not work."
-    printf "Which harness? [claude|cursor|codex|gemini|vscode|skip] "
+    printf "Which harness? [claude|cursor|codex|gemini|vscode|refact|skip] "
     read -r HOST || HOST=""
     [ "$HOST" = "skip" ] && HOST=""
   else
@@ -221,7 +222,7 @@ if [ -z "$HOST" ] && [ "$HOOKS_OPT" != "no" ] && [ -f "$TARGET/.repo-governor.js
     echo "NOTE: no hook offered -- '$SKILLS_DIR' names no host and this is not a"
     echo "      terminal. Declare it to install one:"
     echo "        $SRC/tools/install-skill.sh $TARGET $SKILLS_DIR ask <harness>"
-    echo "      harness: claude | cursor | codex | gemini | vscode"
+    echo "      harness: claude | cursor | codex | gemini | vscode | refact"
   fi
 fi
 
@@ -231,6 +232,7 @@ case "$HOST" in
   codex)  HOST_CFG=".codex/hooks.json" ;;
   gemini) HOST_CFG=".gemini/settings.json" ;;
   vscode) HOST_CFG=".github/hooks/repo-governor.json" ;;
+  refact) HOST_CFG=".refact/hooks.yaml" ;;   # JSON is valid YAML
   *)      HOST_CFG="" ;;
 esac
 [ -n "$HOST_CFG" ] && HOST_KNOWN=1 || HOST_KNOWN=0
@@ -267,7 +269,17 @@ tpl = json.loads((pathlib.Path(rg) / "tools" / "hooks" / f"{host}.json")
 cfg = tpl.get("hooks", {})
 
 p = target / rel
-cur = json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+try:
+    cur = json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+except json.JSONDecodeError:
+    # Refact's .refact/hooks.yaml may be hand-written YAML. This merge speaks
+    # JSON only, and rewriting the user's YAML as JSON would lose comments and
+    # structure they own. Refuse, say what to do; never replace the file.
+    print(f"  NOT installed: {p} exists and is not JSON (hand-written YAML?).")
+    print(f"  Merge the PreToolUse/PostToolUse entries from")
+    print(f"    {rg}/tools/hooks/{host}.json")
+    print(f"  into it by hand, replacing RG_SKILL_DIR with {rg}.")
+    sys.exit(0)
 kept = [k for k in cfg if k in cur.get("hooks", {})]
 cur.setdefault("hooks", {}).update(cfg)          # merge; never replace the file
 for k, v in tpl.items():                          # carry version etc, without clobbering
@@ -277,7 +289,17 @@ p.write_text(json.dumps(cur, indent=2) + "\n", encoding="utf-8")
 print(f"  hook installed -> {p}")
 if kept:
     print(f"  NOTE: replaced your existing {', '.join(kept)} entries -- check them")
-if host != "claude":
+if host == "refact":
+    print("  REFACT: verified from its source, not yet on a running host (issue 247).")
+    print("  Project hooks run ONLY when this repository is listed in")
+    print("  hooks.trusted_projects in ~/.config/refact/privacy.yaml:")
+    print(f"      hooks:\n        trusted_projects: [\"{target.resolve()}\"]")
+    print("  Untrusted, it behaves exactly like a hook that does nothing.")
+    print("  Refact discards hook stdout, so there is no advisory mode and no prompt")
+    print("  moment: the write hook blocks (exit 2) when the manifest sets")
+    print("  repo_governor.enforcement='blocking', and is silent otherwise.")
+    print("  AGENTS.md is the activation remedy on this host; Refact loads it.")
+elif host != "claude":
     print(f"  WARNING: the {host} template is UNVERIFIED. Event names come from its")
     print("  docs; the stdin field names have never been confirmed on a real host.")
     print()
@@ -300,8 +322,9 @@ if host == "codex":
     print("  directory behaves exactly like a hook that does nothing. Codex also")
     print("  documents no prompt-submit event, so only the write check is installed")
     print("  -- an AGENTS.md is the whole activation remedy on this host.")
-print("  advisory only. Blocking needs repo_governor.enforcement='blocking' in the")
-print("  manifest AND --exit2-on-deny on the write hook; neither was added.")
+if host != "refact":
+    print("  advisory only. Blocking needs repo_governor.enforcement='blocking' in the")
+    print("  manifest AND --exit2-on-deny on the write hook; neither was added.")
 PYHOOK
         ;;
       *) echo "  Hook not installed. See docs/installation.md if you change your mind." ;;

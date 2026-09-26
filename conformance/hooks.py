@@ -246,7 +246,7 @@ def main():
 
     # --- per-host templates -------------------------------------------------
     for host, ev in (("claude", "UserPromptSubmit"), ("cursor", "beforeSubmitPrompt"),
-                     ("codex", None)):
+                     ("codex", None), ("refact", None)):
         t = TEMPLATES / f"{host}.json"
         fails += check(f"{host} config template exists", t.exists())
         if t.exists():
@@ -293,6 +293,112 @@ def main():
                                "toolName": "insert_edit_into_file"})
     fails += check("a camelCase VS Code edit tool is recognised", bool(out))
 
+    # --- Refact (issue 247): the payload as its daemon actually sends it ------
+    # Shapes read from JegernOUTT/refact src/ext/hooks_runner.rs and
+    # src/chat/tools.rs. Refact runs the hook in the DAEMON's working directory
+    # and names the repository only as `project_dir`; the output of a tool
+    # arrives as `tool_output`, a string. Each of those alone made the hook
+    # fall silent -- no manifest found, or a verdict recorded as null -- and a
+    # silent hook on a host that only honours exit 2 governs nothing. So the
+    # hook runs here from a directory that is NOT the repository, with no
+    # `cwd` key, against real engine output.
+    with tempfile.TemporaryDirectory() as elsewhere:
+        sid = "conf_refact_capture"
+        run("capture", {"hook_event_name": "PostToolUse", "session_id": sid,
+                        "project_dir": str(ROOT), "tool_name": "shell",
+                        "tool_input": {"command": "python3 engine/completion.py 36"},
+                        "tool_output": real}, cwd=elsewhere)
+        f = sess / f"{sid}.json"
+        got = json.loads(f.read_text())["disposition"] if f.exists() else None
+        fails += check("refact: capture finds the repo from project_dir and reads tool_output",
+                       got is not None and got == real_disp,
+                       f"got {got!r}, engine said {real_disp!r}")
+        rc, out, _ = run("write", {"hook_event_name": "PreToolUse", "session_id": sid,
+                                   "project_dir": str(ROOT), "tool_name": "create_textdoc",
+                                   "tool_input": {"path": "README.md"}}, cwd=elsewhere)
+        fails += check("refact: a write under that session names the real verdict",
+                       real_disp in json.dumps(out) if real_disp in REFUSAL else True,
+                       f"said {out}")
+        if f.exists():
+            f.unlink()
+
+        # Quoted forms. The first is verbatim what a Refact agent ran on a real
+        # host; the capture regex stopped at the closing quote and recorded
+        # nothing, which on an authorized issue refuses every later write.
+        for n, cmd in enumerate(('RG="/x/repo-governor"; python3 "$RG/engine/completion.py" 36',
+                                 "python3 '/x/engine/completion.py' '36'",
+                                 'python3 engine/completion.py "36"; echo done')):
+            sid = f"conf_refact_quoted_{n}"
+            run("capture", {"session_id": sid, "project_dir": str(ROOT), "tool_name": "shell",
+                            "tool_input": {"command": cmd}, "tool_output": real}, cwd=elsewhere)
+            f = sess / f"{sid}.json"
+            st = json.loads(f.read_text()) if f.exists() else {}
+            fails += check(f"capture survives a quoted invocation ({cmd[-32:]!r})",
+                           st.get("authority_id") == "36" and st.get("disposition") == real_disp,
+                           f"recorded {st or 'nothing'}")
+            if f.exists():
+                f.unlink()
+
+    with tempfile.TemporaryDirectory() as td:
+        blk = pathlib.Path(td) / "blocking"
+        blk.mkdir()
+        elsewhere = pathlib.Path(td) / "daemon-cwd"
+        elsewhere.mkdir()
+        subprocess.run(["git", "init", "-q", str(blk)], capture_output=True)
+        mf_ = json.loads((ROOT / ".repo-governor.json").read_text())
+        mf_["repo_governor"]["enforcement"] = "blocking"
+        (blk / ".repo-governor.json").write_text(json.dumps(mf_), encoding="utf-8")
+        sd = blk / ".repo-governor" / "sessions"
+        sd.mkdir(parents=True)
+        (sd / "r.json").write_text(json.dumps(
+            {"authority_id": "1", "disposition": "NO_EXECUTION_AUTHORITY"}))
+
+        def refact_write(tool):
+            return run("write", {"hook_event_name": "PreToolUse", "session_id": "r",
+                                 "project_dir": str(blk), "tool_name": tool,
+                                 "tool_input": {}}, "--exit2-on-deny", cwd=str(elsewhere))
+
+        # Refact reads only the exit code, and hands stderr to the agent as the
+        # tool result. A JSON denial with exit 0 is invisible there.
+        for tool in ("apply_patch", "create_textdoc", "update_textdoc",
+                     "update_textdoc_regex", "undo_textdoc", "mv", "rm",
+                     "worktree_merge", "merge_agent", "merge_ready_in_order"):
+            rc, _, err = refact_write(tool)
+            fails += check(f"refact: {tool} is blocked with exit 2 and a reason on stderr",
+                           rc == 2 and "NO_EXECUTION_AUTHORITY" in err,
+                           f"rc={rc}; before issue 247 this passed as an unknown tool")
+        # "rm" is a substring of "format" and "confirm". Exact names only.
+        for tool in ("cat", "tree", "shell", "format", "confirm", "buddy_memory_merge"):
+            rc, out, _ = refact_write(tool)
+            fails += check(f"refact: {tool} is not treated as a file change",
+                           rc == 0 and out == {}, f"rc={rc} out={out}")
+
+    # The shipped matcher must select the same tools. Refact compiles it with
+    # Rust's regex crate and calls is_match -- UNANCHORED, so the pattern's own
+    # ^...$ is all that keeps "rm" from matching "format". Python's re.search
+    # has the same semantics for this pattern.
+    rt = TEMPLATES / "refact.json"
+    if rt.exists():
+        rcfg = json.loads(rt.read_text())["hooks"]
+        pre = rcfg["PreToolUse"][0]
+        pat = re.compile(pre["matcher"])
+        for tool in ("apply_patch", "create_textdoc", "update_textdoc",
+                     "update_textdoc_anchored", "update_textdoc_by_lines",
+                     "update_textdoc_regex", "undo_textdoc", "mv", "rm",
+                     "worktree_merge", "merge_agent", "merge_ready_in_order"):
+            fails += check(f"refact template matcher selects {tool}", bool(pat.search(tool)))
+        for tool in ("shell", "cat", "format", "confirm", "doc_update", "buddy_memory_merge"):
+            fails += check(f"refact template matcher skips {tool}", not pat.search(tool))
+        fails += check("refact write hook carries --exit2-on-deny",
+                       "--exit2-on-deny" in pre["hooks"][0]["command"],
+                       "Refact discards stdout: without exit 2 the hook can say nothing")
+        fails += check("refact hooks use a single command string, no args array",
+                       all("args" not in h and h.get("command")
+                           for entries in rcfg.values() for e in entries for h in e["hooks"]),
+                       "Refact's loader silently drops `args`, leaving a bare `python3`")
+        fails += check("refact capture listens on its shell tool",
+                       re.compile(rcfg["PostToolUse"][0]["matcher"]).search("shell") is not None)
+
     # --- the docs must not outlive the evidence -----------------------------
     # installation.md said "install it when a missed activation matters" until
     # the control refuted exactly that. A section that recommends a surface
@@ -310,7 +416,7 @@ def main():
     # unverified one must link the issue that says so. A template that ships
     # without a row is a host we quietly claim to support.
     for host, iss in (("Claude Code", None), ("Cursor", "50"), ("Codex", "47"),
-                      ("Gemini", "48"), ("VS Code", "49")):
+                      ("Gemini", "48"), ("VS Code", "49"), ("Refact", "247")):
         fails += check(f"install docs list {host}", host in hook_sec)
         if iss:
             fails += check(f"{host} row links its unvalidated-host issue",
@@ -383,6 +489,9 @@ def main():
         "codex":  {"PreToolUse", "PostToolUse"},
         "gemini": {"BeforeAgent", "BeforeTool", "AfterTool"},
         "vscode": {"UserPromptSubmit", "PreToolUse", "PostToolUse"},
+        # Refact runs UserPromptSubmit but discards its stdout, so the prompt
+        # moment would be a hook that runs and delivers nothing.
+        "refact": {"PreToolUse", "PostToolUse"},
     }
     for host, want in EXPECTED.items():
         t = TEMPLATES / f"{host}.json"
@@ -395,7 +504,8 @@ def main():
                           ("cursor", ".cursor/hooks.json", "beforeSubmitPrompt"),
                           ("codex",  ".codex/hooks.json",  None),
                           ("gemini", ".gemini/settings.json", "BeforeAgent"),
-                          ("vscode", ".github/hooks/repo-governor.json", "UserPromptSubmit")):
+                          ("vscode", ".github/hooks/repo-governor.json", "UserPromptSubmit"),
+                          ("refact", ".refact/hooks.yaml", None)):
         with tempfile.TemporaryDirectory() as td:
             tgt = pathlib.Path(td) / "g"
             tgt.mkdir()
@@ -422,7 +532,14 @@ def main():
                     k.lower() in ("pretooluse", "pretooluse", "beforetool") for k in hooks_))
                 fails += check(f"{host}: paths are substituted, no placeholder left",
                                "RG_SKILL_DIR" not in json.dumps(got))
-            if host != "claude":
+            if host == "refact":
+                fails += check("refact: install names hooks.trusted_projects",
+                               "trusted_projects" in r.stdout,
+                               "an untrusted project looks exactly like a hook that does nothing")
+                fails += check("refact: install does not offer the token check",
+                               "delivery token" not in r.stdout,
+                               "Refact discards hook stdout; the token can never arrive")
+            elif host != "claude":
                 fails += check(f"{host}: install warns the template is unverified",
                                "UNVERIFIED" in r.stdout,
                                "only the Claude payload schema has been confirmed on a host")

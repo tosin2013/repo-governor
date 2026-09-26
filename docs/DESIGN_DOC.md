@@ -334,7 +334,7 @@ The full record is `docs/adrs/`. Three decisions carry most of the design weight
 - Envelope thinness. Most trackers lack explicit non-goals, so a compiled scope envelope is often thin, and a thin envelope governs weakly. Mitigation: issue #2, measured across six repositories.
 - Activation is model-mediated. A skill can be installed and never fire. Measured at 20 of 20 on one host and 0 of 2 on another. Mitigation: `tools/selftest.py`, an `AGENTS.md`, and community measurement requests (milestone RG-VALIDATION-v0.2, issues #5 and #42).
 - Distribution is near zero. The artifact is high quality and effectively invisible, with no registry or directory presence. Mitigation: milestone RG-DISTRIBUTION-v0.7 (issues #233, #234, #235) and ADR-034.
-- Unverified hook surfaces. Five hook templates ship and one is verified. An unverified hook can look identical to a hook that does nothing. Mitigation: per-host issues #47 through #50, and a delivery-token check.
+- Unverified hook surfaces. Six hook templates ship and one is verified. An unverified hook can look identical to a hook that does nothing. Mitigation: per-host issues #47 through #50 and #247, and a delivery-token check. Refact discards hook stdout, so the token check cannot work there; its write hook is the evidence.
 - Two Proposed ADRs the runtime already depends on (031 and 033), recorded as a departure in the ratification reviews. Owner: maintainer.
 
 ---

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Deterministic governance delivery for coding-agent hooks (ADR-029).
 
-One script, three hosts. Reads a hook payload as JSON on stdin, writes a
+One script, every host. Reads a hook payload as JSON on stdin, writes a
 host-shaped decision as JSON on stdout. Exit 0 always, except where a host
 requires exit 2 to block (see `--exit2-on-deny`).
 
@@ -50,11 +50,18 @@ REFUSAL = ("NO_EXECUTION_AUTHORITY", "AUTHORITY_WITHDRAWN", "CONFLICT", "UNKNOWN
 
 # Substrings of tool names that change a file, across hosts: Claude's Edit/Write/
 # NotebookEdit, VS Code's create_file/insert_edit_into_file/replace_string_in_file,
-# Gemini's write_file/replace, Codex's apply_patch. Matched as substrings because
-# every host names its tools differently and a closed list would silently miss
-# the next one. An unknown tool name is ALLOWED, not refused -- failing closed on
-# a name we do not recognise would block work for a naming difference.
-EDIT_TOOLS = ("edit", "write", "patch", "replace", "notebook", "create_file")
+# Gemini's write_file/replace, Codex's apply_patch, Refact's create_textdoc/
+# update_textdoc*/undo_textdoc. Matched as substrings because every host names
+# its tools differently and a closed list would silently miss the next one. An
+# unknown tool name is ALLOWED, not refused -- failing closed on a name we do not
+# recognise would block work for a naming difference.
+EDIT_TOOLS = ("edit", "write", "patch", "replace", "notebook", "create_file", "textdoc")
+# Exact names, for tools a substring cannot safely catch. "rm" is inside "format"
+# and "confirm"; "merge" is inside names that change nothing. Refact moves and
+# deletes files with mv/rm, and its planner writes an agent's worktree branch into
+# the governed repository with the three merge tools. Before issue 247 all of
+# these passed as unknown tools.
+EDIT_TOOLS_EXACT = ("mv", "rm", "worktree_merge", "merge_agent", "merge_ready_in_order")
 
 
 def _payload():
@@ -76,7 +83,11 @@ def _repo(pl):
     Never the install directory. `manifest.target()` walks out of a
     `<host>/skills/` path, which is the whole reason this is not `Path.cwd()`.
     """
-    cwd = pl.get("cwd") or pl.get("workspace_root") or os.getcwd()
+    # Refact sends `project_dir` and runs the hook in the DAEMON's working
+    # directory, which is no repository at all. Without this key the fallback
+    # found no manifest and every Refact write passed silently (issue 247).
+    cwd = (pl.get("cwd") or pl.get("workspace_root") or pl.get("project_dir")
+           or os.environ.get("REFACT_PROJECT_DIR") or os.getcwd())
     try:
         os.chdir(cwd)
     except OSError:
@@ -225,7 +236,7 @@ def moment_write(pl, repo, mf, enforcing, exit2):
     # commands. A governance layer that interrupts `ls` is one that gets
     # uninstalled, and nothing here can rule on a tool that changes no file.
     tool = (pl.get("tool_name") or pl.get("toolName") or "").lower()
-    if tool and not any(k in tool for k in EDIT_TOOLS):
+    if tool and tool not in EDIT_TOOLS_EXACT and not any(k in tool for k in EDIT_TOOLS):
         return 0
 
     sf = _session_file(repo, pl)
@@ -271,11 +282,18 @@ def moment_capture(pl, repo, mf, enforcing):
     cmd = ti.get("command") or ""
     if "completion.py" not in cmd:
         return 0
-    m = re.search(r"completion\.py\s+(\S+)", cmd)
+    # The path and the id may each be quoted. A Refact agent on a real host
+    # (issue 247) ran `python3 "$RG/engine/completion.py" <id>`; the closing
+    # quote defeated `completion\.py\s+`, the verdict was never recorded, and on
+    # an AUTHORIZED issue every later write would have been refused as having
+    # no authority at all. Every host's agent can quote a path.
+    m = re.search(r"""completion\.py["']?\s+["']?([^\s"';&|]+)""", cmd)
     if not m:
         return 0
     aid = m.group(1)
-    resp = pl.get("tool_response") or pl.get("toolResponse") or {}
+    # Refact names it `tool_output` and sends the tool's text, not an object.
+    resp = (pl.get("tool_response") or pl.get("toolResponse")
+            or pl.get("tool_output") or {})
     text = resp if isinstance(resp, str) else json.dumps(resp)
     # engine/completion.py emits "decision"; engine/envelope.py emits
     # "disposition". Both are real and they are not interchangeable spellings

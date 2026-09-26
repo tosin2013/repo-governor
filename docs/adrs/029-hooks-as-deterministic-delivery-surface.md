@@ -101,6 +101,16 @@ Full record: [`docs/research/hook-validation-results.md`](../research/hook-valid
 
 - Reversible. Deleting the config files removes the surface; the skill and engine are untouched.
 
+## Amendment — Refact as a host (2026-09-26, [issue 247](https://github.com/tosin2013/repo-governor/issues/247))
+
+Refact ([JegernOUTT/refact](https://github.com/JegernOUTT/refact), which continues the archived `smallcloudai/refact`) ships the converged convention: `PreToolUse`/`PostToolUse`, JSON on stdin, exit 2 blocks. That makes it a host, not a provider. It is added the same way as the others, with one template (`tools/hooks/refact.json`, installed as `.refact/hooks.yaml`) and no new code path. Its source was read at commit `0d096c9`, but no running host has been tested. It departs from the other hosts in ways that change what this ADR's moments can do there:
+
+- **Stdout is discarded on every event.** The `prompt` moment cannot deliver, so it is not installed. Advisory mode is silence, so the Refact template is the only one that carries `--exit2-on-deny` by default. The manifest's `enforcement` stays the single switch.
+- **It fell open before this amendment, silently.** The payload names the repository `project_dir` and the hook runs in the daemon's working directory. Tool output arrives as `tool_output`. File changes go through `*_textdoc`, `mv`, `rm` and three merge tools. Each of these alone made the hook find no manifest, record a null verdict, or treat the tool as unknown. All four are fixed in the shared script and pinned by `conformance/hooks.py`.
+- **It reads `.claude/settings.json` but drops the `args` array**, so a repository governed for Claude Code looks governed under Refact and is not. The installation docs say so.
+
+The adapter half of issue 247 (Refact's `.refact/` task board as execution state) is not decided here.
+
 ## What this deliberately does not do
 
 **Scope enforcement by file path was designed, built, and removed.** `engine/envelope.py` can classify a target against `in_scope`/`non_goals`, so checking a pending write against the compiled envelope looked correct. Compiling a real envelope for a real GitHub issue returns:
