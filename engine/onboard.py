@@ -143,6 +143,51 @@ def _ships_something(repo: Path):
     return rc == 0 and bool(out.strip())
 
 
+LEVEL_PROFILE = {"L0": "GOVERNOR_GREENFIELD", "L1": "GOVERNOR_LITE", "L2": "GOVERNOR_STANDARD",
+                 "L3": "GOVERNOR_FULL", "L4": "GOVERNOR_HIGH_ASSURANCE"}
+FLOOR_LEVEL = "L4"
+
+
+def _tracked_dirs(repo: Path):
+    """Directory names on tracked paths, or None when git cannot say.
+
+    `generated_consumers` walked the working tree, so a gitignored
+    node_modules/@babel/types/**/generated floored a repository to L4. That was
+    observed on tosin2013/local-knowledge-vault, whose manifest records the
+    false floor by hand. A floor that is ENFORCED (issue 181) cannot rest on
+    what happens to be installed on one machine, or two checkouts of one
+    revision get different verdicts.
+    """
+    rc, out = _git(repo, "ls-files", "-z")
+    if rc != 0:
+        return None
+    names = set()
+    for path in out.split("\0"):
+        names.update(path.split("/")[:-1])
+    return names
+
+
+def floor_indicators(repo: Path):
+    """ADR-006 rule 3's three indicators, and nothing else.
+
+    One function for onboarding (which suggests a level) and for
+    `manifest.py --validate` (which refuses a level below the floor), so the
+    two cannot disagree about the same repository -- issue 161's lesson.
+    """
+    ind = {"public_api_surface": _ships_something(repo)}
+    rc, out = _git(repo, "branch", "-r")
+    ind["release_branches"] = sum(
+        1 for b in out.splitlines() if any(k in b for k in ("release/", "v1.", "v2.", "stable"))) > 0
+    gen = ("generated", "gen", "clients")
+    tracked = _tracked_dirs(repo)
+    if tracked is not None:
+        ind["generated_consumers"] = bool(tracked & set(gen))
+    else:                                       # not a git repository: no ignore rules to read
+        ind["generated_consumers"] = any(
+            p.is_dir() and p.name in gen for p in repo.rglob("*") if "node_modules" not in p.parts)
+    return ind
+
+
 def assess(repo: Path):
     """Report observed indicators and a SUGGESTED level. A human decides."""
     ind = {}
@@ -217,12 +262,7 @@ def assess(repo: Path):
     # This is the fifth time a substring test has stood in for a structural fact
     # here. `conformance/imports.py` refuses to grep source for imports and says
     # why in its docstring -- a string in a comment is not an import.
-    ind["public_api_surface"] = _ships_something(repo)
-    rc, out = _git(repo, "branch", "-r")
-    ind["release_branches"] = sum(
-        1 for b in out.splitlines() if any(k in b for k in ("release/", "v1.", "v2.", "stable"))) > 0
-    ind["generated_consumers"] = any(
-        p.is_dir() and p.name in ("generated", "gen", "clients") for p in repo.rglob("*"))
+    ind.update(floor_indicators(repo))
 
     floors = [k for k in FLOOR_INDICATORS if ind.get(k)]
 
@@ -237,8 +277,7 @@ def assess(repo: Path):
     else:
         level, why = "L0", "nearly empty repository, no architecture history"
 
-    profile = {"L0": "GOVERNOR_GREENFIELD", "L1": "GOVERNOR_LITE", "L2": "GOVERNOR_STANDARD",
-               "L3": "GOVERNOR_FULL", "L4": "GOVERNOR_HIGH_ASSURANCE"}[level]
+    profile = LEVEL_PROFILE[level]
     return {"suggested": level, "profile": profile, "reason": why,
             "floor": floors or None, "indicators": ind}
 

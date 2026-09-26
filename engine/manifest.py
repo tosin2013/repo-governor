@@ -451,6 +451,38 @@ def check_portability(manifest):
              "rule 2 expects exactly that pairing.")]
 
 
+def check_floor(m):
+    """ADR-006 rule 3: a floor may not be overridden downward (issue 181).
+
+    `condition.assessed` was taken on trust, so hand-editing L4 to L1 turned
+    PROVIDER_UNAVAILABLE into READY_FOR_GOVERNANCE with nothing about the
+    repository changed. This re-derives ONLY the three floor indicators and
+    refuses a level or profile below the floor. It does not recompute the
+    level: above the floor the choice stays the human's (ADR-006 rule 1), so an
+    unfloored repository at any level, and a floored one at L4, pass untouched.
+
+    Blocking, not advisory. Rule 3 calls this "the one place human override is
+    constrained"; a finding that informs and permits would leave it
+    undischarged. What made enforcing it cost users an escape hatch -- a floored
+    repository needing a role nobody can bind -- is advisory since issue 180.
+    """
+    import onboard as _O  # noqa: PLC0415 -- local, like vocabulary above
+    cond = m.get("condition") or {}
+    ind = _O.floor_indicators(target())
+    floors = [k for k in _O.FLOOR_INDICATORS if ind.get(k)]
+    if not floors:
+        return []
+    level, profile = cond.get("assessed"), cond.get("profile")
+    want = _O.LEVEL_PROFILE[_O.FLOOR_LEVEL]
+    if level == _O.FLOOR_LEVEL and profile == want:
+        return []
+    return [("condition", "(assessed)", "CONDITION_BELOW_FLOOR",
+             f"declares {level} / {profile}, but {', '.join(floors)} floors this "
+             f"repository to {_O.FLOOR_LEVEL} / {want}. ADR-006 rule 3: the floor "
+             "may not be overridden downward; only the level above it is a human's "
+             "to choose. Re-run engine/onboard.py to see the evidence.")]
+
+
 def main(argv):
     if argv and argv[0] == "--validate":
         m, errs = load()
@@ -477,6 +509,7 @@ def main(argv):
                              f"{m['condition']['profile']} requires this role; it is not "
                              "usable here. Bind it, or reassess the condition -- the level "
                              "is a human's to change (ADR-006 rule 1)."))
+        findings += check_floor(m)
         # Governance that lives on one machine is not governance. Checked here
         # because --validate is what a person runs to find out whether they
         # onboarded correctly, and "did it reach the repository" is half of that.

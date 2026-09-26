@@ -8,9 +8,9 @@
     "id": "tosin2013/repo-governor"
   },
   "condition": {
-    "$comment": "L1: one package, small dependency surface, one maintainer. Not L0 \u2014 architecture history exists. No floor indicator present: no public API, no release branches, no generated consumers.",
-    "assessed": "L1",
-    "profile": "GOVERNOR_LITE"
+    "$comment": "L4 / GOVERNOR_HIGH_ASSURANCE, raised 2026-09-26 by the maintainer when issue 181 made ADR-006 rule 3 enforceable. The earlier 'L1: no public API' stopped being true when this repository began tagging releases (v0.4.0 onward) and shipping a plugin that others install: public_api_surface fires, and the floor may not be overridden downward. The size-based reading (one package, one maintainer) still describes the code; the floor is about what consumers depend on. Issue 167 asks whether tags alone should floor; if it concludes they should not, this is the manifest to revisit. `execution` is unbound and reported as advisory (ADR-031), not refused.",
+    "assessed": "L4",
+    "profile": "GOVERNOR_HIGH_ASSURANCE"
   },
   "providers": {
     "repository": {
