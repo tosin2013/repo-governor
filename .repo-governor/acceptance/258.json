@@ -55,5 +55,13 @@
       "check": "command_exit",
       "target": "./tools/run-conformance.sh --hermetic"
     }
-  ]
+  ],
+  "covers": {
+    "declared": "upgrade and removal of an installed copy for the six hosts: the installer sets a canonical origin and records the installed tag, the documented upgrade works after the temporary clone is gone, and --prune re-applies the prune list; plus the runbook for those procedures",
+    "uncovered": "the Claude Code plugin-channel upgrade and removal procedure (runbook Procedure D): written from `claude plugin --help` and marked NOT RUN",
+    "split_to": [
+      "262"
+    ],
+    "split_note": "Restored and split at the maintainer's decision (2026-09-26) after an earlier draft removed this block so the bar would read complete. Issue 262 runs and verifies Procedure D on a real host. Fixture tags in the upgrade outputs remain a verification limit recorded in $comment, not missing scope."
+  }
 }
