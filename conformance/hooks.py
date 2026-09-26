@@ -322,6 +322,23 @@ def main():
         if f.exists():
             f.unlink()
 
+        # Quoted forms. The first is verbatim what a Refact agent ran on a real
+        # host; the capture regex stopped at the closing quote and recorded
+        # nothing, which on an authorized issue refuses every later write.
+        for n, cmd in enumerate(('RG="/x/repo-governor"; python3 "$RG/engine/completion.py" 36',
+                                 "python3 '/x/engine/completion.py' '36'",
+                                 'python3 engine/completion.py "36"; echo done')):
+            sid = f"conf_refact_quoted_{n}"
+            run("capture", {"session_id": sid, "project_dir": str(ROOT), "tool_name": "shell",
+                            "tool_input": {"command": cmd}, "tool_output": real}, cwd=elsewhere)
+            f = sess / f"{sid}.json"
+            st = json.loads(f.read_text()) if f.exists() else {}
+            fails += check(f"capture survives a quoted invocation ({cmd[-32:]!r})",
+                           st.get("authority_id") == "36" and st.get("disposition") == real_disp,
+                           f"recorded {st or 'nothing'}")
+            if f.exists():
+                f.unlink()
+
     with tempfile.TemporaryDirectory() as td:
         blk = pathlib.Path(td) / "blocking"
         blk.mkdir()

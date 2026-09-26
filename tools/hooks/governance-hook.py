@@ -282,7 +282,12 @@ def moment_capture(pl, repo, mf, enforcing):
     cmd = ti.get("command") or ""
     if "completion.py" not in cmd:
         return 0
-    m = re.search(r"completion\.py\s+(\S+)", cmd)
+    # The path and the id may each be quoted. A Refact agent on a real host
+    # (issue 247) ran `python3 "$RG/engine/completion.py" <id>`; the closing
+    # quote defeated `completion\.py\s+`, the verdict was never recorded, and on
+    # an AUTHORIZED issue every later write would have been refused as having
+    # no authority at all. Every host's agent can quote a path.
+    m = re.search(r"""completion\.py["']?\s+["']?([^\s"';&|]+)""", cmd)
     if not m:
         return 0
     aid = m.group(1)
