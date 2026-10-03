@@ -3,6 +3,7 @@
 | fixture | what it encodes |
 |---|---|
 | `authored/` | a written constitution with four `##` sections, and **two** spec directories — one numbered `001-add-auth`, one **not** numbered (`checkout-flow`), because 23.6% of real repositories do not number them |
+| `authored/.repo-governor/speckit-features.json` | the feature map (ADR-037 decision 3, issue 266). Both features map to **non-numeric** ids that name the state, so a resolver that reads `1` out of `001-add-auth` cannot pass by coincidence. Lives here, never at this repository's own `.repo-governor/` |
 | `template/` | the shipped constitution still carrying named placeholders. **10.2% of real constitutions are in this state**, and reading their articles as constraints would assert an architecture from a file nobody wrote (§37) |
 
 `authored/specs/001-add-auth/tasks.md` carries a completed checkbox on purpose.

@@ -1,0 +1,7 @@
+{
+  "$comment": "Fixture (ADR-037 decision 3). Ids name the state they demonstrate, never a real work item. Numbered features map to NON-numeric ids, so a resolver that parses the number out of a directory name cannot pass by coincidence.",
+  "features": {
+    "001-add-auth": "fixture-mapped-numbered",
+    "checkout-flow": "fixture-mapped-unnumbered"
+  }
+}

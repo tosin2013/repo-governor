@@ -511,6 +511,110 @@ def main():
     _floor_check("control: a tracked generated/ directory does",
                  rc == 1 and "generated_consumers" in out, f"rc={rc} {out.strip()[-200:]}")
 
+    # --- issue 266: a Spec Kit feature maps to an authority by declaration ----
+    #
+    # ADR-037 decision 3. Driven through engine/features.py, which the
+    # extension's commands call. The fixture maps NUMBERED features to
+    # NON-numeric ids, so a resolver that parses `001-` into `1`, or reads the
+    # branch, cannot pass the positive checks by coincidence -- and the control
+    # asks it about an unmapped numbered feature outright.
+    print("\nA Spec Kit feature maps to an authority by declaration (ADR-037, issue 266)\n")
+    import features as _F  # noqa: PLC0415
+    fx = ROOT / "conformance" / "fixtures" / "speckit" / "authored"
+
+    def _feat(label, ok, detail):
+        nonlocal extra
+        extra += not ok
+        print(f"  [{'PASS' if ok else 'FAIL'}] {label}" + ("" if ok else f"\n         {detail}"))
+
+    def _repo_with(td, mapping):
+        r = pathlib.Path(td) / "repo"
+        (r / ".repo-governor").mkdir(parents=True)
+        _sp.run(["git", "init", "-q", str(r)], capture_output=True)
+        if mapping is not None:
+            (r / ".repo-governor" / "speckit-features.json").write_text(
+                mapping if isinstance(mapping, str) else json.dumps(mapping))
+        return r
+
+    def _cli(r, feature):
+        env = dict(_os.environ); env["REPO_GOVERNOR_TARGET"] = str(r)
+        pr = _sp.run([sys.executable, str(ROOT / "engine" / "features.py"), feature],
+                     capture_output=True, text=True, cwd=str(r), env=env, timeout=60)
+        try:
+            return json.loads(pr.stdout), pr.returncode
+        except json.JSONDecodeError:
+            return {}, pr.returncode
+
+    def _why(got):
+        return [(u.get("reason"), u.get("blocking")) for u in got.get("unknowns") or []]
+
+    fmap = json.loads((fx / ".repo-governor" / "speckit-features.json").read_text())
+    with _tf.TemporaryDirectory() as td:
+        r = _repo_with(td, fmap)
+        got, rc = _cli(r, "001-add-auth")
+        _feat("features: a mapped feature resolves to the declared authority id",
+              rc == 0 and got.get("authority_id") == "fixture-mapped-numbered"
+              and not got.get("unknowns"), f"rc={rc} got={got}")
+        _feat("features: the answer cites the mapping file",
+              any(c.get("path") == ".repo-governor/speckit-features.json"
+                  and c.get("key") == "features.001-add-auth" for c in got.get("cites") or []),
+              f"cites={got.get('cites')}")
+        got2, _ = _cli(r, str(r / "specs" / "checkout-flow"))
+        _feat("features: a directory path resolves by its final component",
+              got2.get("authority_id") == "fixture-mapped-unnumbered", f"got={got2}")
+        got3, rc3 = _cli(r, "007-unmapped")
+        _feat("features: an unmapped feature is UNKNOWN FEATURE_UNMAPPED, blocking",
+              rc3 == 0 and got3.get("authority_id") is None
+              and _why(got3) == [("FEATURE_UNMAPPED", True)], f"rc={rc3} got={got3}")
+        _feat("features control: an unmapped numbered feature does not resolve to its number",
+              got3.get("authority_id") not in ("7", "007")
+              and "7" not in json.dumps(got3.get("cites") or []),
+              f"got={got3} -- an authority id was inferred from the directory name (ADR-028)")
+
+    with _tf.TemporaryDirectory() as td:
+        got, rc = _cli(_repo_with(td, None), "001-add-auth")
+        _feat("features: no mapping file is UNKNOWN MAPPING_ABSENT, non-blocking",
+              rc == 0 and got.get("authority_id") is None
+              and _why(got) == [("MAPPING_ABSENT", False)], f"rc={rc} got={got}")
+
+    bad_maps = (("not JSON", "{features: "),
+                ("a numeric id", {"features": {"001-add-auth": 142}}),
+                ("an unknown key", {"features": {}, "branches": {}}))
+    with _tf.TemporaryDirectory() as td:
+        results = []
+        for i, (lbl, bad) in enumerate(bad_maps):
+            r = _repo_with(pathlib.Path(td) / str(i), bad)
+            got, _ = _cli(r, "001-add-auth")
+            results.append((lbl, _why(got), got.get("authority_id")))
+        _feat("features: a malformed mapping file is UNKNOWN MAPPING_INVALID, blocking",
+              all(w == [("MAPPING_INVALID", True)] and a is None for _l, w, a in results),
+              f"{results}")
+
+    def _validate_map(mapping):
+        with _tf.TemporaryDirectory() as td:
+            r = _repo_with(td, mapping)
+            (r / ".repo-governor.json").write_text(json.dumps({
+                "repo_governor": {"version": 1, "engine_min_version": "0.1.0"},
+                "repository": {"id": "example/features"},
+                "condition": {"assessed": "L1", "profile": "GOVERNOR_LITE"},
+                "permissions": {"repository": {"read": True, "write": False}},
+                "providers": {"repository": {"type": "git", "adapter": "adapters/git",
+                                             "contract_version": 1}}}))
+            env = dict(_os.environ); env["REPO_GOVERNOR_TARGET"] = str(r)
+            pr = _sp.run([sys.executable, str(ROOT / "engine" / "manifest.py"), "--validate"],
+                         capture_output=True, text=True, cwd=str(r), env=env, timeout=120)
+            return pr.stdout, pr.returncode
+
+    out, rc = _validate_map({"features": {"001-add-auth": 142}})
+    out_ok, rc_ok = _validate_map(fmap)
+    _feat("features: --validate reports a malformed mapping file",
+          rc == 1 and "FEATURE_MAP_INVALID" in out
+          and rc_ok == 0 and "FEATURE_MAP_INVALID" not in out_ok,
+          f"bad rc={rc} {out.strip()[-160:]} | control rc={rc_ok} {out_ok.strip()[-160:]}")
+    _feat("features: an untracked mapping file is reported, as acceptance bars are",
+          "the Spec Kit feature map" in out_ok or "speckit-features.json" in out_ok,
+          out_ok.strip()[-200:])
+
     fails += extra
     total = len(CASES) + len(PERM_CASES) + 9 + 7
     print(f"\n{total - fails}/{total} checks passed")
