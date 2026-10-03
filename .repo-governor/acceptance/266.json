@@ -1,0 +1,68 @@
+{
+  "$comment": "Acceptance criteria for issue 266: a Spec Kit feature directory maps to a Repo Governor authority id only through a declared, committed file (ADR-037 decision 3). C1 is the published contract. C2-C3 pin resolution of a mapped feature. C4-C6 pin the three ways resolution fails, each a typed UNKNOWN with its own reason and blocking flag: no mapping file is a configuration gap (non-blocking, disclosed, as ADR-031's engine rule); a malformed file and an unmapped feature are blocking, because no authority can be established. THE VACUITY THIS BAR IS BUILT AGAINST: a resolver that parses the number out of '001-add-auth', or reads the branch name, passes C2 whenever the mapping happens to agree with the guess. C7 is the ADR-028 control: the fixture maps numbered features to NON-numeric ids, and an unmapped numbered feature must not resolve to its number. C8 puts the file under manifest.py --validate. C9 is ADR-037's Confirmation row for decision 4: every task in tasks.md ticked, no satisfied bar, and the answer is not STOP_COMPLETE. C10 keeps fixtures under conformance/ with ids that name states, never real work items. WHAT THIS BAR CANNOT CHECK: that an agent does not guess the issue when the resolver answers UNKNOWN. That is substantive and belongs to the calibration run (issue 268).",
+  "authority_id": "266",
+  "criteria": [
+    {
+      "$comment": "C1 the contract is published as a schema",
+      "check": "command_exit",
+      "target": "bash -c 'python3 -c \"import json;json.load(open(\\\"schemas/speckit-features-v1.json\\\"))\"'"
+    },
+    {
+      "$comment": "C2 a mapped feature resolves to the declared id",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/manifest.py | grep -qF \"[PASS] features: a mapped feature resolves to the declared authority id\"'"
+    },
+    {
+      "$comment": "C3 resolution cites the mapping file it read",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/manifest.py | grep -qF \"[PASS] features: the answer cites the mapping file\"'"
+    },
+    {
+      "$comment": "C4 no mapping file is a disclosed, non-blocking configuration gap",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/manifest.py | grep -qF \"[PASS] features: no mapping file is UNKNOWN MAPPING_ABSENT, non-blocking\"'"
+    },
+    {
+      "$comment": "C5 a malformed mapping file is blocking",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/manifest.py | grep -qF \"[PASS] features: a malformed mapping file is UNKNOWN MAPPING_INVALID, blocking\"'"
+    },
+    {
+      "$comment": "C6 an unmapped feature is blocking",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/manifest.py | grep -qF \"[PASS] features: an unmapped feature is UNKNOWN FEATURE_UNMAPPED, blocking\"'"
+    },
+    {
+      "$comment": "C7 CONTROL (ADR-028): nothing is inferred from the directory name or branch",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/manifest.py | grep -qF \"[PASS] features control: an unmapped numbered feature does not resolve to its number\"'"
+    },
+    {
+      "$comment": "C8 manifest.py --validate refuses a malformed mapping file",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/manifest.py | grep -qF \"[PASS] features: --validate reports a malformed mapping file\"'"
+    },
+    {
+      "$comment": "C9 ADR-037 decision 4: a fully ticked tasks.md is not completion",
+      "check": "command_exit",
+      "target": "bash -c 'python3 conformance/acceptance.py | grep -qF \"[PASS] tasks.md fully ticked with no satisfied bar is not STOP_COMPLETE\"'"
+    },
+    {
+      "$comment": "C10 the fixture lives under conformance/ and its ids name states",
+      "check": "command_exit",
+      "target": "bash -c 'test -f conformance/fixtures/speckit/authored/.repo-governor/speckit-features.json && ! test -e .repo-governor/speckit-features.json'"
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/manifest.py"
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/acceptance.py"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh --hermetic"
+    }
+  ]
+}

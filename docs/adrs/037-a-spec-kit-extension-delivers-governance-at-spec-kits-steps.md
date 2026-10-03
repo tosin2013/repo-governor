@@ -73,6 +73,8 @@ That puts this surface in the same class as ADR-029's `prompt` moment. It reliab
    - **Submission.** Submission is Spec Kit's `extension_submission.yml` issue, not a change to their catalog file, and the resulting listing is observed rather than assumed (rule 5).
    - **No self-hosted catalog.** A self-hosted catalog for `.specify/extension-catalogs.yml` would be a further channel and is not decided here.
 
+**The runtime depends on this ADR from issue 266.** `engine/features.py` and `engine/manifest.py --validate` implement decision 3, so under ADR-035 rule 1 a release that ships them depends on ADR-037 while it is `Proposed`. That dependency is recorded in the ratification record of the first release that carries it, v0.9.0, and not earlier: `RATIFICATION-v0.8.0.md` describes a release that never depended on it.
+
 ## Consequences
 
 **Positive**

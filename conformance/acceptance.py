@@ -603,6 +603,78 @@ def main():
                    "target" in crit_def.get("required", []) and "check" in crit_def["required"],
                    f"required={crit_def.get('required')}")
 
+    # ADR-037 decision 4, assigned to issue 266 by its Confirmation table.
+    # Spec Kit presents tasks.md as the shape of done, so a repository whose
+    # every box is ticked is the most likely place for completion to be read
+    # off execution state (INV-002). Driven end to end with Spec Kit BOUND as
+    # the architecture provider, because a scenario where nothing could read
+    # tasks.md would pass whatever the engine did. The control proves the
+    # scenario reaches the completion step: satisfy the real bar and it stops.
+    print("\nA fully ticked tasks.md is not completion (ADR-037 decision 4)\n")
+
+    def _ticked(satisfied):
+        with tempfile.TemporaryDirectory() as td:
+            r = Path(td) / "repo"
+            (r / ".repo-governor" / "acceptance").mkdir(parents=True)
+            (r / ".specify" / "memory").mkdir(parents=True)
+            (r / "specs" / "001-ticked").mkdir(parents=True)
+            subprocess.run(["git", "init", "-q", str(r)], capture_output=True)
+            subprocess.run(["git", "-C", str(r), "remote", "add", "origin",
+                            "https://github.com/acme/t.git"], capture_output=True)
+            (r / ".specify" / "memory" / "constitution.md").write_text(
+                "# Constitution\n\n## Library first\n\nEvery feature starts as a library.\n")
+            (r / "specs" / "001-ticked" / "spec.md").write_text("# Ticked\n")
+            (r / "specs" / "001-ticked" / "tasks.md").write_text(
+                "- [x] T001 write it\n- [x] T002 test it\n- [x] T003 ship it\n")
+            if satisfied:
+                (r / "deliverable.txt").write_text("x\n")
+            (r / "roadmap.json").write_text(json.dumps({"items": {
+                "K-1": {"title": "x", "status": "IN_PROGRESS", "authority": "AUTHORIZED",
+                        "admitted": True, "required_outcome": "x", "in_scope": [],
+                        "decision_history": []}}}))
+            (r / ".repo-governor" / "acceptance" / "K-1.json").write_text(json.dumps({
+                "authority_id": "K-1",
+                "criteria": [{"check": "file_exists", "target": "deliverable.txt"}]}))
+            (r / ".repo-governor.json").write_text(json.dumps({
+                "repo_governor": {"version": 1, "engine_min_version": "0.1.0"},
+                "repository": {"id": "acme/t"},
+                "condition": {"assessed": "L1", "profile": "GOVERNOR_LITE"},
+                "permissions": {"repository": {"read": True, "write": False},
+                                "roadmap_authority": {"read": True, "write": False},
+                                "architecture": {"read": True, "write": False},
+                                "acceptance_criteria": {"read": True, "write": False}},
+                "providers": {
+                    "repository": {"type": "git", "adapter": "adapters/git",
+                                   "contract_version": 1},
+                    "roadmap_authority": {"type": "file-roadmap",
+                                          "adapter": "adapters/file-roadmap",
+                                          "contract_version": 1,
+                                          "env": {"REPO_GOVERNOR_ROADMAP": "roadmap.json"}},
+                    "architecture": [{"type": "speckit", "adapter": "adapters/speckit",
+                                      "contract_version": 1}],
+                    "acceptance_criteria": {"type": "acceptance-file",
+                                            "adapter": "adapters/acceptance-file",
+                                            "contract_version": 1}}}))
+            env = dict(os.environ)
+            env["REPO_GOVERNOR_TARGET"] = str(r)
+            pr = subprocess.run([sys.executable, str(ROOT / "engine" / "completion.py"), "K-1"],
+                                capture_output=True, text=True, cwd=str(r), env=env, timeout=300)
+            try:
+                return json.loads(pr.stdout)
+            except Exception:
+                return {"stdout": pr.stdout[-300:], "stderr": pr.stderr[-300:]}
+
+    got = _ticked(False)
+    ctl = _ticked(True)
+    fails += check("tasks.md fully ticked with no satisfied bar is not STOP_COMPLETE",
+                   got.get("decision") == "CONTINUE",
+                   f"got {got.get('decision')!r} {got.get('unknowns') or got} -- completion "
+                   "was read off checkbox state (INV-002)")
+    fails += check("control: the same repository with its bar satisfied is STOP_COMPLETE",
+                   ctl.get("decision") == "STOP_COMPLETE",
+                   f"got {ctl.get('decision')!r} {ctl.get('unknowns') or ctl} -- the scenario "
+                   "never reached the completion step, so the check above proves nothing")
+
 
     print(f"\n{'ACCEPTANCE: CONFORMANT' if not fails else f'ACCEPTANCE: NON-CONFORMANT ({fails})'}")
     return 0 if not fails else 1

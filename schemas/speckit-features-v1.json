@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tosin2013/repo-governor/schemas/speckit-features-v1.json",
+  "title": "Repo Governor Spec Kit feature map, version 1",
+  "$comment": "One file per repository, at .repo-governor/speckit-features.json (ADR-037 decision 3). It declares which authority id a Spec Kit feature directory is governed by. Written by a human and committed; never derived from a directory name, a branch name or spec text (ADR-028). Read by engine/features.py, validated by engine/manifest.py --validate.",
+  "type": "object",
+  "required": [
+    "features"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$comment": {
+      "type": "string"
+    },
+    "features": {
+      "type": "object",
+      "$comment": "Key: the feature directory name under specs/, exactly as written (numbered or not; 23.6% of Spec Kit repositories do not number features). Value: the authority id the engine asks about, the same shape as an acceptance bar's authority_id.",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9._-]+$"
+      }
+    }
+  }
+}

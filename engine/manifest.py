@@ -351,6 +351,13 @@ def _artifact_classes(manifest, root, mp):
                 "completion bars are repo-local by ADR-017; an untracked bar "
                 "cannot be evaluated on any other checkout"))
 
+    fmap = root / ".repo-governor" / "speckit-features.json"
+    out.append(("the Spec Kit feature map", "ARTIFACT_UNTRACKED",
+                [fmap] if fmap.exists() else [],
+                "which authority governs each Spec Kit feature is declared here "
+                "(ADR-037 decision 3); untracked, every other checkout reads every "
+                "feature as unmapped"))
+
     # Only when a file-backed decision store is actually bound. A store nobody
     # binds is not a governance artifact, and demanding it would be inventing a
     # requirement the manifest never made (INV-013).
@@ -488,6 +495,22 @@ def check_floor(m):
              "to choose. Re-run engine/onboard.py to see the evidence.")]
 
 
+def check_feature_map():
+    """A Spec Kit feature map that exists and does not satisfy its schema blocks.
+
+    Absent is not a finding here: it is a configuration gap that
+    engine/features.py reports per feature, where the consequence is stated.
+    Invalid is, because every feature would read MAPPING_INVALID and nothing
+    else on this surface would say why (ADR-037 decision 3).
+    """
+    import features as _F  # noqa: PLC0415 -- features imports this module
+    p, _data, errs = _F.check(target())
+    if not p.exists() or not errs:
+        return []
+    return [("speckit_features", str(_F.REL), "FEATURE_MAP_INVALID",
+             "does not satisfy schemas/speckit-features-v1.json: " + "; ".join(errs[:3]))]
+
+
 def main(argv):
     if argv and argv[0] == "--validate":
         m, errs = load()
@@ -520,6 +543,7 @@ def main(argv):
         # onboarded correctly, and "did it reach the repository" is half of that.
         findings += check_tracked(m)
         findings += check_portability(m)
+        findings += check_feature_map()
         for role, adapter, kind, detail in findings:
             print(f"  [{kind}] {role} -> {adapter}: {detail}")
 
