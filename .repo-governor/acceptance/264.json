@@ -1,0 +1,59 @@
+{
+  "$comment": "Acceptance criteria for issue 264: write ADR-037, Proposed, deciding how a Spec Kit extension delivers governance at Spec Kit's steps while the engine still decides. C1-C2 pin that the ADR exists in the ledger's shape, with a Confirmation table (ADR-032 applies from 032 onward). C3-C7 pin the five decisions the issue names, one phrase-level check each. THE VACUITY THIS BAR IS BUILT AGAINST: a stub ADR with the right headings passes C1-C2; C3-C7 make each decision say its specific thing, and C5 in particular requires the ADR to state that Spec Kit hooks cannot block a step, the fact an ADR written from the extension docs alone would most likely omit. C8 pins the ADR-034 channel terms. C9 is the index and count discipline that conformance/skill.py already enforces. WHAT THIS BAR CANNOT CHECK: whether the decisions are right. That is substantive and is the maintainer's review; the ADR stays Proposed under this issue, and acceptance is a separate human act (section 68). NO covers BLOCK: the bar covers the issue's whole scope, which is writing the ADR. Implementing its decisions (issues 265-270) and deciding ADR-034 (a v0.9.0 release obligation in RATIFICATION-v0.8.0.md) were never in issue 264's scope; an earlier draft declared them as uncovered scope split to 265-270, which made this issue's completion wait on work it never owned.",
+  "authority_id": "264",
+  "criteria": [
+    {
+      "$comment": "C1 the ADR exists and is Proposed",
+      "check": "command_exit",
+      "target": "bash -c 'f=$(ls docs/adrs/037-*.md) && grep -q \"^\\*\\*Status\\*\\*: Proposed\" \"$f\"'"
+    },
+    {
+      "$comment": "C2 ledger shape, including the ADR-032 Confirmation table and acceptance conditions",
+      "check": "command_exit",
+      "target": "bash -c 'f=$(ls docs/adrs/037-*.md) && for h in \"## Context\" \"## Decision\" \"## Consequences\" \"## Confirmation\" \"## Acceptance conditions\"; do grep -q \"^$h\" \"$f\" || exit 1; done && grep -q \"| obligation | kind |\" \"$f\"'"
+    },
+    {
+      "$comment": "C3 decision 1: hook commands deliver and never decide; the engine decides",
+      "check": "command_exit",
+      "target": "bash -c 'grep -qi \"never decide\" docs/adrs/037-*.md && grep -q \"governance-hook.py\" docs/adrs/037-*.md'"
+    },
+    {
+      "$comment": "C4 decision 2: the hook set names before_implement, after_implement and after_taskstoissues as required",
+      "check": "command_exit",
+      "target": "bash -c 'f=$(ls docs/adrs/037-*.md); grep -q \"before_implement\" \"$f\" && grep -q \"after_implement\" \"$f\" && grep -q \"after_taskstoissues\" \"$f\" && grep -q \"optional: false\" \"$f\"'"
+    },
+    {
+      "$comment": "C5 decision 5, THE FACT MOST LIKELY OMITTED: Spec Kit hooks cannot block a step; enforcement is by instruction",
+      "check": "command_exit",
+      "target": "bash -c 'grep -qiE \"cannot (technically )?block\" docs/adrs/037-*.md'"
+    },
+    {
+      "$comment": "C6 decision 3: features map to issues by a declared file, and an unmapped feature is UNKNOWN, never guessed",
+      "check": "command_exit",
+      "target": "bash -c 'f=$(ls docs/adrs/037-*.md); grep -q \"speckit-features.json\" \"$f\" && grep -q \"UNKNOWN\" \"$f\" && grep -q \"ADR-028\" \"$f\"'"
+    },
+    {
+      "$comment": "C7 decision 4: tasks.md checkboxes are execution state, not completion",
+      "check": "command_exit",
+      "target": "bash -c 'grep -q \"tasks.md\" docs/adrs/037-*.md && grep -q \"INV-002\" docs/adrs/037-*.md'"
+    },
+    {
+      "$comment": "C8 the Spec Kit community catalog is placed under ADR-034's channel rules",
+      "check": "command_exit",
+      "target": "bash -c 'f=$(ls docs/adrs/037-*.md); grep -q \"034\" \"$f\" && grep -qi \"catalog\" \"$f\" && grep -q \"ENGINE_VERSION\" \"$f\"'"
+    },
+    {
+      "$comment": "C9 indexed in the ledger",
+      "check": "command_exit",
+      "target": "bash -c 'grep -q \"037-\" docs/adrs/README.md'"
+    },
+    {
+      "check": "command_exit",
+      "target": "python3 conformance/skill.py"
+    },
+    {
+      "check": "command_exit",
+      "target": "./tools/run-conformance.sh --hermetic"
+    }
+  ]
+}
